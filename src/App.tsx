@@ -12,8 +12,9 @@ import {
   CorporatePayrollAgreement,
   CompetitorId
 } from './game/types';
+import { restoreGameState } from './game/savedState';
 import { INITIAL_GAME_STATE } from './game/initialState';
-import { advanceGameMonth, formatHNL, evaluateClientDivisionUpgrade } from './game/economyEngine';
+import { advanceGameMonth, formatHNL, evaluateClientDivisionUpgrade, addPosMerchant, updatePosMerchant, addPayrollAgreement, updatePayrollAgreement, buyInterbankPortfolio, approveCreditByOfficer, approveCreditByExecutiveBoard, negotiateClientDebt } from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
 import { OverviewDashboard } from './components/OverviewDashboard';
@@ -43,15 +44,12 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Verificar que tenga las propiedades nuevas
-        if (parsed.secondarySecurities && parsed.advisorMonthlyLimitPerAdvisor) {
-          return parsed;
-        }
+        return restoreGameState(parsed);
       }
     } catch {
       // Ignorar error al parsear storage
     }
-    return INITIAL_GAME_STATE;
+    return structuredClone(INITIAL_GAME_STATE);
   });
 
   const [activeTab, setActiveTab] = useState<string>('overview');
@@ -93,7 +91,7 @@ export default function App() {
     if (window.confirm('¿Deseas reiniciar la simulación de Áureo Bank desde Enero 2026? Se restablecerán todos los valores iniciales y la base de datos de clientes.')) {
       sound.playClick();
       localStorage.removeItem(STORAGE_KEY);
-      setGameState(INITIAL_GAME_STATE);
+      setGameState(structuredClone(INITIAL_GAME_STATE));
       setActiveTab('overview');
       setShowSummaryModal(false);
     }
@@ -621,37 +619,13 @@ export default function App() {
 
   // Aprobar solicitud de crédito respetando límite de asesores
   const handleApproveCredit = (applicationId: string) => {
-    const app = gameState.pendingApplications.find(a => a.id === applicationId);
-    if (!app) return;
-
-    if (gameState.financials.cashAndBCHReserves < app.requestedAmount) {
-      sound.playRejectBuzzer();
-      alert('Liquidez en caja insuficiente para desembolsar este crédito.');
-      return;
-    }
-
     setGameState(prev => {
-      const remainingApps = prev.pendingApplications.filter(a => a.id !== applicationId);
-      const targetDiv = prev.divisions[app.division];
-
-      return {
-        ...prev,
-        pendingApplications: remainingApps,
-        advisorApprovalsUsedThisMonth: (prev.advisorApprovalsUsedThisMonth || 0) + 1,
-        divisions: {
-          ...prev.divisions,
-          [app.division]: {
-            ...targetDiv,
-            totalLoans: targetDiv.totalLoans + app.requestedAmount,
-            clientCount: targetDiv.clientCount + 1
-          }
-        },
-        financials: {
-          ...prev.financials,
-          cashAndBCHReserves: prev.financials.cashAndBCHReserves - app.requestedAmount,
-          loanPortfolioCurrent: prev.financials.loanPortfolioCurrent + app.requestedAmount
-        }
-      };
+      const app = prev.pendingApplications.find(a => a.id === applicationId);
+      if (!app) return prev;
+      const result = app.requestedAmount > 20000000
+        ? approveCreditByExecutiveBoard(prev, applicationId)
+        : approveCreditByOfficer(prev, applicationId);
+      return result.updatedState;
     });
   };
 
@@ -815,60 +789,17 @@ export default function App() {
 
   // Guardar modificaciones o nuevo comercio POS
   const handleSavePosMerchant = (merchant: PosMerchant, isNew: boolean) => {
-    sound.playApprovalStamp();
-    setGameState(prev => {
-      let updatedMerchants = [...prev.posMerchants];
-      if (isNew) {
-        updatedMerchants = [merchant, ...updatedMerchants];
-      } else {
-        updatedMerchants = updatedMerchants.map(m => m.id === merchant.id ? merchant : m);
-      }
-      return {
-        ...prev,
-        posMerchants: updatedMerchants
-      };
-    });
+    setGameState(prev => isNew ? addPosMerchant(prev, merchant) : updatePosMerchant(prev, merchant));
   };
 
   // Guardar modificaciones o nuevo convenio de planilla con cuenta obligatoria
   const handleSavePayrollAgreement = (agreement: CorporatePayrollAgreement, isNew: boolean) => {
-    sound.playApprovalStamp();
-    setGameState(prev => {
-      let updatedAgreements = [...prev.payrollAgreements];
-      if (isNew) {
-        updatedAgreements = [agreement, ...updatedAgreements];
-      } else {
-        updatedAgreements = updatedAgreements.map(a => a.id === agreement.id ? agreement : a);
-      }
-      return {
-        ...prev,
-        payrollAgreements: updatedAgreements
-      };
-    });
+    setGameState(prev => isNew ? addPayrollAgreement(prev, agreement) : updatePayrollAgreement(prev, agreement));
   };
 
   // M&A Interbancario: Compra de cartera
   const handleBuyInterbankOffer = (offerId: string) => {
-    sound.playCoinClink();
-    setGameState(prev => {
-      const offer = prev.interbankOffers?.find(o => o.id === offerId);
-      if (!offer || prev.financials.cashAndBCHReserves < offer.offerPriceHNL) {
-        alert('Fondos insuficientes en reservas de caja para adquirir esta cartera.');
-        return prev;
-      }
-      const newOffers = prev.interbankOffers?.map(o => o.id === offerId ? { ...o, status: 'comprado' as const } : o);
-      const isAsset = offer.portfolioType === 'activos_creditos';
-      return {
-        ...prev,
-        interbankOffers: newOffers,
-        financials: {
-          ...prev.financials,
-          cashAndBCHReserves: prev.financials.cashAndBCHReserves - offer.offerPriceHNL,
-          loanPortfolioCurrent: isAsset ? prev.financials.loanPortfolioCurrent + offer.faceValueHNL : prev.financials.loanPortfolioCurrent,
-          depositsPublicTotal: !isAsset ? prev.financials.depositsPublicTotal + offer.faceValueHNL : prev.financials.depositsPublicTotal
-        }
-      };
-    });
+    setGameState(prev => buyInterbankPortfolio(prev, offerId).updatedState);
   };
 
   // Cambiar estrategia de mercadeo
@@ -945,47 +876,7 @@ export default function App() {
   };
 
   const handleNegotiateDebtWorkout = (clientId: string, type: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago') => {
-    sound.playApprovalStamp();
-    setGameState(prev => {
-      const updatedClients = prev.clients.map(c => {
-        if (c.id === clientId) {
-          if (type === 'reestructurar_quitas') {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanBalanceHNL: Math.round(c.loanBalanceHNL * 0.85),
-              notes: 'Reestructurado con quita del 15% de intereses moratorios.'
-            };
-          } else if (type === 'ampliar_plazo') {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanTermMonths: 36,
-              loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.6),
-              notes: 'Plazo extendido a 36 meses reduciendo cuota al 60%.'
-            };
-          } else {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanBalanceHNL: 0,
-              notes: 'Liquidado mediante dación en pago de garantía hipotecaria/prendaria.'
-            };
-          }
-        }
-        return c;
-      });
-      return {
-        ...prev,
-        clients: updatedClients
-      };
-    });
+    setGameState(prev => negotiateClientDebt(prev, clientId, type).updatedState);
   };
 
   return (
@@ -1132,7 +1023,7 @@ export default function App() {
       {/* Modal de Expediente 360° y Robo/Captación de Cartera */}
       {isClient360ModalOpen && selectedClientFor360 && (
         <Client360Modal
-          client={selectedClientFor360}
+          client={gameState.clients.find(c => c.id === selectedClientFor360.id) || selectedClientFor360}
           isOpen={true}
           onClose={() => setIsClient360ModalOpen(false)}
           onBuyoutLoan={handleBuyoutRivalLoan}

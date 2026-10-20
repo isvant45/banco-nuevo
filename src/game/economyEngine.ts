@@ -764,14 +764,14 @@ export function advanceGameMonth(state: GameState): GameState {
       targetTab: 'overview',
       isRead: false
     }] : []),
-    ...(newApplications.some(a => a.requestedAmount >= 21000000) ? [{
+    ...(newApplications.some(a => a.requestedAmount > 20000000) ? [{
       id: `alert-corp-credit-${nextMonth}`,
       severity: 'informativa' as const,
       category: 'credito' as const,
       title: 'Crédito Mayor a L. 20M en Bandeja Ejecutiva',
       message: 'Una empresa corporativa ha solicitado financiamiento superior a 20 millones. Requiere dictamen del Comité y Presidencia.',
       timestampMonth: nextMonth,
-      targetTab: 'credit',
+      targetTab: 'origination',
       isRead: false
     }] : []),
     {
@@ -781,7 +781,7 @@ export function advanceGameMonth(state: GameState): GameState {
       title: `Cartera en Mora CNBS: ${formatHNL(pastDuePortfolio)}`,
       message: `El índice de morosidad se ubica en ${newNPL}%. Puedes negociar quitas con deudores o vender carteras a competidores.`,
       timestampMonth: nextMonth,
-      targetTab: 'risk',
+      targetTab: 'credit_risk',
       isRead: false
     },
     ...(state.dynamicAlerts || []).slice(0, 4)
@@ -971,7 +971,7 @@ export function generateMonthlyApplications(month: number): CreditApplication[] 
       collateral = prod.includes('Vivienda') ? 'Hipoteca Inmobiliaria' : prod.includes('Planilla') ? 'Retención Salarial' : 'Garantía Solidaria';
     }
 
-    const isOverLimit = amount >= 21000000;
+    const isOverLimit = amount > 20000000;
     const isOfficerFavorable = score >= 650 && dti <= 45 && cnbsCat === 'I - Normal';
 
     const officerRecommendation = isOfficerFavorable 
@@ -1196,13 +1196,22 @@ export function buyInterbankPortfolio(
     successMsg = `Adquisición de pasivos exitosa: Se asumió la cartera de depósitos "${offer.name}" de ${offer.sellerBankName}. Áureo Bank recibe ${formatHNL(offer.faceValueHNL)} en efectivo para sus reservas.`;
   }
 
+  const updatedDivisions = { ...state.divisions };
+  updatedDivisions.corporativa = {
+    ...updatedDivisions.corporativa,
+    clientCount: updatedDivisions.corporativa.clientCount + offer.clientCount,
+    totalLoans: updatedDivisions.corporativa.totalLoans + (offer.portfolioType === 'activos_creditos' ? offer.faceValueHNL : 0),
+    totalDeposits: updatedDivisions.corporativa.totalDeposits + (offer.portfolioType === 'activos_creditos' ? 0 : offer.faceValueHNL),
+  };
+
   const updatedOffers = state.interbankOffers.map(o => o.id === offerId ? { ...o, status: 'comprado' as const } : o);
 
   return {
     updatedState: {
       ...state,
       financials: updatedFinancials,
-      interbankOffers: updatedOffers
+      interbankOffers: updatedOffers,
+      divisions: updatedDivisions
     },
     successMessage: successMsg
   };
@@ -1216,6 +1225,7 @@ export function updatePosMerchant(
   updatedMerchant: PosMerchant
 ): GameState {
   const old = state.posMerchants.find(m => m.id === updatedMerchant.id);
+  if (!old) return state;
   const diffBalance = updatedMerchant.bankAccountBalanceHNL - (old?.bankAccountBalanceHNL || 0);
 
   const updatedList = state.posMerchants.map(m => m.id === updatedMerchant.id ? updatedMerchant : m);
@@ -1246,6 +1256,7 @@ export function addPosMerchant(
   state: GameState,
   newMerchant: PosMerchant
 ): GameState {
+  if (state.posMerchants.some(m => m.id === newMerchant.id)) return state;
   const updatedList = [newMerchant, ...state.posMerchants];
   const updatedDivisions = { ...state.divisions };
   if (updatedDivisions.pyme) {
@@ -1277,6 +1288,7 @@ export function updatePayrollAgreement(
   updatedAgreement: CorporatePayrollAgreement
 ): GameState {
   const old = state.payrollAgreements.find(p => p.id === updatedAgreement.id);
+  if (!old) return state;
   const diffBalance = updatedAgreement.bankAccountBalanceHNL - (old?.bankAccountBalanceHNL || 0);
 
   const updatedList = state.payrollAgreements.map(p => p.id === updatedAgreement.id ? updatedAgreement : p);
@@ -1308,6 +1320,7 @@ export function addPayrollAgreement(
   state: GameState,
   newAgreement: CorporatePayrollAgreement
 ): GameState {
+  if (state.payrollAgreements.some(p => p.id === newAgreement.id)) return state;
   const updatedList = [newAgreement, ...state.payrollAgreements];
   const divId = newAgreement.linkedDivision || 'corporativa';
   const updatedDivisions = { ...state.divisions };
@@ -1335,12 +1348,27 @@ export function addPayrollAgreement(
 /**
  * Aprueba una solicitud de crédito por el Oficial de Crédito (Autonomía <= L. 20M)
  */
+function creditApprovalError(state: GameState, app: CreditApplication): string | null {
+  if (!Number.isFinite(app.requestedAmount) || app.requestedAmount <= 0 || app.termMonths <= 0 || !Number.isFinite(app.proposedRate) || app.proposedRate < 0) return 'Condiciones de crédito inválidas';
+  if (state.financials.cashAndBCHReserves < app.requestedAmount) return 'Liquidez insuficiente para desembolsar el crédito';
+  const capacity = (state.staff.find(s => s.id === 'oficiales_credito')?.count ?? 0) * state.advisorMonthlyLimitPerAdvisor;
+  if ((state.advisorApprovalsUsedThisMonth || 0) >= capacity) return 'Capacidad mensual de aprobación agotada';
+  return null;
+}
+
+function monthlyPayment(amount: number, annualRate: number, months: number): number {
+  const rate = annualRate / 1200;
+  return Math.round(rate === 0 ? amount / months : amount * rate / (1 - Math.pow(1 + rate, -months)));
+}
+
 export function approveCreditByOfficer(
   state: GameState,
   appId: string
 ): { updatedState: GameState; successMessage: string } {
   const app = state.pendingApplications.find(a => a.id === appId);
   if (!app) return { updatedState: state, successMessage: 'Solicitud no encontrada' };
+  const error = creditApprovalError(state, app);
+  if (error) return { updatedState: state, successMessage: error };
 
   if (app.requestedAmount > 20000000) {
     return { updatedState: state, successMessage: 'Esta solicitud excede la autonomía del Oficial de Crédito (L. 20M). Requiere aprobación del Comité Ejecutivo y Presidencia.' };
@@ -1357,7 +1385,7 @@ export function approveCreditByOfficer(
   }
 
   const newClient: IndividualClient = {
-    id: `CLI-APR-${Date.now().toString().slice(-4)}`,
+    id: `CLI-APR-${app.id}`,
     cif: `CIF-0501-2026-${Math.floor(10000 + Math.random() * 89999)}`,
     name: app.applicantName,
     division: app.division,
@@ -1365,7 +1393,7 @@ export function approveCreditByOfficer(
     notes: `Crédito de ${formatHNL(app.requestedAmount)} aprobado por Oficial de Crédito bajo política de autonomía automática.`,
     joinedMonth: state.gameMonth,
     accountType: 'Cuenta de Ahorro Rendimiento',
-    accountBalanceHNL: Math.round(app.requestedAmount * 0.15),
+    accountBalanceHNL: 0,
     hasCreditCard: true,
     creditCardBrand: 'Visa Clásica',
     creditCardLimitHNL: Math.round(app.monthlyIncome * 1.5),
@@ -1374,7 +1402,7 @@ export function approveCreditByOfficer(
     loanType: app.productType,
     loanPrincipalHNL: app.requestedAmount,
     loanBalanceHNL: app.requestedAmount,
-    loanMonthlyPaymentHNL: Math.round((app.requestedAmount * (app.proposedRate / 100 / 12)) / (1 - Math.pow(1 + (app.proposedRate / 100 / 12), -app.termMonths))),
+    loanMonthlyPaymentHNL: monthlyPayment(app.requestedAmount, app.proposedRate, app.termMonths),
     loanInterestRateAnnual: app.proposedRate,
     loanMonthsRemaining: app.termMonths,
     guaranteedPayment: true,
@@ -1388,7 +1416,7 @@ export function approveCreditByOfficer(
   const updatedFinancials = {
     ...state.financials,
     loanPortfolioCurrent: newLoans,
-    cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves - app.requestedAmount * 0.1)
+    cashAndBCHReserves: state.financials.cashAndBCHReserves - app.requestedAmount
   };
 
   const remainingApps = state.pendingApplications.filter(a => a.id !== appId);
@@ -1399,6 +1427,7 @@ export function approveCreditByOfficer(
       clients: [newClient, ...state.clients],
       financials: updatedFinancials,
       divisions: updatedDivisions,
+      advisorApprovalsUsedThisMonth: (state.advisorApprovalsUsedThisMonth || 0) + 1,
       pendingApplications: remainingApps
     },
     successMessage: `¡Crédito de ${formatHNL(app.requestedAmount)} aprobado con éxito por el Oficial de Crédito para ${app.applicantName}!`
@@ -1414,6 +1443,8 @@ export function approveCreditByExecutiveBoard(
 ): { updatedState: GameState; successMessage: string } {
   const app = state.pendingApplications.find(a => a.id === appId);
   if (!app) return { updatedState: state, successMessage: 'Solicitud no encontrada' };
+  const error = creditApprovalError(state, app);
+  if (error) return { updatedState: state, successMessage: error };
 
   const newLoans = state.financials.loanPortfolioCurrent + app.requestedAmount;
   const updatedDivisions = { ...state.divisions };
@@ -1426,7 +1457,7 @@ export function approveCreditByExecutiveBoard(
   }
 
   const newClient: IndividualClient = {
-    id: `CLI-CORP-${Date.now().toString().slice(-4)}`,
+    id: `CLI-CORP-${app.id}`,
     cif: `CIF-CORP-2026-${Math.floor(1000 + Math.random() * 8999)}`,
     name: app.applicantName,
     division: app.division,
@@ -1434,7 +1465,7 @@ export function approveCreditByExecutiveBoard(
     notes: `Mega-crédito corporativo de ${formatHNL(app.requestedAmount)} ratificado en pleno por el Presidente Ejecutivo y Comité de Crédito.`,
     joinedMonth: state.gameMonth,
     accountType: 'Cuenta Corriente / Cheques',
-    accountBalanceHNL: Math.round(app.requestedAmount * 0.20),
+    accountBalanceHNL: 0,
     hasCreditCard: true,
     creditCardBrand: 'Mastercard Corporativa',
     creditCardLimitHNL: 1500000,
@@ -1443,7 +1474,7 @@ export function approveCreditByExecutiveBoard(
     loanType: app.productType,
     loanPrincipalHNL: app.requestedAmount,
     loanBalanceHNL: app.requestedAmount,
-    loanMonthlyPaymentHNL: Math.round((app.requestedAmount * (app.proposedRate / 100 / 12)) / (1 - Math.pow(1 + (app.proposedRate / 100 / 12), -app.termMonths))),
+    loanMonthlyPaymentHNL: monthlyPayment(app.requestedAmount, app.proposedRate, app.termMonths),
     loanInterestRateAnnual: app.proposedRate,
     loanMonthsRemaining: app.termMonths,
     guaranteedPayment: true,
@@ -1456,7 +1487,8 @@ export function approveCreditByExecutiveBoard(
 
   const updatedFinancials = {
     ...state.financials,
-    loanPortfolioCurrent: newLoans
+    loanPortfolioCurrent: newLoans,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves - app.requestedAmount
   };
 
   const remainingApps = state.pendingApplications.filter(a => a.id !== appId);
@@ -1467,6 +1499,7 @@ export function approveCreditByExecutiveBoard(
       clients: [newClient, ...state.clients],
       financials: updatedFinancials,
       divisions: updatedDivisions,
+      advisorApprovalsUsedThisMonth: (state.advisorApprovalsUsedThisMonth || 0) + 1,
       pendingApplications: remainingApps
     },
     successMessage: `¡Resolución de Presidencia ratificada! Mega-crédito de ${formatHNL(app.requestedAmount)} otorgado a ${app.applicantName} con garantías registradas.`
@@ -1498,12 +1531,16 @@ export function autoApproveAllOfficerEligibleCredits(state: GameState): { update
   const eligible = state.pendingApplications.filter(a => a.requestedAmount <= 20000000 && a.cnbsCategory === 'I - Normal' && a.calculatedDTI <= 45);
   let curState = state;
   let totalApproved = 0;
+  let count = 0;
 
   eligible.forEach(app => {
     const res = approveCreditByOfficer(curState, app.id);
+    if (res.updatedState !== curState) {
+      count++;
+      totalApproved += app.requestedAmount;
+    }
     curState = res.updatedState;
-    totalApproved += app.requestedAmount;
   });
 
-  return { updatedState: curState, count: eligible.length, totalApproved };
+  return { updatedState: curState, count, totalApproved };
 }

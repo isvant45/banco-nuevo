@@ -30,7 +30,18 @@ jobs:
           node-version: "22"
 
       - name: Instalar dependencias
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Verificar tipos
+        run: npm run lint
+
+      - name: Pruebas de regresion
+        run: npm run test --if-present
 
       - name: Compilar para GitHub Pages
         run: npm run build -- --base=/banco-nuevo/

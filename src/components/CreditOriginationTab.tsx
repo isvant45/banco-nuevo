@@ -46,7 +46,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
   const filteredApps = state.pendingApplications.filter(app => {
     if (filterDivision === 'all') return true;
     if (filterDivision === 'under20m') return app.requestedAmount <= 20000000;
-    if (filterDivision === 'over21m') return app.requestedAmount >= 21000000;
+    if (filterDivision === 'over21m') return app.requestedAmount > 20000000;
     return app.division === filterDivision;
   });
 
@@ -76,10 +76,10 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
       let count = 0;
       eligible.forEach(app => {
         const isApprovable = app.equifaxScore >= 600 && app.calculatedDTI <= 45 && (app.cnbsCategory === 'I - Normal' || app.cnbsCategory === 'II - Especial');
-        if (isApprovable) {
+        if (isApprovable && count < remainingApprovals) {
           onApproveApplication(app.id);
           count++;
-        } else {
+        } else if (!isApprovable) {
           onRejectApplication(app.id);
         }
       });
@@ -88,7 +88,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
   };
 
   const appsUnder20MCount = state.pendingApplications.filter(a => a.requestedAmount <= 20000000).length;
-  const appsOver21MCount = state.pendingApplications.filter(a => a.requestedAmount >= 21000000).length;
+  const appsOver21MCount = state.pendingApplications.filter(a => a.requestedAmount > 20000000).length;
 
   return (
     <div className="space-y-6">
@@ -103,7 +103,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Los <strong>Oficiales de Crédito</strong> evalúan y aprueban solicitudes hasta <strong>L. 20,000,000</strong> de forma automática. Los montos de <strong>L. 21,000,000 en adelante</strong> requieren dictamen técnico del oficial y resolución ejecutiva de la Presidencia.
+              Los <strong>Oficiales de Crédito</strong> evalúan y aprueban solicitudes hasta <strong>L. 20,000,000</strong> de forma automática. Los montos de <strong>más de L. 20,000,000</strong> requieren dictamen técnico del oficial y resolución ejecutiva de la Presidencia.
             </p>
           </div>
 
@@ -123,7 +123,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
             </button>
 
             <span className="bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg font-bold">
-              {appsOver21MCount} casos Comité (L. 21M+)
+              {appsOver21MCount} casos Comité (Más de L. 20M)
             </span>
           </div>
         </div>
@@ -183,7 +183,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
           {[
             { id: 'all', label: `Todos (${state.pendingApplications.length})` },
             { id: 'under20m', label: `Hasta L. 20M - Oficial (${appsUnder20MCount})` },
-            { id: 'over21m', label: `L. 21M+ - Presidencia (${appsOver21MCount})` },
+            { id: 'over21m', label: `Más de L. 20M - Presidencia (${appsOver21MCount})` },
             { id: 'personas', label: 'Personas' },
             { id: 'premier', label: 'Premier' },
             { id: 'pyme', label: 'PYME' },
@@ -222,7 +222,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
             const isHighRisk = app.riskVerdict === 'Alto Riesgo';
             const isModerateRisk = app.riskVerdict === 'Riesgo Moderado';
             const isLowRisk = app.riskVerdict === 'Bajo Riesgo';
-            const isMegaLoan = app.requestedAmount >= 21000000;
+            const isMegaLoan = app.requestedAmount > 20000000;
 
             const officerNoteText = app.officerNote || (isMegaLoan 
               ? 'Dictamen del Oficial de Crédito Senior: Solicitud corporativa de gran envergadura. Se verificaron estados financieros auditados, cobertura de garantía prendaria/hipotecaria del 130% y flujo libre de caja positivo para el servicio de la deuda.'
@@ -244,7 +244,7 @@ export const CreditOriginationTab: React.FC<CreditOriginationTabProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     {isMegaLoan ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> REQUIERE RESOLUCIÓN DE PRESIDENCIA (L. 21M+)
+                        <AlertCircle className="w-3 h-3" /> REQUIERE RESOLUCIÓN DE PRESIDENCIA (Más de L. 20M)
                       </span>
                     ) : (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 uppercase tracking-wider">

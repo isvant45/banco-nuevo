@@ -1752,7 +1752,7 @@ export const INITIAL_DYNAMIC_ALERTS: DynamicAlert[] = [
     title: 'Cartera en Atraso CNBS: L. 55,294,191.00',
     message: 'Se identifican créditos en mora distribuidos desde Categoría I hasta Categoría V (Pérdida). Puedes reestructurarlos con los clientes o venderlos en el mercado interbancario.',
     timestampMonth: 1,
-    targetTab: 'risk',
+    targetTab: 'credit_risk',
     isRead: false
   },
   {
@@ -1762,7 +1762,7 @@ export const INITIAL_DYNAMIC_ALERTS: DynamicAlert[] = [
     title: 'Solicitudes Mayores a L. 20M en Espera de Presidencia',
     message: 'Agroindustria Palma de la Costa (L. 25M) y Constructora Morazán (L. 38M) cuentan con nota favorable del oficial y requieren tu ratificación en Créditos.',
     timestampMonth: 1,
-    targetTab: 'credit',
+    targetTab: 'origination',
     isRead: false
   },
   {
