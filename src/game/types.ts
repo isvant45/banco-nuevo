@@ -119,6 +119,8 @@ export interface PosMerchant {
   hasCommercialLoan: boolean;
   commercialLoanAmount: number;
   hasBusinessCard: boolean;
+  accountNumber?: string;
+  division?: BankingDivisionId;
 }
 
 export interface BankDivisionConfig {
@@ -161,6 +163,12 @@ export interface CreditApplication {
   location: string;
   riskVerdict: 'Bajo Riesgo' | 'Riesgo Moderado' | 'Alto Riesgo';
   reasonText: string;
+  // Autonomía del Oficial de Crédito vs Comité Directivo (L. 21M+)
+  officerNote?: string; // Análisis y dictamen técnico del oficial
+  officerRecommendation?: 'Favorable (Aprobación Sugerida)' | 'Desfavorable (Riesgo Excesivo)' | 'Condicionado a Aval';
+  officerCanAutoApprove?: boolean; // True si monto <= 20,000,000 HNL
+  requiresExecutiveBoardApproval?: boolean; // True si monto >= 21,000,000 HNL
+  officerDecisionStatus?: 'Pendiente' | 'Aprobado Automático Oficial' | 'Rechazado Oficial' | 'Enviado a Comité';
 }
 
 export interface ClearingHouseStats {
@@ -186,17 +194,21 @@ export interface CorporatePayrollAgreement {
   monthsWithBank: number;
   isAutoRenewed: boolean;
   loyaltyBonusPct: number;
+  // Cuenta obligatoria aperturada en Áureo Bank
+  linkedDivision: BankingDivisionId; // e.g. 'corporativa' o 'pyme'
+  bankAccountBalanceHNL: number; // Saldo retenido en la cuenta de la empresa
+  accountNumber: string; // Número de cuenta institucional
 }
 
 export interface SwiftTransaction {
   id: string;
   direction: 'Saliente' | 'Entrante';
-  counterpartyBank: 'JPMorgan Chase (Nueva York)' | 'Citibank (Nueva York)' | 'UBS (Zúrich)' | 'Credit Suisse (Ginebra)' | 'ICBC (Shanghái)' | 'Bank of China (Pekín)';
-  counterpartyCountry: 'Estados Unidos' | 'Suiza' | 'China';
-  currency: 'USD' | 'EUR' | 'CHF';
+  counterpartyBank: string; // Banco corresponsal global
+  counterpartyCountry: string;
+  currency: 'USD' | 'EUR' | 'CHF' | 'GBP';
   amountFX: number;
   clientName: string;
-  purpose: 'Pago de Importación de Maquinaria' | 'Exportación Agrícola (Café)' | 'Inversión Financiera' | 'Materia Prima Textil';
+  purpose: string;
   feeUSD: number;
   settlementStatus: 'Liquidado' | 'En Validación AML' | 'Enviado';
   complianceCheck: 'Aprobado OFAC/BCH' | 'Revisión Manual';
@@ -234,6 +246,8 @@ export interface SecondaryMarketSecurity {
   totalInvestedHNL: number; // Capital invertido
   riskRating: 'AAA' | 'AA+' | 'AA' | 'A+' | 'BBB';
   description: string;
+  priceHistory?: number[];
+  priceChangeMonthPct?: number;
 }
 
 export interface StaffRole {
@@ -348,6 +362,111 @@ export interface GameEventNotification {
   impactSummary: string;
 }
 
+export interface InterbankPortfolioOffer {
+  id: string;
+  sellerBankId: CompetitorId | 'aureo';
+  sellerBankName: string;
+  targetBankId?: CompetitorId | 'aureo';
+  portfolioType: 'activos_creditos' | 'pasivos_depositos';
+  name: string;
+  faceValueHNL: number;
+  offerPriceHNL: number;
+  discountOrPremiumPct: number;
+  averageRatePct: number;
+  riskRating: 'Bajo (A+)' | 'Moderado (BBB)' | 'Alto (B)' | 'Distressed (Mora Recaudable)';
+  clientCount: number;
+  termMonthsAvg: number;
+  description: string;
+  status: 'disponible' | 'comprado' | 'vendido';
+}
+
+export interface DynamicAlert {
+  id: string;
+  severity: 'critica' | 'advertencia' | 'informativa';
+  category: 'liquidez' | 'credito' | 'regulatorio_cnbs' | 'mercado_bursatil' | 'operaciones' | 'swift';
+  title: string;
+  message: string;
+  timestampMonth: number;
+  targetTab?: string;
+  isRead?: boolean;
+}
+
+export interface ExpertOpinion {
+  id: string;
+  author: string;
+  role: string;
+  organization: string;
+  headline: string;
+  summary: string;
+  sentiment: 'Favorable / Crecimiento' | 'Alerta de Riesgo' | 'Oportunidad Estratégica' | 'Neutral Cauteloso';
+  recommendedAction: string;
+  month: number;
+}
+
+export interface TenInnovationsState {
+  // 1. Mesa de Divisas (FX Trading & Subastas BCH)
+  fxDesk: {
+    openPositionUSD: number;
+    bchAuctionBiddedUSD: number;
+    bchAuctionWonUSD: number;
+    fxSpreadIncomeMonthly: number;
+  };
+  // 2. Auditorías Sorpresa CNBS
+  cnbsAudits: {
+    lastAuditResult: string;
+    complianceRating: number; // 0-100
+    requiredProvisionCorrection: number;
+    isAuditedThisPeriod: boolean;
+  };
+  // 3. Mesa de Dinero Interbancario (Call / Overnight)
+  interbankCallMoney: {
+    lentAmountHNL: number;
+    borrowedAmountHNL: number;
+    callRatePct: number;
+  };
+  // 4. Calificación de Riesgo Internacional (Fitch / Moody's)
+  internationalRating: {
+    agency: 'Fitch Ratings' | "Moody's" | 'Standard & Poor\'s';
+    currentRating: string;
+    outlook: 'Estable' | 'Positiva' | 'Negativa';
+    fundingCostDiscountPct: number;
+  };
+  // 5. Centro de Negociación y Condonación de Deudas
+  debtWorkouts: {
+    totalRestructuredAmountHNL: number;
+    totalSoldToRivalsAmountHNL: number;
+    recoveredCapitalHNL: number;
+  };
+  // 6. Adopción de Banca Digital & App Móvil
+  digitalBanking: {
+    appUsersCount: number;
+    mobileAdoptionPct: number;
+    costSavingsMonthlyHNL: number;
+  };
+  // 7. Alianzas de Remesas Familiares
+  remittanceAlliances: {
+    directDepositBonusPct: number;
+    monthlyCapturedRemittanceDepositsHNL: number;
+  };
+  // 8. Pruebas de Estrés (Stress Testing CNBS)
+  stressTesting: {
+    lastScenarioRun: string;
+    simulatedCAR: number;
+    simulatedLCR: number;
+    capitalGapHNL: number;
+  };
+  // 9. Mega-Créditos Sindicados de Infraestructura
+  syndicatedMegaLoans: {
+    participatedProjectsCount: number;
+    activeSyndicatedExposureHNL: number;
+  };
+  // 10. Subastas M&A de Bancos en Liquidación
+  distressedAssetAuctions: {
+    activeAuctionsCount: number;
+    acquiredBranchesCount: number;
+  };
+}
+
 export interface GameState {
   bankName: string;
   gameMonth: number; // 1 = Enero 2026, 2 = Febrero 2026...
@@ -375,4 +494,9 @@ export interface GameState {
   // Asesores de crédito y capacidad de aprobación mensual (12 a 50 transacciones por asesor)
   advisorMonthlyLimitPerAdvisor: number; // Default 25
   advisorApprovalsUsedThisMonth: number;
+  // Nuevas propiedades institucionales
+  interbankOffers: InterbankPortfolioOffer[];
+  dynamicAlerts: DynamicAlert[];
+  expertOpinions: ExpertOpinion[];
+  innovations: TenInnovationsState;
 }

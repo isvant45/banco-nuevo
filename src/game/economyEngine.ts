@@ -9,7 +9,13 @@ import {
   CorporatePayrollAgreement,
   PosMerchant,
   PensionFund,
-  SecondaryMarketSecurity
+  SecondaryMarketSecurity,
+  InterbankPortfolioOffer,
+  DynamicAlert,
+  ExpertOpinion,
+  TenInnovationsState,
+  CompetitorId,
+  SwiftTransaction
 } from './types';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -93,58 +99,63 @@ export function evaluateClientDivisionUpgrade(
  * Calcula la matriz de riesgo crediticio según normativa de la CNBS de Honduras.
  */
 export function calculateCreditRiskMatrix(state: GameState): CreditRiskCategoryBreakdown[] {
-  const totalLoans = state.financials.loanPortfolioCurrent + state.financials.loanPortfolioPastDue;
-  
   // Clientes individuales en mora del estado
-  const overdueClients = state.clients.filter(c => c.pastDueDays > 0);
-  const countOverdue = overdueClients.length;
+  const activeClients = state.clients.filter(c => !c.isSoldToRival);
+  
+  const cat1Clients = activeClients.filter(c => c.cnbsCategory === 'I - Normal');
+  const cat2Clients = activeClients.filter(c => c.cnbsCategory === 'II - Especial');
+  const cat3Clients = activeClients.filter(c => c.cnbsCategory === 'III - Subnormal');
+  const cat4Clients = activeClients.filter(c => c.cnbsCategory === 'IV - Dudoso Recaudo');
+  const cat5Clients = activeClients.filter(c => c.cnbsCategory === 'V - Pérdida');
 
-  const cat1Balance = Math.round(totalLoans * 0.925);
-  const cat2Balance = Math.round(totalLoans * 0.045);
-  const cat3Balance = Math.round(totalLoans * 0.018);
-  const cat4Balance = Math.round(totalLoans * 0.008);
-  const cat5Balance = Math.round(totalLoans * 0.004);
+  const cat1Overdue = cat1Clients.reduce((acc, c) => acc + (c.pastDueAmountHNL || 0), 0) || 12450000;
+  const cat2Overdue = cat2Clients.reduce((acc, c) => acc + (c.pastDueAmountHNL || 0), 0) || 14800000;
+  const cat3Overdue = cat3Clients.reduce((acc, c) => acc + (c.pastDueAmountHNL || 0), 0) || 11250000;
+  const cat4Overdue = cat4Clients.reduce((acc, c) => acc + (c.pastDueAmountHNL || 0), 0) || 9450000;
+  const cat5Overdue = cat5Clients.reduce((acc, c) => acc + (c.pastDueAmountHNL || 0), 0) || 7344191;
+
+  const currentHealthy = Math.max(0, (state.financials.loanPortfolioCurrent || 1995000000) - cat1Overdue);
 
   return [
     {
       category: 'I - Normal',
       daysOverdue: '0 a 30 días de atraso',
       provisionPct: 1.0,
-      balanceHNL: cat1Balance,
-      clientCount: Math.round(state.clients.length * 0.75) + 18500,
-      provisionRequiredHNL: Math.round(cat1Balance * 0.01)
+      balanceHNL: currentHealthy + cat1Overdue,
+      clientCount: cat1Clients.length + 18450,
+      provisionRequiredHNL: Math.round((currentHealthy + cat1Overdue) * 0.01)
     },
     {
       category: 'II - Especial',
       daysOverdue: '31 a 60 días de atraso',
       provisionPct: 5.0,
-      balanceHNL: cat2Balance,
-      clientCount: 1420 + (countOverdue > 0 ? 1 : 0),
-      provisionRequiredHNL: Math.round(cat2Balance * 0.05)
+      balanceHNL: cat2Overdue,
+      clientCount: cat2Clients.length + 1420,
+      provisionRequiredHNL: Math.round(cat2Overdue * 0.05)
     },
     {
       category: 'III - Subnormal',
       daysOverdue: '61 a 90 días de atraso',
       provisionPct: 20.0,
-      balanceHNL: cat3Balance,
-      clientCount: 450 + (countOverdue > 1 ? 1 : 0),
-      provisionRequiredHNL: Math.round(cat3Balance * 0.20)
+      balanceHNL: cat3Overdue,
+      clientCount: cat3Clients.length + 450,
+      provisionRequiredHNL: Math.round(cat3Overdue * 0.20)
     },
     {
       category: 'IV - Dudoso Recaudo',
       daysOverdue: '91 a 180 días de atraso',
       provisionPct: 50.0,
-      balanceHNL: cat4Balance,
-      clientCount: 180 + (countOverdue > 2 ? 1 : 0),
-      provisionRequiredHNL: Math.round(cat4Balance * 0.50)
+      balanceHNL: cat4Overdue,
+      clientCount: cat4Clients.length + 180,
+      provisionRequiredHNL: Math.round(cat4Overdue * 0.50)
     },
     {
       category: 'V - Pérdida',
       daysOverdue: 'Más de 180 días de atraso',
       provisionPct: 100.0,
-      balanceHNL: cat5Balance,
-      clientCount: 65,
-      provisionRequiredHNL: cat5Balance
+      balanceHNL: cat5Overdue,
+      clientCount: cat5Clients.length + 65,
+      provisionRequiredHNL: cat5Overdue
     }
   ];
 }
@@ -472,7 +483,10 @@ export function advanceGameMonth(state: GameState): GameState {
         status: 'En Negociación',
         monthsWithBank: 0,
         isAutoRenewed: false,
-        loyaltyBonusPct: 0
+        loyaltyBonusPct: 0,
+        linkedDivision: 'corporativa',
+        bankAccountBalanceHNL: 4500000,
+        accountNumber: `CTA-CORP-0501-${Math.floor(1000 + Math.random() * 9000)}-01`
       });
     }
   }
@@ -494,8 +508,43 @@ export function advanceGameMonth(state: GameState): GameState {
     totalRemittancesHNL += channel.remittancesCount * (channel.feePerRemittanceUSD * newExchangeRate * 0.35);
   });
 
-  // 10. SWIFT y Operaciones Internacionales
-  const swiftFeeIncomeHNL = state.swiftTransactions.length * (50 * newExchangeRate);
+  // 10. SWIFT y Red Internacional Ampliada (8 Corresponsales Globales)
+  const swiftCorrespondents = [
+    { bank: 'JPMorgan Chase (Nueva York)', country: 'Estados Unidos', curr: 'USD' as const },
+    { bank: 'Citibank (Nueva York)', country: 'Estados Unidos', curr: 'USD' as const },
+    { bank: 'UBS (Zúrich)', country: 'Suiza', curr: 'CHF' as const },
+    { bank: 'Santander (Madrid)', country: 'España / Zona Euro', curr: 'EUR' as const },
+    { bank: 'Barclays Bank (Londres)', country: 'Reino Unido', curr: 'GBP' as const },
+    { bank: 'ICBC (Shanghái)', country: 'China', curr: 'USD' as const },
+    { bank: 'Deutsche Bank (Fráncfort)', country: 'Alemania / Zona Euro', curr: 'EUR' as const },
+    { bank: 'Mizuho Bank (Tokio)', country: 'Japón', curr: 'USD' as const }
+  ];
+  const swiftPurposes = [
+    'Exportación de Café Especial (Marcala / Copán)',
+    'Importación de Maquinaria Agroindustrial',
+    'Pago de Fletes y Logística Marítima (Puerto Cortés)',
+    'Compra de Turbinas de Energía Renovable',
+    'Insumos Médicos Hospitalarios (Europa)',
+    'Materia Prima Textil e Hilos (Asia)'
+  ];
+  const randomCorr = swiftCorrespondents[Math.floor(Math.random() * swiftCorrespondents.length)];
+  const updatedSwiftTransactions: SwiftTransaction[] = [
+    {
+      id: `SW-${nextMonth}-${Math.floor(1000 + Math.random() * 9000)}`,
+      direction: Math.random() > 0.45 ? 'Entrante' : 'Saliente',
+      counterpartyBank: randomCorr.bank,
+      counterpartyCountry: randomCorr.country,
+      currency: randomCorr.curr,
+      amountFX: Math.floor(120000 + Math.random() * 380000),
+      clientName: HN_COMPANIES[Math.floor(Math.random() * HN_COMPANIES.length)],
+      purpose: swiftPurposes[Math.floor(Math.random() * swiftPurposes.length)],
+      feeUSD: 55,
+      settlementStatus: 'Liquidado',
+      complianceCheck: 'Aprobado OFAC/BCH'
+    },
+    ...(state.swiftTransactions || []).slice(0, 5)
+  ];
+  const swiftFeeIncomeHNL = updatedSwiftTransactions.length * (55 * newExchangeRate);
 
   // 11. Tesorería y Títulos BCH
   let treasuryIncome = 0;
@@ -508,27 +557,36 @@ export function advanceGameMonth(state: GameState): GameState {
     };
   });
 
-  // 12. Mercado Secundario de Valores y Acciones Hondureñas (Cupones y Dividendos)
+  // 12. Mercado Secundario de Valores y Acciones Hondureñas (Mercado dinámico y fluctuante)
   let securitiesIncomeMonthly = 0;
   let totalSecuritiesPortfolioHNL = 0;
   const updatedSecurities: SecondaryMarketSecurity[] = (state.secondarySecurities || []).map(sec => {
+    let newPrice = sec.pricePerUnitHNL;
+    if (sec.unitType === 'Acción') {
+      const change = 1 + (Math.random() * 0.05 - 0.024);
+      newPrice = Math.max(10, Math.round(sec.pricePerUnitHNL * change));
+    } else {
+      const change = 1 + (Math.random() * 0.018 - 0.008);
+      newPrice = Math.max(1000, Math.round(sec.pricePerUnitHNL * change));
+    }
+
+    const priceHist = sec.priceHistory && sec.priceHistory.length > 0 ? sec.priceHistory : [sec.pricePerUnitHNL];
+    const newPriceHistory = [...priceHist.slice(-8), newPrice];
+    const priceChangePct = +(((newPrice - sec.pricePerUnitHNL) / sec.pricePerUnitHNL) * 100).toFixed(2);
+
     if (sec.ownedUnits > 0) {
-      const invested = sec.ownedUnits * sec.pricePerUnitHNL;
+      const invested = sec.ownedUnits * newPrice;
       totalSecuritiesPortfolioHNL += invested;
-      // Cobro de cupón o dividendo mensual
       const monthlyReturn = invested * (sec.annualYieldOrDividendPct / 100 / 12);
       securitiesIncomeMonthly += monthlyReturn;
     }
-    // Si es acción bursátil, pequeña oscilación de mercado
-    let newPrice = sec.pricePerUnitHNL;
-    if (sec.unitType === 'Acción') {
-      const change = 1 + (Math.random() * 0.04 - 0.02);
-      newPrice = Math.round(sec.pricePerUnitHNL * change);
-    }
+
     return {
       ...sec,
       pricePerUnitHNL: newPrice,
-      totalInvestedHNL: sec.ownedUnits * newPrice
+      totalInvestedHNL: sec.ownedUnits * newPrice,
+      priceHistory: newPriceHistory,
+      priceChangeMonthPct: priceChangePct
     };
   });
 
@@ -694,6 +752,93 @@ export function advanceGameMonth(state: GameState): GameState {
     impactSummary: `Utilidad neta: ${formatHNL(netIncome)} · CAR CNBS: ${newCAR}%`
   });
 
+  // Generación de Alertas Dinámicas Mensuales
+  const updatedAlerts: DynamicAlert[] = [
+    ...(cashAndBCH < requiredReserves ? [{
+      id: `alert-encaje-${nextMonth}`,
+      severity: 'critica' as const,
+      category: 'liquidez' as const,
+      title: 'Déficit de Encaje Legal ante BCH',
+      message: `Las reservas en caja cayeron por debajo del encaje mínimo exigido de ${formatHNL(requiredReserves)}. Se activó préstamo interbancario de liquidez.`,
+      timestampMonth: nextMonth,
+      targetTab: 'overview',
+      isRead: false
+    }] : []),
+    ...(newApplications.some(a => a.requestedAmount >= 21000000) ? [{
+      id: `alert-corp-credit-${nextMonth}`,
+      severity: 'informativa' as const,
+      category: 'credito' as const,
+      title: 'Crédito Mayor a L. 20M en Bandeja Ejecutiva',
+      message: 'Una empresa corporativa ha solicitado financiamiento superior a 20 millones. Requiere dictamen del Comité y Presidencia.',
+      timestampMonth: nextMonth,
+      targetTab: 'credit',
+      isRead: false
+    }] : []),
+    {
+      id: `alert-mora-${nextMonth}`,
+      severity: pastDuePortfolio > 40000000 ? 'advertencia' as const : 'informativa' as const,
+      category: 'credito' as const,
+      title: `Cartera en Mora CNBS: ${formatHNL(pastDuePortfolio)}`,
+      message: `El índice de morosidad se ubica en ${newNPL}%. Puedes negociar quitas con deudores o vender carteras a competidores.`,
+      timestampMonth: nextMonth,
+      targetTab: 'risk',
+      isRead: false
+    },
+    ...(state.dynamicAlerts || []).slice(0, 4)
+  ];
+
+  // Generación de Opiniones de Expertos Mensuales
+  const updatedExpertOpinions: ExpertOpinion[] = [
+    {
+      id: `exp-${nextMonth}-1`,
+      author: 'Dr. Hugo Noé Pino',
+      role: 'Ex-Presidente del BCH y Doctor en Economía',
+      organization: 'Colegio Hondureño de Economistas (CHE)',
+      headline: `Evaluación Macroeconómica - Mes ${nextMonth} (${fullLabel})`,
+      summary: `Con la inflación en ${newInflation}% y la TPM en ${newTPM}%, la política monetaria hondureña busca equilibrar el crédito productivo. El banco debe mantener disciplina en sus tasas pasivas.`,
+      sentiment: newInflation > 5.2 ? 'Alerta de Riesgo' : 'Favorable / Crecimiento',
+      recommendedAction: 'Supervisar el costo de depósitos a plazo fijo y el encaje legal en el BCH.',
+      month: nextMonth
+    },
+    {
+      id: `exp-${nextMonth}-2`,
+      author: 'Lic. José Luis Moncada',
+      role: 'Ex-Comisionado Presidente de la CNBS',
+      organization: 'Consultoría Financiera Internacional',
+      headline: `Supervisión Bancaria y Provisiones Anticíclicas`,
+      summary: `El coeficiente CAR de Áureo Bank se ubica en ${newCAR}%. Cumple holgadamente con el 10.0% regulatorio. Se recomienda seguir saneando la cartera vencida para no inmovilizar capital.`,
+      sentiment: newCAR >= 12.0 ? 'Favorable / Crecimiento' : 'Neutral Cauteloso',
+      recommendedAction: 'Mantener la renegociación de deudas en mora (Categorías I a V) o subastarlas en el mercado interbancario.',
+      month: nextMonth
+    },
+    ...(state.expertOpinions || []).slice(0, 2)
+  ];
+
+  // Actualización de Módulos de Innovación
+  const updatedInnovations: TenInnovationsState = {
+    ...(state.innovations || {
+      fxDesk: { openPositionUSD: 7450000, bchAuctionBiddedUSD: 2500000, bchAuctionWonUSD: 2000000, fxSpreadIncomeMonthly: 850000 },
+      cnbsAudits: { lastAuditResult: 'Favorable', complianceRating: 94, requiredProvisionCorrection: 0, isAuditedThisPeriod: false },
+      interbankCallMoney: { lentAmountHNL: 0, borrowedAmountHNL: 0, callRatePct: 6.25 },
+      internationalRating: { agency: 'Fitch Ratings', currentRating: 'AAA (hnd)', outlook: 'Estable', fundingCostDiscountPct: 0.40 },
+      debtWorkouts: { totalRestructuredAmountHNL: 0, totalSoldToRivalsAmountHNL: 0, recoveredCapitalHNL: 0 },
+      digitalBanking: { appUsersCount: 42500, mobileAdoptionPct: 68.5, costSavingsMonthlyHNL: 420000 },
+      remittanceAlliances: { directDepositBonusPct: 2.0, monthlyCapturedRemittanceDepositsHNL: 18500000 },
+      stressTesting: { lastScenarioRun: 'Línea Base', simulatedCAR: 14.8, simulatedLCR: 130.0, capitalGapHNL: 0 },
+      syndicatedMegaLoans: { participatedProjectsCount: 1, activeSyndicatedExposureHNL: 25000000 },
+      distressedAssetAuctions: { activeAuctionsCount: 2, acquiredBranchesCount: 0 }
+    }),
+    digitalBanking: {
+      appUsersCount: (state.innovations?.digitalBanking?.appUsersCount || 42500) + Math.floor(450 + Math.random() * 300),
+      mobileAdoptionPct: +Math.min(92, (state.innovations?.digitalBanking?.mobileAdoptionPct || 68.5) + 0.4).toFixed(1),
+      costSavingsMonthlyHNL: (state.innovations?.digitalBanking?.costSavingsMonthlyHNL || 420000) + 15000
+    },
+    fxDesk: {
+      ...(state.innovations?.fxDesk || { openPositionUSD: 7450000, bchAuctionBiddedUSD: 2500000, bchAuctionWonUSD: 2000000, fxSpreadIncomeMonthly: 850000 }),
+      fxSpreadIncomeMonthly: Math.round(750000 + Math.random() * 300000)
+    }
+  };
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -715,6 +860,7 @@ export function advanceGameMonth(state: GameState): GameState {
     pensionFunds: updatedPensionFunds,
     payrollAgreements: updatedPayrollAgreements,
     clearingHouse: updatedClearing,
+    swiftTransactions: updatedSwiftTransactions,
     treasuryHoldings: updatedTreasury,
     secondarySecurities: updatedSecurities,
     competitors: updatedCompetitors,
@@ -730,7 +876,11 @@ export function advanceGameMonth(state: GameState): GameState {
       }
     ].slice(-12),
     // Reiniciar aprobaciones del mes para asesores de crédito
-    advisorApprovalsUsedThisMonth: 0
+    advisorApprovalsUsedThisMonth: 0,
+    interbankOffers: state.interbankOffers || [],
+    dynamicAlerts: updatedAlerts,
+    expertOpinions: updatedExpertOpinions,
+    innovations: updatedInnovations
   };
 }
 
@@ -821,6 +971,21 @@ export function generateMonthlyApplications(month: number): CreditApplication[] 
       collateral = prod.includes('Vivienda') ? 'Hipoteca Inmobiliaria' : prod.includes('Planilla') ? 'Retención Salarial' : 'Garantía Solidaria';
     }
 
+    const isOverLimit = amount >= 21000000;
+    const isOfficerFavorable = score >= 650 && dti <= 45 && cnbsCat === 'I - Normal';
+
+    const officerRecommendation = isOfficerFavorable 
+      ? 'Favorable (Aprobación Sugerida)' 
+      : score < 580 || dti > 60 
+        ? 'Desfavorable (Riesgo Excesivo)' 
+        : 'Condicionado a Aval';
+
+    const officerNote = isOverLimit
+      ? `NOTA DEL OFICIAL DE CRÉDITO: Solicitud de ${formatHNL(amount)} excede la autonomía técnica de 20 millones de lempiras. Requiere dictamen superior. Calificación en buró: ${score} pts, DTI: ${dti}%, garantía: ${collateral}. Se eleva a decisión directa de Presidencia y Comité Ejecutivo.`
+      : isOfficerFavorable
+        ? `Oficial de Crédito dictamina viabilidad financiera favorable bajo límite autónomo de 20 millones. Apto para aprobación automática.`
+        : `Oficial de Crédito dictamina observación técnica (DTI ${dti}% / Scoring ${score}). Se recomienda aval solidario o rechazo.`;
+
     return {
       id: `SOL-${month}-${100 + idx}`,
       applicantName: name,
@@ -840,7 +1005,505 @@ export function generateMonthlyApplications(month: number): CreditApplication[] 
       riskVerdict,
       reasonText: isCompany 
         ? `Empresa radicada en ${city}. Solicitud para expansión operativa. Buró crediticio con categoría ${cnbsCat}.`
-        : `Cliente solicita ${prod} en ${city}. DTI calculado en ${dti}%. Verificado por oficiales de negocios.`
+        : `Cliente solicita ${prod} en ${city}. DTI calculado en ${dti}%. Verificado por oficiales de negocios.`,
+      officerNote,
+      officerRecommendation,
+      officerCanAutoApprove: !isOverLimit,
+      requiresExecutiveBoardApproval: isOverLimit,
+      officerDecisionStatus: isOverLimit ? 'Enviado a Comité' : 'Pendiente'
     };
   });
+}
+
+/**
+ * Negocia la deuda de un cliente en mora (Categorías I a V)
+ */
+export function negotiateClientDebt(
+  state: GameState,
+  clientId: string,
+  negotiationType: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago'
+): { updatedState: GameState; successMessage: string } {
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) return { updatedState: state, successMessage: 'Cliente no encontrado' };
+
+  let cashDelta = 0;
+  let successMessage = '';
+  const oldPastDue = client.pastDueAmountHNL || 0;
+
+  const updatedClients = state.clients.map(c => {
+    if (c.id !== clientId) return c;
+
+    if (negotiationType === 'reestructurar_quitas') {
+      const tokenPayment = Math.round(oldPastDue * 0.25);
+      cashDelta += tokenPayment;
+      successMessage = `Convenio de reestructuración exitoso con ${c.name}. Se condonó el 40% de recargos moratorios, el deudor abonó ${formatHNL(tokenPayment)} y vuelve a Categoría I - Normal con pago garantizado.`;
+      return {
+        ...c,
+        cnbsCategory: 'I - Normal' as const,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        guaranteedPayment: true,
+        loanMonthsRemaining: (c.loanMonthsRemaining || 24) + 12,
+        notes: `${c.notes || ''} [Reestructurado en mes ${state.gameMonth}: condonación parcial y reactivación a Cat I]`,
+        isRestructured: true
+      };
+    } else if (negotiationType === 'ampliar_plazo') {
+      successMessage = `Ampliación de plazo pactada con ${c.name}. Plazo extendido en 24 meses y cuota reducida un 35%. Se reclasifica a Categoría II - Especial en seguimiento activo.`;
+      return {
+        ...c,
+        cnbsCategory: 'II - Especial' as const,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        loanMonthsRemaining: (c.loanMonthsRemaining || 12) + 24,
+        loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.65),
+        notes: `${c.notes || ''} [Ampliación de plazo pactada en mes ${state.gameMonth}]`,
+        isRestructured: true
+      };
+    } else {
+      const recoveryAmount = Math.round((c.loanBalanceHNL || oldPastDue) * 0.75);
+      cashDelta += recoveryAmount;
+      successMessage = `Dación en pago completada con ${c.name}. Se adjudicó la garantía recuperando ${formatHNL(recoveryAmount)} de capital de inmediato.`;
+      return {
+        ...c,
+        hasLoan: false,
+        loanBalanceHNL: 0,
+        loanPrincipalHNL: 0,
+        loanMonthlyPaymentHNL: 0,
+        loanMonthsRemaining: 0,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        cnbsCategory: 'I - Normal' as const,
+        notes: `${c.notes || ''} [Finiquitado por dación en pago en mes ${state.gameMonth}]`
+      };
+    }
+  });
+
+  const updatedFinancials = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + cashDelta,
+    loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - oldPastDue),
+    loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.round(oldPastDue * 0.3))
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      financials: updatedFinancials,
+      innovations: {
+        ...state.innovations,
+        debtWorkouts: {
+          ...state.innovations.debtWorkouts,
+          totalRestructuredAmountHNL: state.innovations.debtWorkouts.totalRestructuredAmountHNL + oldPastDue,
+          recoveredCapitalHNL: state.innovations.debtWorkouts.recoveredCapitalHNL + cashDelta
+        }
+      }
+    },
+    successMessage
+  };
+}
+
+/**
+ * Vende la cartera en mora de un cliente a un banco competidor
+ */
+export function sellClientDebtToCompetitor(
+  state: GameState,
+  clientId: string,
+  buyerBankId: CompetitorId
+): { updatedState: GameState; successMessage: string } {
+  const client = state.clients.find(c => c.id === clientId);
+  const buyer = state.competitors.find(b => b.id === buyerBankId) || state.competitors[0];
+  if (!client) return { updatedState: state, successMessage: 'Cliente no encontrado' };
+
+  const discounts: Record<string, number> = {
+    'I - Normal': 0.05,
+    'II - Especial': 0.12,
+    'III - Subnormal': 0.25,
+    'IV - Dudoso Recaudo': 0.45,
+    'V - Pérdida': 0.70
+  };
+  const discountRate = discounts[client.cnbsCategory] || 0.35;
+  const debtAmount = client.pastDueAmountHNL > 0 ? client.pastDueAmountHNL : client.loanBalanceHNL;
+  const cashProceeds = Math.round(debtAmount * (1 - discountRate));
+
+  const updatedClients = state.clients.map(c => {
+    if (c.id !== clientId) return c;
+    return {
+      ...c,
+      isSoldToRival: true,
+      soldToBankName: buyer.name,
+      hasLoan: false,
+      loanBalanceHNL: 0,
+      pastDueAmountHNL: 0,
+      pastDueDays: 0,
+      notes: `${c.notes || ''} [Cartera cedida y vendida a ${buyer.name} con descuento del ${(discountRate * 100).toFixed(0)}%]`
+    };
+  });
+
+  const updatedFinancials = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + cashProceeds,
+    loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - debtAmount),
+    loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.round(debtAmount * discountRate))
+  };
+
+  const successMessage = `Venta de cartera perfeccionada. Se transfirió el crédito de ${client.name} (${client.cnbsCategory}) a ${buyer.name}. Áureo Bank recibió ${formatHNL(cashProceeds)} de liquidez inmediata en caja.`;
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      financials: updatedFinancials,
+      innovations: {
+        ...state.innovations,
+        debtWorkouts: {
+          ...state.innovations.debtWorkouts,
+          totalSoldToRivalsAmountHNL: state.innovations.debtWorkouts.totalSoldToRivalsAmountHNL + debtAmount,
+          recoveredCapitalHNL: state.innovations.debtWorkouts.recoveredCapitalHNL + cashProceeds
+        }
+      }
+    },
+    successMessage
+  };
+}
+
+/**
+ * Compra de cartera en el mercado interbancario a un banco rival
+ */
+export function buyInterbankPortfolio(
+  state: GameState,
+  offerId: string
+): { updatedState: GameState; successMessage: string } {
+  const offer = state.interbankOffers.find(o => o.id === offerId);
+  if (!offer || offer.status !== 'disponible') {
+    return { updatedState: state, successMessage: 'Oferta no disponible' };
+  }
+
+  if (state.financials.cashAndBCHReserves < offer.offerPriceHNL && offer.portfolioType === 'activos_creditos') {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para comprar esta cartera' };
+  }
+
+  const updatedFinancials = { ...state.financials };
+  let successMsg = '';
+
+  if (offer.portfolioType === 'activos_creditos') {
+    updatedFinancials.cashAndBCHReserves -= offer.offerPriceHNL;
+    updatedFinancials.loanPortfolioCurrent += offer.faceValueHNL;
+    successMsg = `Adquisición exitosa: Se compró la cartera de créditos "${offer.name}" de ${offer.sellerBankName} por ${formatHNL(offer.offerPriceHNL)} (Valor facial: ${formatHNL(offer.faceValueHNL)}). Se incorporan ${offer.clientCount} clientes acreditados a tu balance.`;
+  } else {
+    updatedFinancials.cashAndBCHReserves += offer.faceValueHNL;
+    updatedFinancials.depositsPublicTotal += offer.faceValueHNL;
+    successMsg = `Adquisición de pasivos exitosa: Se asumió la cartera de depósitos "${offer.name}" de ${offer.sellerBankName}. Áureo Bank recibe ${formatHNL(offer.faceValueHNL)} en efectivo para sus reservas.`;
+  }
+
+  const updatedOffers = state.interbankOffers.map(o => o.id === offerId ? { ...o, status: 'comprado' as const } : o);
+
+  return {
+    updatedState: {
+      ...state,
+      financials: updatedFinancials,
+      interbankOffers: updatedOffers
+    },
+    successMessage: successMsg
+  };
+}
+
+/**
+ * Modificar un comercio POS existente
+ */
+export function updatePosMerchant(
+  state: GameState,
+  updatedMerchant: PosMerchant
+): GameState {
+  const old = state.posMerchants.find(m => m.id === updatedMerchant.id);
+  const diffBalance = updatedMerchant.bankAccountBalanceHNL - (old?.bankAccountBalanceHNL || 0);
+
+  const updatedList = state.posMerchants.map(m => m.id === updatedMerchant.id ? updatedMerchant : m);
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions.pyme) {
+    updatedDivisions.pyme = {
+      ...updatedDivisions.pyme,
+      totalDeposits: Math.max(0, updatedDivisions.pyme.totalDeposits + diffBalance)
+    };
+  }
+
+  return {
+    ...state,
+    posMerchants: updatedList,
+    divisions: updatedDivisions,
+    financials: {
+      ...state.financials,
+      depositsPublicTotal: Math.max(0, state.financials.depositsPublicTotal + diffBalance),
+      cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves + diffBalance)
+    }
+  };
+}
+
+/**
+ * Agregar un nuevo comercio a la red POS
+ */
+export function addPosMerchant(
+  state: GameState,
+  newMerchant: PosMerchant
+): GameState {
+  const updatedList = [newMerchant, ...state.posMerchants];
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions.pyme) {
+    updatedDivisions.pyme = {
+      ...updatedDivisions.pyme,
+      totalDeposits: updatedDivisions.pyme.totalDeposits + newMerchant.bankAccountBalanceHNL,
+      clientCount: updatedDivisions.pyme.clientCount + 1,
+      activeAccountsCount: updatedDivisions.pyme.activeAccountsCount + 1
+    };
+  }
+
+  return {
+    ...state,
+    posMerchants: updatedList,
+    divisions: updatedDivisions,
+    financials: {
+      ...state.financials,
+      depositsPublicTotal: state.financials.depositsPublicTotal + newMerchant.bankAccountBalanceHNL,
+      cashAndBCHReserves: state.financials.cashAndBCHReserves + newMerchant.bankAccountBalanceHNL
+    }
+  };
+}
+
+/**
+ * Modificar un convenio de planilla existente
+ */
+export function updatePayrollAgreement(
+  state: GameState,
+  updatedAgreement: CorporatePayrollAgreement
+): GameState {
+  const old = state.payrollAgreements.find(p => p.id === updatedAgreement.id);
+  const diffBalance = updatedAgreement.bankAccountBalanceHNL - (old?.bankAccountBalanceHNL || 0);
+
+  const updatedList = state.payrollAgreements.map(p => p.id === updatedAgreement.id ? updatedAgreement : p);
+  const divId = updatedAgreement.linkedDivision || 'corporativa';
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions[divId]) {
+    updatedDivisions[divId] = {
+      ...updatedDivisions[divId],
+      totalDeposits: Math.max(0, updatedDivisions[divId].totalDeposits + diffBalance)
+    };
+  }
+
+  return {
+    ...state,
+    payrollAgreements: updatedList,
+    divisions: updatedDivisions,
+    financials: {
+      ...state.financials,
+      depositsPublicTotal: Math.max(0, state.financials.depositsPublicTotal + diffBalance),
+      cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves + diffBalance)
+    }
+  };
+}
+
+/**
+ * Agregar una nueva empresa con convenio de nómina CEE
+ */
+export function addPayrollAgreement(
+  state: GameState,
+  newAgreement: CorporatePayrollAgreement
+): GameState {
+  const updatedList = [newAgreement, ...state.payrollAgreements];
+  const divId = newAgreement.linkedDivision || 'corporativa';
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions[divId]) {
+    updatedDivisions[divId] = {
+      ...updatedDivisions[divId],
+      totalDeposits: updatedDivisions[divId].totalDeposits + newAgreement.bankAccountBalanceHNL,
+      clientCount: updatedDivisions[divId].clientCount + 1,
+      activeAccountsCount: updatedDivisions[divId].activeAccountsCount + newAgreement.employeeCount
+    };
+  }
+
+  return {
+    ...state,
+    payrollAgreements: updatedList,
+    divisions: updatedDivisions,
+    financials: {
+      ...state.financials,
+      depositsPublicTotal: state.financials.depositsPublicTotal + newAgreement.bankAccountBalanceHNL,
+      cashAndBCHReserves: state.financials.cashAndBCHReserves + newAgreement.bankAccountBalanceHNL
+    }
+  };
+}
+
+/**
+ * Aprueba una solicitud de crédito por el Oficial de Crédito (Autonomía <= L. 20M)
+ */
+export function approveCreditByOfficer(
+  state: GameState,
+  appId: string
+): { updatedState: GameState; successMessage: string } {
+  const app = state.pendingApplications.find(a => a.id === appId);
+  if (!app) return { updatedState: state, successMessage: 'Solicitud no encontrada' };
+
+  if (app.requestedAmount > 20000000) {
+    return { updatedState: state, successMessage: 'Esta solicitud excede la autonomía del Oficial de Crédito (L. 20M). Requiere aprobación del Comité Ejecutivo y Presidencia.' };
+  }
+
+  const newLoans = state.financials.loanPortfolioCurrent + app.requestedAmount;
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions[app.division]) {
+    updatedDivisions[app.division] = {
+      ...updatedDivisions[app.division],
+      totalLoans: updatedDivisions[app.division].totalLoans + app.requestedAmount,
+      clientCount: updatedDivisions[app.division].clientCount + 1
+    };
+  }
+
+  const newClient: IndividualClient = {
+    id: `CLI-APR-${Date.now().toString().slice(-4)}`,
+    cif: `CIF-0501-2026-${Math.floor(10000 + Math.random() * 89999)}`,
+    name: app.applicantName,
+    division: app.division,
+    city: app.location,
+    notes: `Crédito de ${formatHNL(app.requestedAmount)} aprobado por Oficial de Crédito bajo política de autonomía automática.`,
+    joinedMonth: state.gameMonth,
+    accountType: 'Cuenta de Ahorro Rendimiento',
+    accountBalanceHNL: Math.round(app.requestedAmount * 0.15),
+    hasCreditCard: true,
+    creditCardBrand: 'Visa Clásica',
+    creditCardLimitHNL: Math.round(app.monthlyIncome * 1.5),
+    creditCardBalanceHNL: 0,
+    hasLoan: true,
+    loanType: app.productType,
+    loanPrincipalHNL: app.requestedAmount,
+    loanBalanceHNL: app.requestedAmount,
+    loanMonthlyPaymentHNL: Math.round((app.requestedAmount * (app.proposedRate / 100 / 12)) / (1 - Math.pow(1 + (app.proposedRate / 100 / 12), -app.termMonths))),
+    loanInterestRateAnnual: app.proposedRate,
+    loanMonthsRemaining: app.termMonths,
+    guaranteedPayment: true,
+    pastDueDays: 0,
+    pastDueAmountHNL: 0,
+    equifaxScore: app.equifaxScore,
+    cnbsCategory: 'I - Normal',
+    otherBankProducts: []
+  };
+
+  const updatedFinancials = {
+    ...state.financials,
+    loanPortfolioCurrent: newLoans,
+    cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves - app.requestedAmount * 0.1)
+  };
+
+  const remainingApps = state.pendingApplications.filter(a => a.id !== appId);
+
+  return {
+    updatedState: {
+      ...state,
+      clients: [newClient, ...state.clients],
+      financials: updatedFinancials,
+      divisions: updatedDivisions,
+      pendingApplications: remainingApps
+    },
+    successMessage: `¡Crédito de ${formatHNL(app.requestedAmount)} aprobado con éxito por el Oficial de Crédito para ${app.applicantName}!`
+  };
+}
+
+/**
+ * Aprueba una solicitud de crédito por el Presidente Ejecutivo y Comité Superior (>= L. 21M)
+ */
+export function approveCreditByExecutiveBoard(
+  state: GameState,
+  appId: string
+): { updatedState: GameState; successMessage: string } {
+  const app = state.pendingApplications.find(a => a.id === appId);
+  if (!app) return { updatedState: state, successMessage: 'Solicitud no encontrada' };
+
+  const newLoans = state.financials.loanPortfolioCurrent + app.requestedAmount;
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions[app.division]) {
+    updatedDivisions[app.division] = {
+      ...updatedDivisions[app.division],
+      totalLoans: updatedDivisions[app.division].totalLoans + app.requestedAmount,
+      clientCount: updatedDivisions[app.division].clientCount + 1
+    };
+  }
+
+  const newClient: IndividualClient = {
+    id: `CLI-CORP-${Date.now().toString().slice(-4)}`,
+    cif: `CIF-CORP-2026-${Math.floor(1000 + Math.random() * 8999)}`,
+    name: app.applicantName,
+    division: app.division,
+    city: app.location,
+    notes: `Mega-crédito corporativo de ${formatHNL(app.requestedAmount)} ratificado en pleno por el Presidente Ejecutivo y Comité de Crédito.`,
+    joinedMonth: state.gameMonth,
+    accountType: 'Cuenta Corriente / Cheques',
+    accountBalanceHNL: Math.round(app.requestedAmount * 0.20),
+    hasCreditCard: true,
+    creditCardBrand: 'Mastercard Corporativa',
+    creditCardLimitHNL: 1500000,
+    creditCardBalanceHNL: 0,
+    hasLoan: true,
+    loanType: app.productType,
+    loanPrincipalHNL: app.requestedAmount,
+    loanBalanceHNL: app.requestedAmount,
+    loanMonthlyPaymentHNL: Math.round((app.requestedAmount * (app.proposedRate / 100 / 12)) / (1 - Math.pow(1 + (app.proposedRate / 100 / 12), -app.termMonths))),
+    loanInterestRateAnnual: app.proposedRate,
+    loanMonthsRemaining: app.termMonths,
+    guaranteedPayment: true,
+    pastDueDays: 0,
+    pastDueAmountHNL: 0,
+    equifaxScore: app.equifaxScore,
+    cnbsCategory: 'I - Normal',
+    otherBankProducts: []
+  };
+
+  const updatedFinancials = {
+    ...state.financials,
+    loanPortfolioCurrent: newLoans
+  };
+
+  const remainingApps = state.pendingApplications.filter(a => a.id !== appId);
+
+  return {
+    updatedState: {
+      ...state,
+      clients: [newClient, ...state.clients],
+      financials: updatedFinancials,
+      divisions: updatedDivisions,
+      pendingApplications: remainingApps
+    },
+    successMessage: `¡Resolución de Presidencia ratificada! Mega-crédito de ${formatHNL(app.requestedAmount)} otorgado a ${app.applicantName} con garantías registradas.`
+  };
+}
+
+/**
+ * Rechaza una solicitud de crédito
+ */
+export function rejectCreditApplication(
+  state: GameState,
+  appId: string
+): { updatedState: GameState; successMessage: string } {
+  const app = state.pendingApplications.find(a => a.id === appId);
+  const remaining = state.pendingApplications.filter(a => a.id !== appId);
+  return {
+    updatedState: {
+      ...state,
+      pendingApplications: remaining
+    },
+    successMessage: `Solicitud de ${app?.applicantName || 'cliente'} rechazada formalmente.`
+  };
+}
+
+/**
+ * Aprueba automáticamente en bloque todas las solicitudes elegibles según la política del Oficial (<= L. 20M)
+ */
+export function autoApproveAllOfficerEligibleCredits(state: GameState): { updatedState: GameState; count: number; totalApproved: number } {
+  const eligible = state.pendingApplications.filter(a => a.requestedAmount <= 20000000 && a.cnbsCategory === 'I - Normal' && a.calculatedDTI <= 45);
+  let curState = state;
+  let totalApproved = 0;
+
+  eligible.forEach(app => {
+    const res = approveCreditByOfficer(curState, app.id);
+    curState = res.updatedState;
+    totalApproved += app.requestedAmount;
+  });
+
+  return { updatedState: curState, count: eligible.length, totalApproved };
 }

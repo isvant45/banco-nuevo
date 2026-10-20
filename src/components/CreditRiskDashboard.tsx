@@ -17,16 +17,20 @@ import {
   Check
 } from 'lucide-react';
 
+import { DebtNegotiationModal } from './DebtNegotiationModal';
+
 interface CreditRiskDashboardProps {
   state: GameState;
   onRestructureLoan: (clientId: string) => void;
   onSellNPLToCompetitor: (clientId: string, buyerBank: string, discountPct: number) => void;
+  onNegotiateWorkout?: (clientId: string, workoutType: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago') => void;
 }
 
 export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
   state,
   onRestructureLoan,
-  onSellNPLToCompetitor
+  onSellNPLToCompetitor,
+  onNegotiateWorkout
 }) => {
   const fin = state.financials;
   const riskMatrix = calculateCreditRiskMatrix(state);
@@ -34,50 +38,51 @@ export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
   const totalConstitudedProvisions = fin.loanLossProvisions;
   const isProvisionCovered = totalConstitudedProvisions >= totalRequiredProvisions;
 
+  // Filtro de Categoría CNBS (I a V)
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Clientes para negociación
+  const [selectedClientForDebtModal, setSelectedClientForDebtModal] = useState<IndividualClient | null>(null);
+  const [isDebtModalOpen, setIsDebtModalOpen] = useState<boolean>(false);
+
   // Clientes con atraso o mora activa que no hayan sido vendidos
-  const delinquentClients = state.clients.filter(c => (c.pastDueDays > 0 || c.cnbsCategory !== 'I - Normal') && !c.isSoldToRival);
+  const allDelinquentClients = state.clients.filter(c => (c.pastDueDays > 0 || c.cnbsCategory !== 'I - Normal') && !c.isSoldToRival);
+  
+  const displayedClients = allDelinquentClients.filter(c => {
+    if (categoryFilter === 'all') return true;
+    return c.cnbsCategory.startsWith(categoryFilter);
+  });
 
-  // Estado para el modal de venta o negociación
-  const [selectedClientForAction, setSelectedClientForAction] = useState<IndividualClient | null>(null);
-  const [actionType, setActionType] = useState<'restructure' | 'sell' | null>(null);
-  const [selectedBuyerBank, setSelectedBuyerBank] = useState<string>('Banco Atlántida S.A.');
-  const [selectedDiscountPct, setSelectedDiscountPct] = useState<number>(78);
-
-  const buyerOptions = [
-    { bank: 'Banco Atlántida S.A.', discount: 78, tag: 'Líder en recuperación' },
-    { bank: 'Banco Ficohsa S.A.', discount: 75, tag: 'Fuerte en cobranza' },
-    { bank: 'Banco del País S.A. (Banpaís)', discount: 72, tag: 'Especialista zona norte' },
-    { bank: 'Banco de Occidente S.A.', discount: 70, tag: 'Conservador' }
-  ];
-
-  const handleOpenRestructure = (client: IndividualClient) => {
+  const handleOpenNegotiationModal = (client: IndividualClient) => {
     sound.playClick();
-    setSelectedClientForAction(client);
-    setActionType('restructure');
+    setSelectedClientForDebtModal(client);
+    setIsDebtModalOpen(true);
   };
 
-  const handleOpenSell = (client: IndividualClient) => {
-    sound.playClick();
-    setSelectedClientForAction(client);
-    setActionType('sell');
-    setSelectedBuyerBank(buyerOptions[0].bank);
-    setSelectedDiscountPct(buyerOptions[0].discount);
-  };
-
-  const handleConfirmRestructure = () => {
-    if (!selectedClientForAction) return;
+  const handleExecuteWorkout = (clientId: string, type: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago') => {
     sound.playApprovalStamp();
-    onRestructureLoan(selectedClientForAction.id);
-    setActionType(null);
-    setSelectedClientForAction(null);
+    if (onNegotiateWorkout) {
+      onNegotiateWorkout(clientId, type);
+    } else {
+      onRestructureLoan(clientId);
+    }
+    setIsDebtModalOpen(false);
   };
 
-  const handleConfirmSell = () => {
-    if (!selectedClientForAction) return;
+  const handleExecuteSaleToRival = (clientId: string, rivalId: CompetitorId) => {
     sound.playCashChime();
-    onSellNPLToCompetitor(selectedClientForAction.id, selectedBuyerBank, selectedDiscountPct);
-    setActionType(null);
-    setSelectedClientForAction(null);
+    const rival = state.competitors.find(c => c.id === rivalId) || state.competitors[0];
+    const client = state.clients.find(c => c.id === clientId);
+    const discounts: Record<string, number> = {
+      'I - Normal': 5,
+      'II - Especial': 12,
+      'III - Subnormal': 25,
+      'IV - Dudoso Recaudo': 45,
+      'V - Pérdida': 70
+    };
+    const discount = client ? (discounts[client.cnbsCategory] || 35) : 35;
+    onSellNPLToCompetitor(clientId, rival.name, 100 - discount);
+    setIsDebtModalOpen(false);
   };
 
   return (
@@ -140,19 +145,46 @@ export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="text-slate-400">Casos en Mora Activa:</span>
+            <span className="text-slate-400">Casos Filtrados:</span>
             <span className="bg-rose-500/15 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg font-bold">
-              {delinquentClients.length} cuentas
+              {displayedClients.length} cuentas
             </span>
           </div>
         </div>
 
-        {delinquentClients.length === 0 ? (
+        {/* Barra de Filtro de Categorías CNBS I a V */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-xs pb-1">
+          {[
+            { id: 'all', label: `Todos los Atrasos (${allDelinquentClients.length})` },
+            { id: 'I ', label: 'Cat. I - Normal' },
+            { id: 'II ', label: 'Cat. II - Especial' },
+            { id: 'III ', label: 'Cat. III - Subnormal' },
+            { id: 'IV ', label: 'Cat. IV - Dudoso' },
+            { id: 'V ', label: 'Cat. V - Pérdida' }
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => {
+                sound.playClick();
+                setCategoryFilter(f.id);
+              }}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap ${
+                categoryFilter === f.id
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {displayedClients.length === 0 ? (
           <div className="p-8 bg-slate-950/60 rounded-xl border border-slate-800 text-center text-slate-400 text-xs">
             <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-            <h3 className="font-bold text-white text-sm mb-1">Toda la Cartera se Encuentra al Día</h3>
+            <h3 className="font-bold text-white text-sm mb-1">No hay cuentas en esta categoría</h3>
             <p className="text-slate-500 max-w-md mx-auto">
-              No hay cuentas con días de atraso en mora severa. Si deseas simular un caso moroso, puedes editar un cliente en las Bancas reduciendo su saldo y préstamo sin garantía.
+              Puedes seleccionar otra categoría o ver todos los atrasos para negociar o vender créditos vencidos.
             </p>
           </div>
         ) : (
@@ -166,11 +198,11 @@ export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
                   <th className="py-2.5 px-3 text-right">Saldo Deuda (L.)</th>
                   <th className="py-2.5 px-3 text-right">Mora Vencida (L.)</th>
                   <th className="py-2.5 px-3 text-center">Categoría CNBS</th>
-                  <th className="py-2.5 px-3 text-right font-sans">Acción de Cobro</th>
+                  <th className="py-2.5 px-3 text-right font-sans">Acción de Negociación</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {delinquentClients.map(c => {
+                {displayedClients.map(c => {
                   return (
                     <tr key={c.id} className="hover:bg-slate-800/40 text-slate-300">
                       <td className="py-3 px-3 font-sans">
@@ -201,25 +233,14 @@ export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
                       </td>
 
                       <td className="py-3 px-3 text-right font-sans">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Botón Negociar / Reestructurar */}
-                          <button
-                            onClick={() => handleOpenRestructure(c)}
-                            className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-                          >
-                            <Handshake className="w-3 h-3" />
-                            <span>Negociar</span>
-                          </button>
-
-                          {/* Botón Vender a Banco Rival con Descuento */}
-                          <button
-                            onClick={() => handleOpenSell(c)}
-                            className="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-                          >
-                            <DollarSign className="w-3 h-3" />
-                            <span>Vender Cartera</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleOpenNegotiationModal(c)}
+                          className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-xs flex items-center gap-1.5 ml-auto shadow-sm transition-colors"
+                          title="Negociar Quitas, Ampliar Plazo o Vender a Bancos Rivales"
+                        >
+                          <Handshake className="w-3.5 h-3.5" />
+                          <span>Negociar / Vender</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -338,147 +359,16 @@ export const CreditRiskDashboard: React.FC<CreditRiskDashboardProps> = ({
         </div>
       </div>
 
-      {/* Modal de Reestructuración de Deuda */}
-      {actionType === 'restructure' && selectedClientForAction && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-emerald-500/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                <Handshake className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-sm">
-                  Acuerdo de Reestructuración de Crédito
-                </h3>
-                <p className="text-xs text-slate-400">Cliente: {selectedClientForAction.name}</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Saldo Capital Vencido:</span>
-                <span className="font-mono text-white font-bold">{formatHNL(selectedClientForAction.loanBalanceHNL)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Días de Atraso Acumulados:</span>
-                <span className="font-mono text-rose-400 font-bold">{selectedClientForAction.pastDueDays} días</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Tasa de Salvamento Propuesta:</span>
-                <span className="font-mono text-emerald-400 font-bold">12.0% Anual (Tasa Social)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Cláusula de Garantía:</span>
-                <span className="text-emerald-300 font-semibold">Activación de Pago Garantizado Automático</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Al formalizar la reestructuración, se condonarán recargos moratorios, la cuenta volverá a <strong>Categoría I - Normal (Al día)</strong> y se liberará la provisión obligatoria requerida por la CNBS.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                onClick={() => setActionType(null)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold hover:bg-slate-700"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmRestructure}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-md shadow-emerald-600/20"
-              >
-                Firmar Reestructuración
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Venta de Cartera a Banco Competidor */}
-      {actionType === 'sell' && selectedClientForAction && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-rose-500/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-sm">
-                  Venta de Cartera Castigada (Cesión de Derechos de Crédito)
-                </h3>
-                <p className="text-xs text-slate-400">Cliente Deudor: {selectedClientForAction.name}</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Saldo Nominal del Crédito:</span>
-                <span className="font-mono text-white font-bold">{formatHNL(selectedClientForAction.loanBalanceHNL)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Banco Comprador Seleccionado:</span>
-                <span className="text-amber-400 font-bold">{selectedBuyerBank}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Factor de Descuento:</span>
-                <span className="font-mono text-blue-400 font-bold">{selectedDiscountPct}% del valor</span>
-              </div>
-              <div className="flex justify-between border-t border-slate-800 pt-2 text-sm">
-                <span className="text-emerald-300 font-bold">Efectivo Inmediato a Recibir:</span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  {formatHNL(Math.round(selectedClientForAction.loanBalanceHNL * (selectedDiscountPct / 100)))}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] text-slate-400 block">Selecciona la Oferta de Compra:</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {buyerOptions.map(opt => (
-                  <button
-                    key={opt.bank}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBuyerBank(opt.bank);
-                      setSelectedDiscountPct(opt.discount);
-                    }}
-                    className={`p-2.5 rounded-lg border text-left text-xs transition-colors ${
-                      selectedBuyerBank === opt.bank
-                        ? 'bg-amber-500/15 border-amber-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="font-bold truncate">{opt.bank}</div>
-                    <div className="flex justify-between items-center text-[10px] mt-1 text-slate-400">
-                      <span>Paga al: <strong className="text-amber-400">{opt.discount}%</strong></span>
-                      <span className="text-[9px] text-slate-500">{opt.tag}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-400">
-              Al confirmar la venta, <strong>Áureo Bank transferirá el cobro judicial y riesgo a {selectedBuyerBank}</strong>. Recibirás {formatHNL(Math.round(selectedClientForAction.loanBalanceHNL * (selectedDiscountPct / 100)))} de inmediato en la reserva de caja y se liberará la provisión obligatoria de este crédito.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                onClick={() => setActionType(null)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold hover:bg-slate-700"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmSell}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-md shadow-rose-600/20"
-              >
-                Confirmar Venta y Cobrar Efectivo
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Modal Interactivo de Negociación y Venta de Deuda CNBS */}
+      {isDebtModalOpen && selectedClientForDebtModal && (
+        <DebtNegotiationModal
+          isOpen={true}
+          client={selectedClientForDebtModal}
+          competitors={state.competitors}
+          onClose={() => setIsDebtModalOpen(false)}
+          onNegotiate={(clientId, type) => handleExecuteWorkout(clientId, type)}
+          onSellToRival={(clientId, rivalId) => handleExecuteSaleToRival(clientId, rivalId)}
+        />
       )}
     </div>
   );

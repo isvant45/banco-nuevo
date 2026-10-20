@@ -16,7 +16,11 @@ import {
   IndividualClient,
   PensionFund,
   PosMerchant,
-  SecondaryMarketSecurity
+  SecondaryMarketSecurity,
+  InterbankPortfolioOffer,
+  DynamicAlert,
+  ExpertOpinion,
+  TenInnovationsState
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -577,6 +581,148 @@ export const INITIAL_CLIENTS: IndividualClient[] = [
         details: 'Depósitos en dólares en banca corresponsal Ficohsa.'
       }
     ]
+  },
+
+  // 7. Cartera Institucional en Mora (Categorías I a V - Total L. 55,294,191.00)
+  {
+    id: 'CLI-MORA-01',
+    cif: 'CIF-0501-1975-00891',
+    name: 'Inversiones Comerciales Guaymuras S. de R.L.',
+    division: 'pyme',
+    city: 'San Pedro Sula',
+    notes: 'Distribuidora de abarrotes. Atraso leve de 20 días por desfase de pagos en cadena de supermercados.',
+    joinedMonth: 1,
+    accountType: 'Cuenta Corriente / Cheques',
+    accountBalanceHNL: 145000,
+    hasCreditCard: true,
+    creditCardBrand: 'Visa Empresarial',
+    creditCardLimitHNL: 200000,
+    creditCardBalanceHNL: 98000,
+    hasLoan: true,
+    loanType: 'Capital de Trabajo PYME',
+    loanPrincipalHNL: 16000000,
+    loanBalanceHNL: 14500000,
+    loanMonthlyPaymentHNL: 420000,
+    loanInterestRateAnnual: 17.5,
+    loanMonthsRemaining: 42,
+    guaranteedPayment: false,
+    pastDueDays: 20,
+    pastDueAmountHNL: 12450000,
+    equifaxScore: 685,
+    cnbsCategory: 'I - Normal',
+    otherBankProducts: []
+  },
+  {
+    id: 'CLI-MORA-02',
+    cif: 'CIF-0101-1982-01449',
+    name: 'Desarrollos Hoteleros de la Bahía S.A.',
+    division: 'premier',
+    city: 'La Ceiba / Roatán',
+    notes: 'Complejo eco-turístico. Temporada baja generó retraso de 48 días en pago de cuotas hipotecarias.',
+    joinedMonth: 1,
+    accountType: 'Cuenta DPF Plazo Fijo',
+    accountBalanceHNL: 320000,
+    hasCreditCard: true,
+    creditCardBrand: 'Mastercard Platinum',
+    creditCardLimitHNL: 400000,
+    creditCardBalanceHNL: 185000,
+    hasLoan: true,
+    loanType: 'Préstamo de Vivienda / Hotelero',
+    loanPrincipalHNL: 18500000,
+    loanBalanceHNL: 16800000,
+    loanMonthlyPaymentHNL: 495000,
+    loanInterestRateAnnual: 14.8,
+    loanMonthsRemaining: 68,
+    guaranteedPayment: false,
+    pastDueDays: 48,
+    pastDueAmountHNL: 14800000,
+    equifaxScore: 620,
+    cnbsCategory: 'II - Especial',
+    otherBankProducts: []
+  },
+  {
+    id: 'CLI-MORA-03',
+    cif: 'CIF-0501-1980-03312',
+    name: 'Transportes y Cargas del Norte S.A.',
+    division: 'corporativa',
+    city: 'Puerto Cortés',
+    notes: 'Flota de transporte pesado. Contrato estatal impago provocó atraso de 75 días. Requiere plan de reestructuración.',
+    joinedMonth: 1,
+    accountType: 'Cuenta Corriente / Cheques',
+    accountBalanceHNL: 210000,
+    hasCreditCard: false,
+    creditCardBrand: 'Sin Tarjeta',
+    creditCardLimitHNL: 0,
+    creditCardBalanceHNL: 0,
+    hasLoan: true,
+    loanType: 'Préstamo Sindicado Corp',
+    loanPrincipalHNL: 15000000,
+    loanBalanceHNL: 13500000,
+    loanMonthlyPaymentHNL: 410000,
+    loanInterestRateAnnual: 15.2,
+    loanMonthsRemaining: 45,
+    guaranteedPayment: false,
+    pastDueDays: 75,
+    pastDueAmountHNL: 11250000,
+    equifaxScore: 560,
+    cnbsCategory: 'III - Subnormal',
+    otherBankProducts: []
+  },
+  {
+    id: 'CLI-MORA-04',
+    cif: 'CIF-0801-1976-00921',
+    name: 'Agropecuaria El Zamorano / Valle Verde',
+    division: 'pyme',
+    city: 'Comayagua',
+    notes: 'Cultivos bajo riego afectados por sequía. 135 días de atraso. Evaluar dación en pago de maquinaria o venta de cartera.',
+    joinedMonth: 1,
+    accountType: 'Cuenta Corriente / Cheques',
+    accountBalanceHNL: 85000,
+    hasCreditCard: true,
+    creditCardBrand: 'Visa Empresarial',
+    creditCardLimitHNL: 100000,
+    creditCardBalanceHNL: 78000,
+    hasLoan: true,
+    loanType: 'Capital de Trabajo PYME',
+    loanPrincipalHNL: 12000000,
+    loanBalanceHNL: 10800000,
+    loanMonthlyPaymentHNL: 340000,
+    loanInterestRateAnnual: 18.0,
+    loanMonthsRemaining: 38,
+    guaranteedPayment: false,
+    pastDueDays: 135,
+    pastDueAmountHNL: 9450000,
+    equifaxScore: 490,
+    cnbsCategory: 'IV - Dudoso Recaudo',
+    otherBankProducts: []
+  },
+  {
+    id: 'CLI-MORA-05',
+    cif: 'CIF-1501-1971-00109',
+    name: 'Consorcio Maderero Olancho S.A.',
+    division: 'corporativa',
+    city: 'Juticalpa / Catacamas',
+    notes: 'Planta de aserrío clausurada por litigio judicial. 240 días de atraso. Cartera en pérdida; candidato para venta a fondo de cobro o castigo.',
+    joinedMonth: 1,
+    accountType: 'Cuenta Corriente / Cheques',
+    accountBalanceHNL: 12000,
+    hasCreditCard: false,
+    creditCardBrand: 'Sin Tarjeta',
+    creditCardLimitHNL: 0,
+    creditCardBalanceHNL: 0,
+    hasLoan: true,
+    loanType: 'Préstamo Sindicado Corp',
+    loanPrincipalHNL: 10000000,
+    loanBalanceHNL: 8500000,
+    loanMonthlyPaymentHNL: 290000,
+    loanInterestRateAnnual: 19.5,
+    loanMonthsRemaining: 30,
+    guaranteedPayment: false,
+    pastDueDays: 240,
+    pastDueAmountHNL: 7344191,
+    equifaxScore: 380,
+    cnbsCategory: 'V - Pérdida',
+    otherBankProducts: []
   }
 ];
 
@@ -854,7 +1000,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     creditEligible: true,
     hasCommercialLoan: true,
     commercialLoanAmount: 1200000,
-    hasBusinessCard: true
+    hasBusinessCard: true,
+    accountNumber: 'CTA-PYM-0501-8812-01',
+    division: 'pyme'
   },
   {
     id: 'pos-02',
@@ -870,7 +1018,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     creditEligible: true,
     hasCommercialLoan: false,
     commercialLoanAmount: 0,
-    hasBusinessCard: true
+    hasBusinessCard: true,
+    accountNumber: 'CTA-PYM-0501-9923-04',
+    division: 'pyme'
   },
   {
     id: 'pos-03',
@@ -886,7 +1036,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     creditEligible: true,
     hasCommercialLoan: false,
     commercialLoanAmount: 0,
-    hasBusinessCard: false
+    hasBusinessCard: false,
+    accountNumber: 'CTA-PYM-0801-7714-02',
+    division: 'pyme'
   },
   {
     id: 'pos-04',
@@ -902,7 +1054,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     creditEligible: true,
     hasCommercialLoan: true,
     commercialLoanAmount: 350000,
-    hasBusinessCard: true
+    hasBusinessCard: true,
+    accountNumber: 'CTA-PYM-0301-3315-08',
+    division: 'pyme'
   },
   {
     id: 'pos-05',
@@ -918,7 +1072,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     creditEligible: false,
     hasCommercialLoan: false,
     commercialLoanAmount: 0,
-    hasBusinessCard: false
+    hasBusinessCard: false,
+    accountNumber: 'CTA-PYM-1101-5516-11',
+    division: 'pyme'
   }
 ];
 
@@ -1214,7 +1370,10 @@ export const INITIAL_PAYROLL_AGREEMENTS: CorporatePayrollAgreement[] = [
     status: 'Activo',
     monthsWithBank: 8,
     isAutoRenewed: true,
-    loyaltyBonusPct: 5
+    loyaltyBonusPct: 5,
+    linkedDivision: 'corporativa',
+    bankAccountBalanceHNL: 14500000,
+    accountNumber: 'CTA-CORP-0501-8841-01'
   },
   {
     id: 'pay-02',
@@ -1228,7 +1387,10 @@ export const INITIAL_PAYROLL_AGREEMENTS: CorporatePayrollAgreement[] = [
     status: 'Activo',
     monthsWithBank: 6,
     isAutoRenewed: true,
-    loyaltyBonusPct: 5
+    loyaltyBonusPct: 5,
+    linkedDivision: 'corporativa',
+    bankAccountBalanceHNL: 8900000,
+    accountNumber: 'CTA-CORP-0501-4412-09'
   },
   {
     id: 'pay-03',
@@ -1242,7 +1404,10 @@ export const INITIAL_PAYROLL_AGREEMENTS: CorporatePayrollAgreement[] = [
     status: 'Activo',
     monthsWithBank: 4,
     isAutoRenewed: false,
-    loyaltyBonusPct: 0
+    loyaltyBonusPct: 0,
+    linkedDivision: 'pyme',
+    bankAccountBalanceHNL: 4200000,
+    accountNumber: 'CTA-PYM-0801-9921-03'
   }
 ];
 
@@ -1373,7 +1538,12 @@ export const INITIAL_APPLICATIONS: CreditApplication[] = [
     collateralValue: 4200000,
     location: 'Tegucigalpa (Las Lomas)',
     riskVerdict: 'Bajo Riesgo',
-    reasonText: 'Médico especialista con 12 años en Hospital Viera. Capacidad de pago comprobada y garantía con LTV 66%.'
+    reasonText: 'Médico especialista con 12 años en Hospital Viera. Capacidad de pago comprobada y garantía con LTV 66%.',
+    officerNote: 'Solicitud dentro de la autonomía máxima de L. 20M. Scoring excelente (885) y ratio DTI holgado. El Oficial de Crédito aprueba automáticamente bajo política institucional.',
+    officerRecommendation: 'Favorable (Aprobación Sugerida)',
+    officerCanAutoApprove: true,
+    requiresExecutiveBoardApproval: false,
+    officerDecisionStatus: 'Pendiente'
   },
   {
     id: 'SOL-2026-082',
@@ -1392,7 +1562,12 @@ export const INITIAL_APPLICATIONS: CreditApplication[] = [
     collateralValue: 900000,
     location: 'San Pedro Sula (Medina)',
     riskVerdict: 'Riesgo Moderado',
-    reasonText: 'Comercio con 7 años de operación. Ventas estables, solicita compra de inventario importado para temporada.'
+    reasonText: 'Comercio con 7 años de operación. Ventas estables, solicita compra de inventario importado para temporada.',
+    officerNote: 'Comercio afiliado a la red POS de Áureo. Flujo verificable en cuentas del banco. Oficial de crédito faculta desembolso inmediato.',
+    officerRecommendation: 'Favorable (Aprobación Sugerida)',
+    officerCanAutoApprove: true,
+    requiresExecutiveBoardApproval: false,
+    officerDecisionStatus: 'Pendiente'
   },
   {
     id: 'SOL-2026-083',
@@ -1411,7 +1586,12 @@ export const INITIAL_APPLICATIONS: CreditApplication[] = [
     collateralValue: 95000,
     location: 'Choloma (ZIP Choloma)',
     riskVerdict: 'Bajo Riesgo',
-    reasonText: 'Supervisor de planta en empresa con convenio de nómina Áureo. Descuento automático por planilla.'
+    reasonText: 'Supervisor de planta en empresa con convenio de nómina Áureo. Descuento automático por planilla.',
+    officerNote: 'Deducción directa garantizada por convenio de nómina con Manufacturas Textiles del Valle S.A. Oficial de Crédito aprueba automáticamente.',
+    officerRecommendation: 'Favorable (Aprobación Sugerida)',
+    officerCanAutoApprove: true,
+    requiresExecutiveBoardApproval: false,
+    officerDecisionStatus: 'Pendiente'
   },
   {
     id: 'SOL-2026-084',
@@ -1430,10 +1610,39 @@ export const INITIAL_APPLICATIONS: CreditApplication[] = [
     collateralValue: 42000000,
     location: 'El Progreso / Tela',
     riskVerdict: 'Bajo Riesgo',
-    reasonText: 'Exportadora consolidada. Financiamiento para ampliación de planta extractora. Participación conjunta con Banpaís.'
+    reasonText: 'Exportadora consolidada. Financiamiento para ampliación de planta extractora. Participación conjunta con Banpaís.',
+    officerNote: 'NOTA DEL OFICIAL DE CRÉDITO: El monto solicitado de L. 25,000,000.00 supera mi límite autónomo de 20 millones. La empresa exporta a México y la UE, cuenta con hipoteca industrial de L. 42M (LTV 59.5%) y liquidez sólida. Emitimos DICTAMEN FAVORABLE y remitimos el caso a su decisión como Presidente y al Comité Ejecutivo de Crédito.',
+    officerRecommendation: 'Favorable (Aprobación Sugerida)',
+    officerCanAutoApprove: false,
+    requiresExecutiveBoardApproval: true,
+    officerDecisionStatus: 'Enviado a Comité'
   },
   {
     id: 'SOL-2026-085',
+    applicantName: 'Constructora & Pavimentos Morazán S.A.',
+    division: 'corporativa',
+    productType: 'Préstamo Sindicado Corp',
+    requestedAmount: 38000000,
+    termMonths: 72,
+    proposedRate: 13.5,
+    monthlyIncome: 12000000,
+    monthlyObligations: 3400000,
+    calculatedDTI: 36.2,
+    cnbsCategory: 'I - Normal',
+    equifaxScore: 810,
+    collateralType: 'Hipoteca Inmobiliaria',
+    collateralValue: 55000000,
+    location: 'San Pedro Sula (Bulevar del Norte)',
+    riskVerdict: 'Bajo Riesgo',
+    reasonText: 'Consorcio vial con licitación pública adjudicada para infraestructura urbana.',
+    officerNote: 'NOTA DEL OFICIAL DE CRÉDITO: Solicitud de L. 38,000,000.00 reservada estrictamente al Presidente Ejecutivo. Garantía hipotecaria y cesión de flujos del fideicomiso vial. Emitimos recomendación favorable con condición de retención del 10% en cuenta de reserva.',
+    officerRecommendation: 'Favorable (Aprobación Sugerida)',
+    officerCanAutoApprove: false,
+    requiresExecutiveBoardApproval: true,
+    officerDecisionStatus: 'Enviado a Comité'
+  },
+  {
+    id: 'SOL-2026-086',
     applicantName: 'Juan Carlos Midence',
     division: 'personas',
     productType: 'Préstamo Personal',
@@ -1449,22 +1658,238 @@ export const INITIAL_APPLICATIONS: CreditApplication[] = [
     collateralValue: 0,
     location: 'Comayagüela',
     riskVerdict: 'Alto Riesgo',
-    reasonText: 'DTI excede el 68%. Tarjetas en atraso de 45 días en Ficohsa. Riesgo de mora elevado; requiere aval o rechazo.'
+    reasonText: 'DTI excede el 68%. Tarjetas en atraso de 45 días en Ficohsa. Riesgo de mora elevado; requiere aval o rechazo.',
+    officerNote: 'Oficial de Crédito dictamina RECHAZO AUTOMÁTICO por sobreendeudamiento (DTI > 65%) e historial negativo en buró Equifax.',
+    officerRecommendation: 'Desfavorable (Riesgo Excesivo)',
+    officerCanAutoApprove: true,
+    requiresExecutiveBoardApproval: false,
+    officerDecisionStatus: 'Pendiente'
   }
 ];
+
+export const INITIAL_INTERBANK_OFFERS: InterbankPortfolioOffer[] = [
+  {
+    id: 'mna-01',
+    sellerBankId: 'ficohsa',
+    sellerBankName: 'Banco Ficohsa S.A.',
+    portfolioType: 'activos_creditos',
+    name: 'Paquete Préstamos Hipotecarios Residenciales San Pedro Sula',
+    faceValueHNL: 40000000,
+    offerPriceHNL: 38400000,
+    discountOrPremiumPct: -4.0,
+    averageRatePct: 13.5,
+    riskRating: 'Bajo (A+)',
+    clientCount: 22,
+    termMonthsAvg: 140,
+    description: 'Cartera hipotecaria de primer orden en colonias residenciales de San Pedro Sula (Trejo, Bella Vista). 100% al día con garantía hipotecaria inscrita.',
+    status: 'disponible'
+  },
+  {
+    id: 'mna-02',
+    sellerBankId: 'atlantida',
+    sellerBankName: 'Banco Atlántida S.A.',
+    portfolioType: 'activos_creditos',
+    name: 'Cartera Comercial PYME Agroindustrial Valle de Sula',
+    faceValueHNL: 65000000,
+    offerPriceHNL: 58500000,
+    discountOrPremiumPct: -10.0,
+    averageRatePct: 16.2,
+    riskRating: 'Moderado (BBB)',
+    clientCount: 38,
+    termMonthsAvg: 36,
+    description: 'Créditos productivos a procesadoras de granos y cítricos. Atlántida busca liberar espacio en su cupo de concentración agroindustrial.',
+    status: 'disponible'
+  },
+  {
+    id: 'mna-03',
+    sellerBankId: 'bac',
+    sellerBankName: 'BAC Credomatic',
+    portfolioType: 'activos_creditos',
+    name: 'Paquete Crédito de Consumo y Tarjetas Oro/Platinum',
+    faceValueHNL: 28000000,
+    offerPriceHNL: 23800000,
+    discountOrPremiumPct: -15.0,
+    averageRatePct: 24.5,
+    riskRating: 'Alto (B)',
+    clientCount: 140,
+    termMonthsAvg: 24,
+    description: 'Clientes de consumo con alto rendimiento financiero pero atrasos rotativos de 30-45 días. Ofrece alto margen de cobro mensual.',
+    status: 'disponible'
+  },
+  {
+    id: 'mna-04',
+    sellerBankId: 'occidente',
+    sellerBankName: 'Banco de Occidente S.A.',
+    portfolioType: 'pasivos_depositos',
+    name: 'Paquete de Captación: Depósitos a Plazo Fijo DPF Fiduciarios',
+    faceValueHNL: 50000000,
+    offerPriceHNL: 50000000,
+    discountOrPremiumPct: 0.0,
+    averageRatePct: 5.75,
+    riskRating: 'Bajo (A+)',
+    clientCount: 12,
+    termMonthsAvg: 18,
+    description: 'Transferencia de pasivos estables de cooperativas y fondos del occidente. Incrementa de inmediato la liquidez y depósitos de Áureo Bank.',
+    status: 'disponible'
+  }
+];
+
+export const INITIAL_DYNAMIC_ALERTS: DynamicAlert[] = [
+  {
+    id: 'alert-01',
+    severity: 'critica',
+    category: 'regulatorio_cnbs',
+    title: 'Monitoreo de Encaje Legal Obligatorio BCH',
+    message: 'El encaje legal requerido por el BCH se sitúa en L. 280,800,000.00 (12.0% de captaciones). Tu disponibilidad de caja cubre holgadamente la exigencia.',
+    timestampMonth: 1,
+    targetTab: 'overview',
+    isRead: false
+  },
+  {
+    id: 'alert-02',
+    severity: 'advertencia',
+    category: 'credito',
+    title: 'Cartera en Atraso CNBS: L. 55,294,191.00',
+    message: 'Se identifican créditos en mora distribuidos desde Categoría I hasta Categoría V (Pérdida). Puedes reestructurarlos con los clientes o venderlos en el mercado interbancario.',
+    timestampMonth: 1,
+    targetTab: 'risk',
+    isRead: false
+  },
+  {
+    id: 'alert-03',
+    severity: 'informativa',
+    category: 'credito',
+    title: 'Solicitudes Mayores a L. 20M en Espera de Presidencia',
+    message: 'Agroindustria Palma de la Costa (L. 25M) y Constructora Morazán (L. 38M) cuentan con nota favorable del oficial y requieren tu ratificación en Créditos.',
+    timestampMonth: 1,
+    targetTab: 'credit',
+    isRead: false
+  },
+  {
+    id: 'alert-04',
+    severity: 'informativa',
+    category: 'mercado_bursatil',
+    title: 'Rendimientos en Títulos Soberanos BCH / SEFIN',
+    message: 'Los Bonos Soberanos 2030 del Gobierno de Honduras cotizan a la par con cupón anual de 8.25%. Oportunidad para fortalecer el margen financiero.',
+    timestampMonth: 1,
+    targetTab: 'treasury',
+    isRead: false
+  }
+];
+
+export const INITIAL_EXPERT_OPINIONS: ExpertOpinion[] = [
+  {
+    id: 'exp-01',
+    author: 'Dr. Hugo Noé Pino',
+    role: 'Ex-Presidente del BCH y Doctor en Economía',
+    organization: 'Colegio Hondureño de Economistas (CHE)',
+    headline: 'Preservar coberturas de liquidez ante el ciclo de importaciones',
+    summary: 'La factura petrolera y la demanda de dólares en la subasta del BCH imponen mantener un coeficiente LCR superior al 120%. Los bancos que vigilan su liquidez captan los mejores convenios corporativos.',
+    sentiment: 'Cauteloso' as any,
+    recommendedAction: 'Mantener depósitos estables y no sobrecolocar sin respaldo de encaje legal.',
+    month: 1
+  },
+  {
+    id: 'exp-02',
+    author: 'Lic. José Luis Moncada',
+    role: 'Ex-Comisionado Presidente de la CNBS',
+    organization: 'Consultoría Financiera Internacional',
+    headline: 'Estrategia de saneamiento de cartera morosa (Categorías III a V)',
+    summary: 'Tener L. 55.29M en mora es una cifra manejable para un banco de L. 3,000M, pero las provisiones del 50% y 100% de la norma CNBS drenan capital si no se renegocia a tiempo con el deudor o se liquida a bancos rivales.',
+    sentiment: 'Alerta de Riesgo' as any,
+    recommendedAction: 'Ofrecer condonación de recargos moratorios para reactivar pagos a Categoría I.',
+    month: 1
+  },
+  {
+    id: 'exp-03',
+    author: 'Licda. Mayra Falck',
+    role: 'Ex-Presidenta de Banhprovi y Asesora de Fondeo',
+    organization: 'Asociación Bancaria Hondureña',
+    headline: 'Potencial de los comercios afiliados POS y nóminas CEE',
+    summary: 'La captación proveniente de saldos retenidos en cuentas de planillas y comercios POS es el fondeo más barato del sistema bancario nacional, con costo inferior al 2% anual.',
+    sentiment: 'Oportunidad Estratégica' as any,
+    recommendedAction: 'Afiliar activamente nuevas empresas de nómina y elevar el ticket de los comercios POS.',
+    month: 1
+  },
+  {
+    id: 'exp-04',
+    author: 'Msc. Roberto Lagos',
+    role: 'Macroeconomista y Catedrático Internacional',
+    organization: 'Análisis Económico Washington D.C.',
+    headline: 'El arbitraje en la curva soberana del BCH y títulos bursátiles',
+    summary: 'Con la TPM en 5.75%, los bonos soberanos SEFIN a 8.25% y las emisiones corporativas de Cervecería Hondureña y Dinant ofrecen una prima de riesgo altamente atractiva.',
+    sentiment: 'Favorable / Crecimiento' as any,
+    recommendedAction: 'Incrementar compras de bonos soberanos en la bolsa secundaria.',
+    month: 1
+  }
+];
+
+export const INITIAL_INNOVATIONS: TenInnovationsState = {
+  fxDesk: {
+    openPositionUSD: 7450000,
+    bchAuctionBiddedUSD: 2500000,
+    bchAuctionWonUSD: 2000000,
+    fxSpreadIncomeMonthly: 850000
+  },
+  cnbsAudits: {
+    lastAuditResult: 'Inspección General Ordinaria Favorable - Sin observaciones graves en encaje legal',
+    complianceRating: 94,
+    requiredProvisionCorrection: 0,
+    isAuditedThisPeriod: false
+  },
+  interbankCallMoney: {
+    lentAmountHNL: 0,
+    borrowedAmountHNL: 0,
+    callRatePct: 6.25
+  },
+  internationalRating: {
+    agency: 'Fitch Ratings',
+    currentRating: 'AAA (hnd) / BB- Global',
+    outlook: 'Estable',
+    fundingCostDiscountPct: 0.40
+  },
+  debtWorkouts: {
+    totalRestructuredAmountHNL: 0,
+    totalSoldToRivalsAmountHNL: 0,
+    recoveredCapitalHNL: 0
+  },
+  digitalBanking: {
+    appUsersCount: 42500,
+    mobileAdoptionPct: 68.5,
+    costSavingsMonthlyHNL: 420000
+  },
+  remittanceAlliances: {
+    directDepositBonusPct: 2.0,
+    monthlyCapturedRemittanceDepositsHNL: 18500000
+  },
+  stressTesting: {
+    lastScenarioRun: 'Línea Base Sin Shocks Macroeconómicos',
+    simulatedCAR: 14.8,
+    simulatedLCR: 130.0,
+    capitalGapHNL: 0
+  },
+  syndicatedMegaLoans: {
+    participatedProjectsCount: 1,
+    activeSyndicatedExposureHNL: 25000000
+  },
+  distressedAssetAuctions: {
+    activeAuctionsCount: 2,
+    acquiredBranchesCount: 0
+  }
+};
 
 export const INITIAL_FINANCIALS: BankFinancialStatements = {
   // Balance General (Lempiras)
   cashAndBCHReserves: 365000000,
   requiredReserveAmount: 280800000, // 12% de 2,340,000,000
   loanPortfolioCurrent: 1995000000,
-  loanPortfolioPastDue: 35000000,
-  loanLossProvisions: 42000000,
+  loanPortfolioPastDue: 55294191, // Cartera en atraso exacta: L. 55,294,191.00
+  loanLossProvisions: 58000000,
   treasuryBondsBCH: 265000000,
   secondarySecuritiesValueHNL: 48780000, // Valor total de títulos y acciones en posesión inicial
   fxReservesUSDValueInHNL: 185000000,
   fixedAssetsBranches: 147000000,
-  totalAssets: 2998780000,
+  totalAssets: 3019074191,
 
   depositsPublicTotal: 2340000000,
   interbankBorrowingBCH: 0,
@@ -1472,14 +1897,14 @@ export const INITIAL_FINANCIALS: BankFinancialStatements = {
   totalLiabilities: 2525000000,
 
   capitalStock: 350000000,
-  retainedEarnings: 110280000,
+  retainedEarnings: 130574191,
   currentMonthProfit: 13500000,
-  totalEquity: 473780000,
+  totalEquity: 494074191,
 
   // Ratios Regulatorios CNBS
   capitalAdequacyRatioCAR: 14.8, // 14.8% (muy por encima del 10.0% mínimo)
   liquidityCoverageRatioLCR: 130.0, // 130%
-  delinquencyRatioNPL: 1.72, // 1.72% de mora (excelente nivel < 3%)
+  delinquencyRatioNPL: 2.69, // 2.69% de mora
   returnOnEquityROE: 16.5, // 16.5% anualizado
 
   // Estado de Resultados del Mes (Lempiras)
@@ -1536,7 +1961,7 @@ export const INITIAL_GAME_STATE: GameState = {
   historyMonthlyProfits: [
     { monthLabel: 'Nov 2025', profit: 12800000, assets: 2820000000, car: 14.5 },
     { monthLabel: 'Dic 2025', profit: 14100000, assets: 2890000000, car: 14.6 },
-    { monthLabel: 'Ene 2026', profit: 15955500, assets: 2998780000, car: 14.8 }
+    { monthLabel: 'Ene 2026', profit: 15955500, assets: 3019074191, car: 14.8 }
   ],
   notifications: [
     {
@@ -1561,5 +1986,10 @@ export const INITIAL_GAME_STATE: GameState = {
   marketingAggressiveness: 'Agresiva (Guerra de Tasas)',
   digitalTechLevel: 2,
   advisorMonthlyLimitPerAdvisor: 25,
-  advisorApprovalsUsedThisMonth: 0
+  advisorApprovalsUsedThisMonth: 0,
+  // Nuevas propiedades institucionales
+  interbankOffers: INITIAL_INTERBANK_OFFERS,
+  dynamicAlerts: INITIAL_DYNAMIC_ALERTS,
+  expertOpinions: INITIAL_EXPERT_OPINIONS,
+  innovations: INITIAL_INNOVATIONS
 };

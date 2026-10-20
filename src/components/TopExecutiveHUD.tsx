@@ -11,7 +11,11 @@ import {
   ShieldCheck, 
   TrendingUp, 
   BadgePercent, 
-  Coins 
+  Coins,
+  Bell,
+  FileSpreadsheet,
+  Building,
+  Sparkles
 } from 'lucide-react';
 
 interface TopExecutiveHUDProps {
@@ -20,6 +24,8 @@ interface TopExecutiveHUDProps {
   onResetGame: () => void;
   activeTab: string;
   onSelectTab: (tab: string) => void;
+  onOpenFinancialStatements: () => void;
+  onOpenInterbankMarket: () => void;
 }
 
 export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
@@ -27,9 +33,12 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   onAdvanceMonth,
   onResetGame,
   activeTab,
-  onSelectTab
+  onSelectTab,
+  onOpenFinancialStatements,
+  onOpenInterbankMarket
 }) => {
   const [isMuted, setIsMuted] = React.useState(sound.getMuted());
+  const [showAlertsDropdown, setShowAlertsDropdown] = React.useState(false);
   const { name: monthName, year, fullLabel } = getMonthName(state.gameMonth);
 
   const toggleSound = () => {
@@ -43,6 +52,9 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   const actualReserves = state.financials.cashAndBCHReserves;
   const isReserveCompliant = actualReserves >= requiredReserves;
 
+  const alerts = state.dynamicAlerts || [];
+  const unreadAlertsCount = alerts.filter(a => !a.isRead).length;
+
   const navItems = [
     { id: 'overview', label: 'Directorio' },
     { id: 'divisions', label: '6 Bancas y Clientes' },
@@ -52,6 +64,9 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
     { id: 'clearing', label: 'CCE y Planilla' },
     { id: 'origination', label: `Créditos (${state.pendingApplications.length})` },
     { id: 'treasury', label: 'Tesorería y Mercado Secundario' },
+    { id: 'operations', label: 'Eficiencia Operativa' },
+    { id: 'experts', label: 'Opiniones Expertos' },
+    { id: 'innovations', label: '10 Innovaciones' },
     { id: 'board_staff', label: 'Talento y Directiva' },
     { id: 'branches', label: 'Sucursales' }
   ];
@@ -107,6 +122,96 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
         {/* Botones de acción derecha */}
         <div className="flex items-center gap-2">
+          {/* Botón Estados Financieros CNBS */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              onOpenFinancialStatements();
+            }}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
+            title="Ver Estados Financieros Auditados CNBS"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Estados Financieros</span>
+          </button>
+
+          {/* Botón Mercado M&A Interbancario */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              onOpenInterbankMarket();
+            }}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
+            title="Mercado Interbancario de Compra y Venta de Carteras"
+          >
+            <Building className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden md:inline">M&A Carteras</span>
+          </button>
+
+          {/* Botón Campana Alertas Dinámicas */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                sound.playClick();
+                setShowAlertsDropdown(!showAlertsDropdown);
+              }}
+              className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors relative"
+              title="Alertas Dinámicas del Sistema"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadAlertsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center font-mono animate-pulse">
+                  {unreadAlertsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown de Alertas Dinámicas */}
+            {showAlertsDropdown && (
+              <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-3 z-50 text-xs space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <Bell className="w-3.5 h-3.5 text-amber-400" /> Alertas Dinámicas del Banco
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">{alerts.length} eventos</span>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-1.5">
+                  {alerts.length === 0 ? (
+                    <p className="text-slate-500 py-3 text-center">No hay alertas pendientes.</p>
+                  ) : (
+                    alerts.map(a => {
+                      const isCritical = a.severity === 'critica';
+                      const isWarn = a.severity === 'advertencia';
+                      return (
+                        <div
+                          key={a.id}
+                          onClick={() => {
+                            setShowAlertsDropdown(false);
+                            if (a.targetTab) onSelectTab(a.targetTab);
+                          }}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                            isCritical ? 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20' :
+                            isWarn ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20' :
+                            'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between font-bold text-[11px] mb-0.5">
+                            <span>{a.title}</span>
+                            <span className="text-[9px] uppercase font-mono px-1 rounded bg-black/40">
+                              {a.severity}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-tight">{a.message}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={toggleSound}
             className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
@@ -122,15 +227,15 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
             title="Reiniciar simulador"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reiniciar</span>
+            <span className="hidden sm:inline">Reiniciar</span>
           </button>
 
           <button
             onClick={onAdvanceMonth}
-            className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold flex items-center gap-2 text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold flex items-center gap-2 text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Avanzar al Próximo Mes</span>
+            <span>Avanzar Mes</span>
           </button>
         </div>
       </div>

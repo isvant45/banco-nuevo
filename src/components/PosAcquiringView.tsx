@@ -12,8 +12,10 @@ import {
   CheckCircle2, 
   Sparkles, 
   ShieldCheck, 
-  Building 
+  Building,
+  Edit3
 } from 'lucide-react';
+import { PosMerchantEditModal } from './PosMerchantEditModal';
 
 interface PosAcquiringViewProps {
   state: GameState;
@@ -21,6 +23,7 @@ interface PosAcquiringViewProps {
   onGrantMerchantCard: (merchantId: string) => void;
   onAffiliateNewMerchant: (merchantName: string, category: PosMerchant['businessCategory'], city: string) => void;
   onUpdateMerchantFee: (merchantId: string, newFeePct: number) => void;
+  onSaveMerchant?: (merchant: PosMerchant, isNew: boolean) => void;
 }
 
 export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
@@ -28,12 +31,11 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
   onGrantMerchantLoan,
   onGrantMerchantCard,
   onAffiliateNewMerchant,
-  onUpdateMerchantFee
+  onUpdateMerchantFee,
+  onSaveMerchant
 }) => {
-  const [showAffiliateModal, setShowAffiliateModal] = useState<boolean>(false);
-  const [newMerchantName, setNewMerchantName] = useState<string>('Repuestos El Halcón S. de R.L.');
-  const [newCategory, setNewCategory] = useState<PosMerchant['businessCategory']>('Taller & Repuestos');
-  const [newCity, setNewCity] = useState<string>('San Pedro Sula');
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [selectedMerchantForEdit, setSelectedMerchantForEdit] = useState<PosMerchant | null>(null);
 
   const totalMonthlySales = state.posMerchants.reduce((acc, m) => acc + m.monthlySalesVolumeHNL, 0);
   const totalPhysicalPos = state.posMerchants.reduce((acc, m) => acc + m.physicalPosCount, 0);
@@ -53,11 +55,28 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
     onGrantMerchantCard(merchant.id);
   };
 
-  const handleAffiliateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOpenNewMerchant = () => {
+    sound.playClick();
+    setSelectedMerchantForEdit(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenEditMerchant = (merchant: PosMerchant) => {
+    sound.playClick();
+    setSelectedMerchantForEdit(merchant);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveMerchantFromModal = (merchant: PosMerchant, isNew: boolean) => {
     sound.playApprovalStamp();
-    onAffiliateNewMerchant(newMerchantName, newCategory, newCity);
-    setShowAffiliateModal(false);
+    if (onSaveMerchant) {
+      onSaveMerchant(merchant, isNew);
+    } else {
+      if (isNew) {
+        onAffiliateNewMerchant(merchant.merchantName, merchant.businessCategory, merchant.city);
+      }
+    }
+    setIsEditModalOpen(false);
   };
 
   return (
@@ -120,11 +139,11 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
           </div>
 
           <button
-            onClick={() => setShowAffiliateModal(true)}
+            onClick={handleOpenNewMerchant}
             className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Afiliar Nuevo Comercio</span>
+            <span>Afiliar / Agregar Comercio con Saldo Personalizado</span>
           </button>
         </div>
 
@@ -140,6 +159,7 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
                 <th className="py-2.5 px-3 text-right">Saldo en Cuenta (L.)</th>
                 <th className="py-2.5 px-3 text-center">Comisión POS</th>
                 <th className="py-2.5 px-3 text-right">Productos y Financiación</th>
+                <th className="py-2.5 px-3 text-center">Gestión</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -153,7 +173,7 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
                         </span>
                         <div>
                           <span className="font-semibold text-white block">{merchant.merchantName}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">{merchant.id}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{merchant.id} · {merchant.accountNumber || 'Cuenta Áureo'}</span>
                         </div>
                       </div>
                     </td>
@@ -200,7 +220,7 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
                             Otorgar Crédito
                           </button>
                         ) : (
-                          <span className="text-[10px] text-slate-500">Volumen insuficiente</span>
+                          <span className="text-[10px] text-slate-500">Volumen bajo</span>
                         )}
 
                         {!merchant.hasBusinessCard ? (
@@ -211,9 +231,20 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
                             + Tarjeta Visa
                           </button>
                         ) : (
-                          <span className="text-[10px] text-slate-400">Visa Corp activa</span>
+                          <span className="text-[10px] text-slate-400">Visa Corp</span>
                         )}
                       </div>
+                    </td>
+
+                    <td className="py-3 px-3 text-center font-sans">
+                      <button
+                        onClick={() => handleOpenEditMerchant(merchant)}
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold flex items-center gap-1 mx-auto transition-colors"
+                        title="Modificar Saldo en Cuenta y Facturación Mensual"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Editar</span>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -223,84 +254,14 @@ export const PosAcquiringView: React.FC<PosAcquiringViewProps> = ({
         </div>
       </div>
 
-      {/* Modal para Afiliar Nuevo Comercio */}
-      {showAffiliateModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Afiliar Comercio a Red de POS Áureo
-              </h3>
-              <button
-                onClick={() => setShowAffiliateModal(false)}
-                className="text-slate-400 hover:text-white text-base"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleAffiliateSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Nombre Comercial de la Empresa:</label>
-                <input
-                  type="text"
-                  required
-                  value={newMerchantName}
-                  onChange={e => setNewMerchantName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Categoría de Negocio:</label>
-                <select
-                  value={newCategory}
-                  onChange={e => setNewCategory(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2"
-                >
-                  <option value="Supermercado & Abarrotería">Supermercado & Abarrotería</option>
-                  <option value="Restaurante & Café">Restaurante & Café</option>
-                  <option value="Ferretería & Construcción">Ferretería & Construcción</option>
-                  <option value="Farmacia & Salud">Farmacia & Salud</option>
-                  <option value="Tienda Retail & Moda">Tienda Retail & Moda</option>
-                  <option value="Taller & Repuestos">Taller & Repuestos</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Ciudad:</label>
-                <select
-                  value={newCity}
-                  onChange={e => setNewCity(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2"
-                >
-                  <option value="San Pedro Sula">San Pedro Sula</option>
-                  <option value="Tegucigalpa">Tegucigalpa</option>
-                  <option value="Choloma">Choloma</option>
-                  <option value="La Ceiba">La Ceiba</option>
-                  <option value="Roatán">Roatán</option>
-                  <option value="Comayagua">Comayagua</option>
-                </select>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAffiliateModal(false)}
-                  className="px-3 py-1.5 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
-                >
-                  Afiliar e Instalar POS
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Modal Interactivo de Edición y Creación de Comercio POS */}
+      {isEditModalOpen && (
+        <PosMerchantEditModal
+          isOpen={true}
+          merchantToEdit={selectedMerchantForEdit}
+          onClose={() => setIsEditModalOpen(false)}
+          onSaveMerchant={handleSaveMerchantFromModal}
+        />
       )}
     </div>
   );

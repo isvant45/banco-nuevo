@@ -17,26 +17,29 @@ import {
   Clock 
 } from 'lucide-react';
 
+import { PayrollEditModal } from './PayrollEditModal';
+
 interface ClearingAndPayrollTabProps {
   state: GameState;
   onUpdateAchFee: (newFee: number) => void;
   onSignPayrollAgreement: (agreementId: string) => void;
   onUpdatePayrollAgreement: (agreementId: string, employeeCount: number, monthlyPayrollVolume: number) => void;
+  onSavePayrollAgreement?: (agreement: CorporatePayrollAgreement, isNew: boolean) => void;
 }
 
 export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
   state,
   onUpdateAchFee,
   onSignPayrollAgreement,
-  onUpdatePayrollAgreement
+  onUpdatePayrollAgreement,
+  onSavePayrollAgreement
 }) => {
   const [achFee, setAchFee] = useState<number>(state.clearingHouse.achFeePerTransfer);
   const clearing = state.clearingHouse;
 
-  // Modal para editar colaboradores y monto de nómina
-  const [editingAgreement, setEditingAgreement] = useState<CorporatePayrollAgreement | null>(null);
-  const [editEmployees, setEditEmployees] = useState<number>(0);
-  const [editPayrollVolume, setEditPayrollVolume] = useState<number>(0);
+  // Modal para editar / afiliar convenio completo con cuenta bancaria
+  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState<boolean>(false);
+  const [selectedAgreementForModal, setSelectedAgreementForModal] = useState<CorporatePayrollAgreement | null>(null);
 
   const handleSaveAchFee = () => {
     sound.playApprovalStamp();
@@ -48,19 +51,26 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
     onSignPayrollAgreement(id);
   };
 
-  const openEditModal = (agreement: CorporatePayrollAgreement) => {
-    setEditingAgreement(agreement);
-    setEditEmployees(agreement.employeeCount);
-    setEditPayrollVolume(agreement.monthlyPayrollVolume);
+  const handleOpenEditModal = (agreement: CorporatePayrollAgreement) => {
+    sound.playClick();
+    setSelectedAgreementForModal(agreement);
+    setIsPayrollModalOpen(true);
   };
 
-  const handleSaveAgreementEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingAgreement) {
-      sound.playApprovalStamp();
-      onUpdatePayrollAgreement(editingAgreement.id, editEmployees, editPayrollVolume);
-      setEditingAgreement(null);
+  const handleOpenNewAgreement = () => {
+    sound.playClick();
+    setSelectedAgreementForModal(null);
+    setIsPayrollModalOpen(true);
+  };
+
+  const handleSaveModalAgreement = (agreement: CorporatePayrollAgreement, isNew: boolean) => {
+    sound.playApprovalStamp();
+    if (onSavePayrollAgreement) {
+      onSavePayrollAgreement(agreement, isNew);
+    } else {
+      onUpdatePayrollAgreement(agreement.id, agreement.employeeCount, agreement.monthlyPayrollVolume);
     }
+    setIsPayrollModalOpen(false);
   };
 
   const totalEmployees = state.payrollAgreements
@@ -191,13 +201,23 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
 
         {/* Lista de Convenios Corporativos */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-              Convenios de Nómina Registrados ({state.payrollAgreements.length})
-            </h3>
-            <span className="text-[11px] text-slate-400">
-              * A los 6 meses de antigüedad con el banco, el convenio se renueva automáticamente.
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Convenios de Nómina Registrados ({state.payrollAgreements.length})
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Cada empresa afiliada debe mantener aperturada su cuenta corriente o empresarial con fondos de reserva en la banca correspondiente de Áureo Bank.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenNewAgreement}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Afiliar Nueva Empresa de Planilla</span>
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -205,11 +225,12 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
                   <th className="py-2.5 px-3">Empresa / Razón Social</th>
-                  <th className="py-2.5 px-3">Sector e Industria</th>
+                  <th className="py-2.5 px-3">Banca y Cuenta Obligatoria</th>
                   <th className="py-2.5 px-3 text-right">Empleados</th>
                   <th className="py-2.5 px-3 text-right">Monto Nómina (L.)</th>
+                  <th className="py-2.5 px-3 text-right">Saldo en Cuenta (L.)</th>
                   <th className="py-2.5 px-3 text-center">Antigüedad</th>
-                  <th className="py-2.5 px-3 text-center">Estado / Renovación</th>
+                  <th className="py-2.5 px-3 text-center">Estado</th>
                   <th className="py-2.5 px-3 text-right">Acción</th>
                 </tr>
               </thead>
@@ -217,6 +238,8 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
                 {state.payrollAgreements.map(agreement => {
                   const isActive = agreement.status === 'Activo';
                   const isRenewed = agreement.isAutoRenewed;
+                  const divName = (agreement.linkedDivision || 'corporativa').toUpperCase();
+
                   return (
                     <tr key={agreement.id} className="hover:bg-slate-800/40 text-slate-300">
                       <td className="py-3 px-3 font-sans font-semibold text-white">
@@ -228,10 +251,16 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
                             </span>
                           )}
                         </div>
+                        <span className="text-[10px] text-slate-400 block font-normal">{agreement.industry}</span>
                       </td>
 
-                      <td className="py-3 px-3 font-sans text-slate-400">
-                        {agreement.industry}
+                      <td className="py-3 px-3 font-sans">
+                        <span className="text-amber-400 font-bold text-[11px] block">
+                          BANCA {divName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {agreement.accountNumber || `CTA-${divName.slice(0, 4)}-0501-11`}
+                        </span>
                       </td>
 
                       <td className="py-3 px-3 text-right text-slate-200">
@@ -240,6 +269,10 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
 
                       <td className="py-3 px-3 text-right text-emerald-400 font-bold">
                         {formatHNL(agreement.monthlyPayrollVolume)}
+                      </td>
+
+                      <td className="py-3 px-3 text-right text-blue-300 font-bold">
+                        {formatHNL(agreement.bankAccountBalanceHNL || 0)}
                       </td>
 
                       <td className="py-3 px-3 text-center font-sans">
@@ -261,21 +294,22 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
 
                       <td className="py-3 px-3 text-right font-sans">
                         <div className="flex items-center justify-end gap-1.5">
-                          {isActive ? (
-                            <button
-                              onClick={() => openEditModal(agreement)}
-                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                              <span>Modificar</span>
-                            </button>
-                          ) : (
+                          <button
+                            onClick={() => handleOpenEditModal(agreement)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
+                            title="Modificar colaboradores, nómina, saldo y cuenta bancaria"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Modificar</span>
+                          </button>
+
+                          {!isActive && (
                             <button
                               onClick={() => handleSignAgreement(agreement.id)}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm"
                             >
                               <PlusCircle className="w-3 h-3" />
-                              <span>Firmar Convenio</span>
+                              <span>Firmar</span>
                             </button>
                           )}
                         </div>
@@ -289,60 +323,14 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
         </div>
       </div>
 
-      {/* Modal para Editar Empleados y Monto de Nómina */}
-      {editingAgreement && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Modificar Convenio de Planilla
-            </h3>
-            <p className="text-xs text-slate-400">
-              {editingAgreement.companyName}
-            </p>
-
-            <form onSubmit={handleSaveAgreementEdit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Colaboradores en Planilla:</label>
-                <input
-                  type="number"
-                  min="10"
-                  step="10"
-                  value={editEmployees}
-                  onChange={e => setEditEmployees(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Monto Total de Nómina Mensual (L.):</label>
-                <input
-                  type="number"
-                  min="50000"
-                  step="50000"
-                  value={editPayrollVolume}
-                  onChange={e => setEditPayrollVolume(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 font-mono font-bold"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setEditingAgreement(null)}
-                  className="px-3 py-1.5 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
-                >
-                  Guardar Cambios
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Modal Interactivo de Creación y Edición de Convenios de Planilla */}
+      {isPayrollModalOpen && (
+        <PayrollEditModal
+          isOpen={true}
+          agreementToEdit={selectedAgreementForModal}
+          onClose={() => setIsPayrollModalOpen(false)}
+          onSaveAgreement={handleSaveModalAgreement}
+        />
       )}
     </div>
   );

@@ -165,6 +165,21 @@ class SoundEngine {
       // Ignorar
     }
   }
+
+  // Alias para clink de monedas
+  public playCoinClink() {
+    this.playCashChime();
+  }
+
+  // Alias para campana de advertencia
+  public playWarningChime() {
+    this.playRejectBuzzer();
+  }
+
+  // Alias para jingle de mejora técnica
+  public playUpgradeJingle() {
+    this.playApprovalStamp();
+  }
 }
 
 export const sound = new SoundEngine();
