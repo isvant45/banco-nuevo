@@ -1,0 +1,6 @@
+{
+  "name": "Áureo Bank - Simulador Financiero Hondureño",
+  "description": "Simulador bancario y macroeconómico de alta fidelidad basado en el sistema financiero de Honduras, normativas del BCH, CNBS, 6 bancas especializadas y transferencias SWIFT.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
