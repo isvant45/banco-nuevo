@@ -50,6 +50,7 @@ import { FxAndForwardsModal } from './components/FxAndForwardsModal';
 import { ClientActionsModal } from './components/ClientActionsModal';
 import { StressTestingModal } from './components/StressTestingModal';
 import { ProgramsSuite20View } from './components/ProgramsSuite20View';
+import { AdvancedOperationsHub } from './components/AdvancedOperationsHub';
 import { restoreGameState } from './game/savedState';
 
 const STORAGE_KEY = 'aureo-bank-sim-state-v5';
@@ -1074,6 +1075,14 @@ export default function App() {
           <OverviewDashboard
             state={gameState}
             onSetMarketing={handleSetMarketing}
+            onNavigateTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'advanced_ops' && (
+          <AdvancedOperationsHub
+            state={gameState}
+            onUpdateState={setGameState}
             onNavigateTab={setActiveTab}
           />
         )}

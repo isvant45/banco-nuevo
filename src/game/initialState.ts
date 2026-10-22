@@ -23,7 +23,8 @@ import {
   TenInnovationsState,
   BchMoneyDeskState,
   FxForwardContract,
-  AureoProgramsState
+  AureoProgramsState,
+  AdvancedOperationsState
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -2471,6 +2472,479 @@ export const INITIAL_BANKING_PROGRAMS_20: AureoProgramsState = {
   }
 };
 
+export const INITIAL_ADVANCED_OPERATIONS: AdvancedOperationsState = {
+  // Eje 1: Red Física & Canales (Features 1 a 6)
+  departmentBranches: [
+    {
+      id: 'dep-fm',
+      name: 'Francisco Morazán',
+      capitalCity: 'Tegucigalpa (Distrito Central)',
+      activeBranches: 4,
+      totalEmployees: 48,
+      depositsCollectedHNL: 980000000,
+      loansDisbursedHNL: 840000000,
+      monthlyOperatingCostHNL: 1850000,
+      expansionCostHNL: 6500000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-cortes',
+      name: 'Cortés',
+      capitalCity: 'San Pedro Sula',
+      activeBranches: 3,
+      totalEmployees: 36,
+      depositsCollectedHNL: 760000000,
+      loansDisbursedHNL: 690000000,
+      monthlyOperatingCostHNL: 1450000,
+      expansionCostHNL: 6200000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-atlantida',
+      name: 'Atlántida',
+      capitalCity: 'La Ceiba',
+      activeBranches: 2,
+      totalEmployees: 20,
+      depositsCollectedHNL: 290000000,
+      loansDisbursedHNL: 240000000,
+      monthlyOperatingCostHNL: 820000,
+      expansionCostHNL: 4800000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-choluteca',
+      name: 'Choluteca',
+      capitalCity: 'Choluteca',
+      activeBranches: 1,
+      totalEmployees: 12,
+      depositsCollectedHNL: 165000000,
+      loansDisbursedHNL: 155000000,
+      monthlyOperatingCostHNL: 490000,
+      expansionCostHNL: 4200000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-copan',
+      name: 'Copán',
+      capitalCity: 'Santa Rosa de Copán',
+      activeBranches: 1,
+      totalEmployees: 10,
+      depositsCollectedHNL: 140000000,
+      loansDisbursedHNL: 135000000,
+      monthlyOperatingCostHNL: 420000,
+      expansionCostHNL: 4000000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-comayagua',
+      name: 'Comayagua',
+      capitalCity: 'Comayagua (Valle)',
+      activeBranches: 1,
+      totalEmployees: 11,
+      depositsCollectedHNL: 155000000,
+      loansDisbursedHNL: 145000000,
+      monthlyOperatingCostHNL: 440000,
+      expansionCostHNL: 4100000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-olancho',
+      name: 'Olancho',
+      capitalCity: 'Juticalpa',
+      activeBranches: 1,
+      totalEmployees: 9,
+      depositsCollectedHNL: 125000000,
+      loansDisbursedHNL: 130000000,
+      monthlyOperatingCostHNL: 390000,
+      expansionCostHNL: 3900000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-el-paraiso',
+      name: 'El Paraíso',
+      capitalCity: 'Danlí',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3800000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-yoro',
+      name: 'Yoro',
+      capitalCity: 'El Progreso',
+      activeBranches: 1,
+      totalEmployees: 12,
+      depositsCollectedHNL: 180000000,
+      loansDisbursedHNL: 160000000,
+      monthlyOperatingCostHNL: 510000,
+      expansionCostHNL: 4200000,
+      status: 'Operativa'
+    },
+    {
+      id: 'dep-islas',
+      name: 'Islas de la Bahía',
+      capitalCity: 'Roatán',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 5500000,
+      status: 'Planificada'
+    }
+  ],
+
+  atmFleet: [
+    {
+      id: 'atm-01',
+      location: 'Multiplaza Tegucigalpa (Mall)',
+      type: 'Multifunción Smart',
+      cashVaultHNL: 1850000,
+      maxCapacityHNL: 2500000,
+      monthlyTransactions: 8400,
+      monthlyFeeIncomeHNL: 168000,
+      maintenanceCostHNL: 22000,
+      uptimePct: 99.6
+    },
+    {
+      id: 'atm-02',
+      location: 'City Mall San Pedro Sula',
+      type: 'Multifunción Smart',
+      cashVaultHNL: 1950000,
+      maxCapacityHNL: 2500000,
+      monthlyTransactions: 9100,
+      monthlyFeeIncomeHNL: 182000,
+      maintenanceCostHNL: 22000,
+      uptimePct: 99.8
+    },
+    {
+      id: 'atm-03',
+      location: 'Aeropuerto Palmerola Comayagua',
+      type: 'Multifunción Smart',
+      cashVaultHNL: 1400000,
+      maxCapacityHNL: 2000000,
+      monthlyTransactions: 6200,
+      monthlyFeeIncomeHNL: 148000,
+      maintenanceCostHNL: 25000,
+      uptimePct: 99.1
+    },
+    {
+      id: 'atm-04',
+      location: 'Bulevar Morazán Tegucigalpa (Agencia Central)',
+      type: 'Multifunción Smart',
+      cashVaultHNL: 2200000,
+      maxCapacityHNL: 3000000,
+      monthlyTransactions: 11200,
+      monthlyFeeIncomeHNL: 224000,
+      maintenanceCostHNL: 24000,
+      uptimePct: 99.9
+    },
+    {
+      id: 'atm-05',
+      location: 'Mercado Dandy San Pedro Sula',
+      type: 'Básico Dispensador',
+      cashVaultHNL: 850000,
+      maxCapacityHNL: 1500000,
+      monthlyTransactions: 5400,
+      monthlyFeeIncomeHNL: 98000,
+      maintenanceCostHNL: 18000,
+      uptimePct: 98.4
+    },
+    {
+      id: 'atm-06',
+      location: 'Avenida San Isidro La Ceiba',
+      type: 'Básico Dispensador',
+      cashVaultHNL: 950000,
+      maxCapacityHNL: 1500000,
+      monthlyTransactions: 4800,
+      monthlyFeeIncomeHNL: 86000,
+      maintenanceCostHNL: 17500,
+      uptimePct: 98.9
+    }
+  ],
+
+  bankingAgents: [
+    {
+      id: 'caja-01',
+      businessName: 'Pulpería El Carmen',
+      department: 'Cortés (Cofradía)',
+      monthlyVolumeHNL: 420000,
+      commissionSharedHNL: 14500,
+      activeServices: ['Depósitos en Efectivo', 'Retiros con PIN', 'Pago de Servicios Públicos (ENEE/Sanaa)']
+    },
+    {
+      id: 'caja-02',
+      businessName: 'Farmacia San José',
+      department: 'Francisco Morazán (Valle de Ángeles)',
+      monthlyVolumeHNL: 580000,
+      commissionSharedHNL: 19800,
+      activeServices: ['Cobro de Remesas Familiares', 'Depósitos de Ahorro', 'Recargas de Celular']
+    },
+    {
+      id: 'caja-03',
+      businessName: 'Ferretería Morazán',
+      department: 'Choluteca (San Lorenzo)',
+      monthlyVolumeHNL: 690000,
+      commissionSharedHNL: 23500,
+      activeServices: ['Abono a Préstamos', 'Pago de Tarjetas de Crédito', 'Depósitos Comerciales']
+    },
+    {
+      id: 'caja-04',
+      businessName: 'Mini Súper Maya',
+      department: 'Copán (Copán Ruinas)',
+      monthlyVolumeHNL: 360000,
+      commissionSharedHNL: 12200,
+      activeServices: ['Cobro de Remesas Western Union / MoneyGram', 'Retiros con Tarjeta Débito']
+    },
+    {
+      id: 'caja-05',
+      businessName: 'Abarrotería Ceibeña',
+      department: 'Atlántida (Tela)',
+      monthlyVolumeHNL: 490000,
+      commissionSharedHNL: 16700,
+      activeServices: ['Depósitos en Efectivo', 'Pago de Matrícula Vehicular', 'Retiros']
+    }
+  ],
+
+  armoredTransportFleet: {
+    armoredTrucksCount: 8,
+    monthlyRouteCostHNL: 420000,
+    cashInTransitInsuredHNL: 180000000,
+    riskIncidentsCount: 0
+  },
+  driveThruLanesCount: 14,
+  privateLoungesCount: 4,
+
+  // Eje 2: Mercado de Capitales & Tesorería (Features 7 a 12)
+  subordinatedBonds: [
+    {
+      id: 'bond-sub-01',
+      seriesName: 'Bono Subordinado Serie A 2026',
+      faceValueHNL: 120000000,
+      couponRateAnnualPct: 8.75,
+      tenorYears: 5,
+      tierCategory: 'Tier 2 Complementario',
+      status: 'En Circulación',
+      monthsElapsed: 6
+    },
+    {
+      id: 'bond-sub-02',
+      seriesName: 'Bono Verde Sostenible Energía Limpia',
+      faceValueHNL: 80000000,
+      couponRateAnnualPct: 7.95,
+      tenorYears: 7,
+      tierCategory: 'Bono Sostenible Verde',
+      status: 'En Circulación',
+      monthsElapsed: 3
+    }
+  ],
+
+  fxBchBids: [
+    {
+      id: 'fx-bid-101',
+      bidDate: '15 Ene 2026',
+      requestedUSD: 2500000,
+      offeredExchangeRate: 24.87,
+      allocatedUSD: 2500000,
+      status: 'Adjudicado'
+    },
+    {
+      id: 'fx-bid-102',
+      bidDate: '28 Ene 2026',
+      requestedUSD: 3000000,
+      offeredExchangeRate: 24.86,
+      allocatedUSD: 2200000,
+      status: 'Parcial'
+    }
+  ],
+
+  sovereignHoldings: [
+    {
+      id: 'sov-01',
+      securityType: 'Letra BCH (LRM)',
+      principalHNL: 85000000,
+      yieldPct: 6.25,
+      termMonthsRemaining: 8,
+      liquidCollateralRatio: 1.0
+    },
+    {
+      id: 'sov-02',
+      securityType: 'Bono Soberano SEFIN',
+      principalHNL: 110000000,
+      yieldPct: 7.45,
+      termMonthsRemaining: 28,
+      liquidCollateralRatio: 0.95
+    }
+  ],
+
+  multilateralLines: [
+    {
+      id: 'multi-bcie',
+      institution: 'BCIE',
+      totalFacilityUSD: 15000000,
+      drawnUSD: 9500000,
+      spreadOverSofrPct: 2.15,
+      dedicatedSector: 'Energía Renovable'
+    },
+    {
+      id: 'multi-bid',
+      institution: 'BID Invest',
+      totalFacilityUSD: 20000000,
+      drawnUSD: 12000000,
+      spreadOverSofrPct: 1.95,
+      dedicatedSector: 'Pymes Exportadoras'
+    }
+  ],
+
+  mutualFunds: [
+    {
+      id: 'fund-liquidez',
+      fundName: 'Fondo Mutuo Áureo Liquidez HNL',
+      aumHNL: 65000000,
+      navPerShareHNL: 108.45,
+      investorCount: 420,
+      managementFeePct: 1.25,
+      targetAssetAllocation: '70% Letras BCH / 30% DPFs Interbancarios'
+    },
+    {
+      id: 'fund-dolar',
+      fundName: 'Fondo Mutuo Renta Fija Dólar USD',
+      aumHNL: 48000000,
+      navPerShareHNL: 112.10,
+      investorCount: 185,
+      managementFeePct: 1.40,
+      targetAssetAllocation: 'US Treasuries & Bonos Soberanos Centroamérica'
+    }
+  ],
+
+  overnightInterbankPositions: {
+    lentOvernightHNL: 25000000,
+    borrowedOvernightHNL: 0,
+    weightedRatePct: 6.10
+  },
+
+  // Eje 3: Inteligencia Ejecutiva, Pruebas de Estrés & CNBS (Features 13 a 18)
+  lastStressTest: undefined,
+  ifrs9ProvisionsLedger: {
+    stage1NormalHNL: 12500000,
+    stage2WatchlistHNL: 14800000,
+    stage3ImpairedHNL: 32000000,
+    totalExpectedLossHNL: 59300000,
+    coverageRatioPct: 112.5
+  },
+  cyberSecurityCenter: {
+    ddosBlockedAttacksCount: 18420,
+    suspiciousTxBlockedCount: 128,
+    pciDssComplianceScorePct: 99.4,
+    securityFirewallTier: 2
+  },
+  amlCompliancePortal: {
+    transactionsOver10kScreened: 640,
+    pepsAlertsTriggered: 18,
+    uifReportsSubmitted: 5,
+    complianceClearanceRatePct: 99.2
+  },
+  executiveAlcoMetrics: {
+    netInterestMarginNIM: 5.85,
+    costOfFundsPct: 4.15,
+    efficiencyRatioCIR: 52.4,
+    returnOnEquityROE: 16.8,
+    returnOnAssetsROA: 2.15
+  },
+  alcoInterestRateForecast: {
+    recommendedActiveRatePct: 15.25,
+    recommendedPassiveRatePct: 5.75,
+    expectedNIMImprovementBps: 24
+  },
+
+  // Eje 4: Soluciones Corporativas, Retail & Clientes (Features 19 a 24)
+  corporateCashManagement: {
+    corporateClientsEnrolled: 42,
+    monthlyPayrollDispersalsHNL: 145000000,
+    supplierPaymentsProcessedHNL: 88000000,
+    feeGeneratedHNL: 485000
+  },
+  fiduciaryTrustContracts: [
+    {
+      id: 'fidei-01',
+      trustName: 'Fideicomiso Residencial Los Próceres',
+      settlorClientName: 'Constructora Morazán S.A.',
+      fiduciaryAssetsHNL: 240000000,
+      trustType: 'Administración Inmobiliaria',
+      monthlyFiduciaryFeeHNL: 120000,
+      activeBeneficiariesCount: 180
+    },
+    {
+      id: 'fidei-02',
+      trustName: 'Fideicomiso Parque Solar Valle de Nacaome',
+      settlorClientName: 'Energías del Sur S.A.',
+      fiduciaryAssetsHNL: 180000000,
+      trustType: 'Garantía Crediticia',
+      monthlyFiduciaryFeeHNL: 95000,
+      activeBeneficiariesCount: 4
+    },
+    {
+      id: 'fidei-03',
+      trustName: 'Fideicomiso Recaudación Peaje Corredor Logístico',
+      settlorClientName: 'Consorcio Vial de Honduras',
+      fiduciaryAssetsHNL: 95000000,
+      trustType: 'Pago de Infraestructura',
+      monthlyFiduciaryFeeHNL: 65000,
+      activeBeneficiariesCount: 12
+    }
+  ],
+  microInsurancePortfolio: [
+    {
+      id: 'ins-salud',
+      productName: 'Seguro Salud Áureo Familiar',
+      monthlyPremiumHNL: 180,
+      activePolicies: 4600,
+      totalCoveragePerClaimHNL: 50000,
+      monthlyLossRatioPct: 32.4,
+      underwriterPartner: 'Seguros Atlántida'
+    },
+    {
+      id: 'ins-vida',
+      productName: 'Plan Protección Vida y Sepelio',
+      monthlyPremiumHNL: 120,
+      activePolicies: 5900,
+      totalCoveragePerClaimHNL: 75000,
+      monthlyLossRatioPct: 24.8,
+      underwriterPartner: 'Ficohsa Seguros'
+    },
+    {
+      id: 'ins-clima',
+      productName: 'Microseguro Paramétrico Cosecha Segura',
+      monthlyPremiumHNL: 350,
+      activePolicies: 1850,
+      totalCoveragePerClaimHNL: 120000,
+      monthlyLossRatioPct: 41.0,
+      underwriterPartner: 'Mapfre Seguros Honduras'
+    }
+  ],
+  clientChurnPredictor: {
+    overallNPSScore: 78,
+    highRiskChurnClientsCount: 14,
+    automatedRetentionRetentionRatePct: 86.5,
+    activeLoyaltyCampaignsCount: 3
+  },
+  digitalInstantLoans: {
+    disbursedThisMonthCount: 128,
+    totalDisbursedHNL: 14200000,
+    averageApprovalTimeMinutes: 2.4,
+    badRatePct: 1.1
+  },
+  shareholdersPortal: {
+    sharesOutstanding: 10000000,
+    bookValuePerShareHNL: 42.50,
+    declaredDividendPerShareHNL: 3.20,
+    retainedEarningsRatioPct: 65.0
+  }
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -2529,6 +3003,8 @@ export const INITIAL_GAME_STATE: GameState = {
   bchMoneyDesk: INITIAL_BCH_MONEY_DESK,
   fxForwards: INITIAL_FX_FORWARDS,
   // Suite de 20 Características, Programas e Innovaciones Bancarias
-  bankingPrograms20: INITIAL_BANKING_PROGRAMS_20
+  bankingPrograms20: INITIAL_BANKING_PROGRAMS_20,
+  // Centro de Operaciones Avanzadas (24 Características)
+  advancedOperations: INITIAL_ADVANCED_OPERATIONS
 };
 

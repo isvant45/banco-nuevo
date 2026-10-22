@@ -22,9 +22,20 @@ import {
   MonthlyClosingSummary,
   BchRepoOperation,
   AureoProgramsState,
-  AureoProgramItem
+  AureoProgramItem,
+  AdvancedOperationsState,
+  BranchDepartment,
+  AtmUnit,
+  SubordinatedBondEmission,
+  FxAuctionBid,
+  SovereignHolding,
+  MultilateralCreditLine,
+  MutualFundTier,
+  CorporateTrustContract,
+  MicroInsuranceProduct,
+  StressSimulationResult
 } from './types';
-import { INITIAL_BANKING_PROGRAMS_20 } from './initialState';
+import { INITIAL_BANKING_PROGRAMS_20, INITIAL_ADVANCED_OPERATIONS } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
 const HN_FIRST_NAMES = ['Carlos', 'Ana', 'José', 'Suyapa', 'Roberto', 'María', 'Luis', 'Daniela', 'Rigoberto', 'Xiomara', 'Mario', 'Gissel', 'Edgar', 'Brenda', 'Héctor', 'Karla', 'Mauricio', 'Miriam'];
@@ -1051,6 +1062,9 @@ export function advanceGameMonth(state: GameState): GameState {
   // 14. Suite de 20 Características, Programas e Innovaciones Bancarias
   const { updatedPrograms: newBankingPrograms20 } = advanceBankingPrograms20(state, nextMonth, tpmDelta, newExchangeRate);
 
+  // 15. Centro de Operaciones Avanzadas (24 Características en 4 Ejes Estratégicos)
+  const { updatedOperations: newAdvancedOperations } = advanceAdvancedOperationsMonth(state, nextMonth, tpmDelta, newExchangeRate);
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -1096,7 +1110,8 @@ export function advanceGameMonth(state: GameState): GameState {
     bchMoneyDesk: updatedBchMoneyDesk,
     fxForwards: updatedFxForwards,
     lastMonthlyClosingSummary: monthlyClosingSummary,
-    bankingPrograms20: newBankingPrograms20
+    bankingPrograms20: newBankingPrograms20,
+    advancedOperations: newAdvancedOperations
   };
 }
 
@@ -2946,4 +2961,1061 @@ export function fileUifComplianceDeclaration(
     successMessage: `Formulario de origen de fondos ($10,000+ USD) radicado ante UIF para ${clientName} (${formatUSD(amountUSD)}). Origen: ${sourceOfFunds}. Auditoría favorable.`
   };
 }
+
+// ====================================================================================
+// CENTRO DE OPERACIONES AVANZADAS: 24 CARACTERÍSTICAS EN 4 EJES ESTRATÉGICOS
+// ====================================================================================
+
+/**
+ * Liquidación y actualización mensual automática de las 24 operaciones avanzadas
+ */
+export function advanceAdvancedOperationsMonth(
+  state: GameState,
+  nextMonth: number,
+  tpmDelta: number,
+  newExchangeRate: number
+): {
+  updatedOperations: AdvancedOperationsState;
+  totalOperationsIncome: number;
+} {
+  const base: AdvancedOperationsState = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+
+  // EJE 1: RED FÍSICA & CANALES
+  let branchTotalOperatingCost = 0;
+  const updatedBranches = (base.departmentBranches || []).map(dept => {
+    if (dept.status === 'Operativa') {
+      const growthFactor = 1 + (0.006 + Math.random() * 0.008);
+      const loanFactor = 1 + (0.004 + Math.random() * 0.006);
+      const newDeposits = Math.round(dept.depositsCollectedHNL * growthFactor);
+      const newLoans = Math.round(dept.loansDisbursedHNL * loanFactor);
+      branchTotalOperatingCost += dept.monthlyOperatingCostHNL;
+      return {
+        ...dept,
+        depositsCollectedHNL: newDeposits,
+        loansDisbursedHNL: newLoans
+      };
+    }
+    return dept;
+  });
+
+  // ATMs
+  let atmFeeIncome = 0;
+  let atmMaintenanceTotal = 0;
+  const updatedAtms = (base.atmFleet || []).map(atm => {
+    const txCount = Math.round(atm.monthlyTransactions * (1 + (Math.random() * 0.06 - 0.03)));
+    const fee = txCount * 20; // L. 20 por transacción interbancaria
+    atmFeeIncome += fee;
+    atmMaintenanceTotal += atm.maintenanceCostHNL;
+    const dispensed = Math.round(txCount * 180);
+    const newVault = Math.max(150000, atm.cashVaultHNL - dispensed);
+    return {
+      ...atm,
+      monthlyTransactions: txCount,
+      monthlyFeeIncomeHNL: fee,
+      cashVaultHNL: newVault,
+      uptimePct: +(Math.min(99.9, Math.max(97.5, atm.uptimePct + (Math.random() * 0.4 - 0.2)))).toFixed(1)
+    };
+  });
+
+  // Agentes Comunitarios ("Caja Amiga")
+  let agentCommissionIncome = 0;
+  const updatedAgents = (base.bankingAgents || []).map(agent => {
+    const vol = Math.round(agent.monthlyVolumeHNL * (1 + (Math.random() * 0.04 - 0.01)));
+    const comm = Math.round(vol * 0.035);
+    agentCommissionIncome += comm;
+    return {
+      ...agent,
+      monthlyVolumeHNL: vol,
+      commissionSharedHNL: comm
+    };
+  });
+
+  // EJE 2: MERCADO DE CAPITALES & TESORERÍA
+  const updatedBonds = (base.subordinatedBonds || []).map(b => ({
+    ...b,
+    monthsElapsed: b.monthsElapsed + 1
+  }));
+
+  const updatedSovereign = (base.sovereignHoldings || []).map(s => {
+    const newRem = Math.max(0, s.termMonthsRemaining - 1);
+    return {
+      ...s,
+      termMonthsRemaining: newRem
+    };
+  });
+
+  // Fondos Mutuos (AUM crece por suscripciones y rendimiento)
+  let mutualFundFeeIncome = 0;
+  const updatedMutualFunds = (base.mutualFunds || []).map(fund => {
+    const returnMonthly = 0.0055;
+    const growth = Math.round(fund.aumHNL * (1 + returnMonthly + (Math.random() * 0.008)));
+    const fee = Math.round(growth * (fund.managementFeePct / 100 / 12));
+    mutualFundFeeIncome += fee;
+    return {
+      ...fund,
+      aumHNL: growth,
+      investorCount: fund.investorCount + Math.floor(Math.random() * 8 + 2),
+      navPerShareHNL: +(fund.navPerShareHNL * (1 + returnMonthly)).toFixed(2)
+    };
+  });
+
+  // EJE 3: INTELIGENCIA EJECUTIVA & REGULATORIA
+  const totalLoans = state.financials.loanPortfolioCurrent || 2150000000;
+  const pastDue = state.financials.loanPortfolioPastDue || 32000000;
+  const stage1 = Math.round(totalLoans * 0.008);
+  const stage2 = Math.round(totalLoans * 0.025);
+  const stage3 = Math.round(pastDue * 0.65);
+  const totalEcl = stage1 + stage2 + stage3;
+
+  const cyberSec = {
+    ...base.cyberSecurityCenter,
+    ddosBlockedAttacksCount: base.cyberSecurityCenter.ddosBlockedAttacksCount + Math.floor(1200 + Math.random() * 800),
+    suspiciousTxBlockedCount: base.cyberSecurityCenter.suspiciousTxBlockedCount + Math.floor(15 + Math.random() * 20),
+    pciDssComplianceScorePct: +(Math.min(99.9, Math.max(98.0, base.cyberSecurityCenter.pciDssComplianceScorePct + (Math.random() * 0.2 - 0.1)))).toFixed(1)
+  };
+
+  const aml = {
+    ...base.amlCompliancePortal,
+    transactionsOver10kScreened: base.amlCompliancePortal.transactionsOver10kScreened + Math.floor(45 + Math.random() * 30),
+    pepsAlertsTriggered: base.amlCompliancePortal.pepsAlertsTriggered + Math.floor(1 + Math.random() * 3),
+    complianceClearanceRatePct: +(Math.min(99.9, Math.max(98.5, base.amlCompliancePortal.complianceClearanceRatePct + (Math.random() * 0.1 - 0.05)))).toFixed(1)
+  };
+
+  // Métricas ALCO
+  const nim = +(Math.max(4.5, Math.min(8.0, (state.financials.netInterestMargin || 14000000) / (state.financials.totalAssets || 3000000000) * 1200))).toFixed(2);
+  const cir = +(Math.max(40, Math.min(65, (state.financials.totalOperatingExpense || 12000000) / Math.max(1, (state.financials.totalFinancialIncome || 24000000) + (state.financials.totalFeeIncome || 4000000)) * 100))).toFixed(1);
+
+  // EJE 4: CORPORATIVO & CLIENTES
+  const cashMgmt = {
+    ...base.corporateCashManagement,
+    corporateClientsEnrolled: base.corporateCashManagement.corporateClientsEnrolled + (nextMonth % 2 === 0 ? 1 : 0),
+    monthlyPayrollDispersalsHNL: Math.round(base.corporateCashManagement.monthlyPayrollDispersalsHNL * (1 + (Math.random() * 0.03 - 0.01))),
+    feeGeneratedHNL: Math.round(base.corporateCashManagement.feeGeneratedHNL * 1.02)
+  };
+
+  let fiduciaryFeeTotal = 0;
+  const updatedTrusts = (base.fiduciaryTrustContracts || []).map(t => {
+    fiduciaryFeeTotal += t.monthlyFiduciaryFeeHNL;
+    return t;
+  });
+
+  let insuranceIncome = 0;
+  const updatedInsurance = (base.microInsurancePortfolio || []).map(ins => {
+    const newPolicies = ins.activePolicies + Math.floor(20 + Math.random() * 40);
+    const premium = newPolicies * ins.monthlyPremiumHNL;
+    const claims = Math.round(premium * (ins.monthlyLossRatioPct / 100));
+    insuranceIncome += (premium - claims);
+    return {
+      ...ins,
+      activePolicies: newPolicies
+    };
+  });
+
+  // Churn & NPS
+  const npsScore = Math.floor(76 + Math.random() * 6);
+  const churnPredictor = {
+    ...base.clientChurnPredictor,
+    overallNPSScore: npsScore,
+    highRiskChurnClientsCount: Math.max(3, Math.floor(12 + Math.random() * 5 - 2))
+  };
+
+  // Préstamos Digitales Instantáneos
+  const instantCount = Math.floor(90 + Math.random() * 50);
+  const instantVolume = Math.round(instantCount * 95000);
+  const digitalInstant = {
+    disbursedThisMonthCount: instantCount,
+    totalDisbursedHNL: instantVolume,
+    averageApprovalTimeMinutes: +(Math.max(1.8, Math.min(3.2, 2.4 + (Math.random() * 0.4 - 0.2)))).toFixed(1),
+    badRatePct: 1.1
+  };
+
+  // Portal del Accionista
+  const bookVal = +(Math.max(25, (state.financials.totalEquity || 425000000) / (base.shareholdersPortal.sharesOutstanding || 10000000))).toFixed(2);
+  const shareholders = {
+    ...base.shareholdersPortal,
+    bookValuePerShareHNL: bookVal
+  };
+
+  const totalOperationsIncome = atmFeeIncome + agentCommissionIncome + mutualFundFeeIncome + fiduciaryFeeTotal + insuranceIncome + cashMgmt.feeGeneratedHNL - branchTotalOperatingCost - atmMaintenanceTotal;
+
+  const updatedOperations: AdvancedOperationsState = {
+    ...base,
+    departmentBranches: updatedBranches,
+    atmFleet: updatedAtms,
+    bankingAgents: updatedAgents,
+    subordinatedBonds: updatedBonds,
+    sovereignHoldings: updatedSovereign,
+    mutualFunds: updatedMutualFunds,
+    ifrs9ProvisionsLedger: {
+      stage1NormalHNL: stage1,
+      stage2WatchlistHNL: stage2,
+      stage3ImpairedHNL: stage3,
+      totalExpectedLossHNL: totalEcl,
+      coverageRatioPct: +(Math.min(180, Math.max(105, (state.financials.loanLossProvisions / Math.max(1, totalEcl)) * 100))).toFixed(1)
+    },
+    cyberSecurityCenter: cyberSec,
+    amlCompliancePortal: aml,
+    executiveAlcoMetrics: {
+      netInterestMarginNIM: Number(nim),
+      costOfFundsPct: +(Math.max(2.5, 4.15 + tpmDelta * 0.5)).toFixed(2),
+      efficiencyRatioCIR: Number(cir),
+      returnOnEquityROE: +(state.financials.returnOnEquityROE || 16.8).toFixed(1),
+      returnOnAssetsROA: +(state.financials.returnOnEquityROE ? state.financials.returnOnEquityROE / 7.8 : 2.15).toFixed(2)
+    },
+    corporateCashManagement: cashMgmt,
+    fiduciaryTrustContracts: updatedTrusts,
+    microInsurancePortfolio: updatedInsurance,
+    clientChurnPredictor: churnPredictor,
+    digitalInstantLoans: digitalInstant,
+    shareholdersPortal: shareholders
+  };
+
+  return {
+    updatedOperations,
+    totalOperationsIncome
+  };
+}
+
+// ------------------------------------------------------------------------------------
+// ACCIONES INTERACTIVAS DIRECTAS: 24 CARACTERÍSTICAS
+// ------------------------------------------------------------------------------------
+
+/** 1. Expandir o Aperturar Sucursal Departamental */
+export function openOrExpandDepartmentBranch(
+  state: GameState,
+  departmentId: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const dept = (current.departmentBranches || []).find(d => d.id === departmentId);
+  if (!dept) return { updatedState: state, successMessage: 'Departamento no encontrado.' };
+
+  const cost = dept.expansionCostHNL;
+  if (state.financials.cashAndBCHReserves < cost) {
+    return { updatedState: state, successMessage: `Liquidez insuficiente para abrir sucursal en ${dept.name} (${formatHNL(cost)} requerido).` };
+  }
+
+  const updatedDeptList = current.departmentBranches.map(d => {
+    if (d.id === departmentId) {
+      return {
+        ...d,
+        activeBranches: d.activeBranches + 1,
+        totalEmployees: d.totalEmployees + 10,
+        depositsCollectedHNL: d.depositsCollectedHNL + 75000000,
+        loansDisbursedHNL: d.loansDisbursedHNL + 65000000,
+        monthlyOperatingCostHNL: d.monthlyOperatingCostHNL + 380000,
+        status: 'Operativa' as const
+      };
+    }
+    return d;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        departmentBranches: updatedDeptList
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - cost,
+        fixedAssetsBranches: state.financials.fixedAssetsBranches + cost,
+        depositsPublicTotal: state.financials.depositsPublicTotal + 75000000
+      }
+    },
+    successMessage: `¡Nueva sucursal bancaria inaugurada en ${dept.name} (${dept.capitalCity})! Inversión: ${formatHNL(cost)}.`
+  };
+}
+
+/** 2. Instalar Nuevo Cajero Automático Inteligente (ATM) */
+export function installNewAtmUnit(
+  state: GameState,
+  location: string,
+  type: 'Multifunción Smart' | 'Básico Dispensador'
+): { updatedState: GameState; successMessage: string } {
+  const cost = type === 'Multifunción Smart' ? 650000 : 350000;
+  if (state.financials.cashAndBCHReserves < cost) {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para adquirir este cajero.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const newAtm: AtmUnit = {
+    id: `atm-${Date.now().toString().slice(-4)}`,
+    location,
+    type,
+    cashVaultHNL: type === 'Multifunción Smart' ? 1500000 : 800000,
+    maxCapacityHNL: type === 'Multifunción Smart' ? 2500000 : 1200000,
+    monthlyTransactions: 5200,
+    monthlyFeeIncomeHNL: 104000,
+    maintenanceCostHNL: type === 'Multifunción Smart' ? 22000 : 16000,
+    uptimePct: 99.7
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        atmFleet: [newAtm, ...(current.atmFleet || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - cost,
+        fixedAssetsBranches: state.financials.fixedAssetsBranches + cost
+      }
+    },
+    successMessage: `Cajero ${type} instalado exitosamente en ${location}. Inversión: ${formatHNL(cost)}.`
+  };
+}
+
+/** 3. Recargar Efectivo en Bóveda de Cajero ATM */
+export function reloadAtmVaultCash(
+  state: GameState,
+  atmId: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const atm = (current.atmFleet || []).find(a => a.id === atmId);
+  if (!atm) return { updatedState: state, successMessage: 'Cajero no encontrado.' };
+
+  if (state.financials.cashAndBCHReserves < amountHNL) {
+    return { updatedState: state, successMessage: 'Fondos insuficientes en reservas centrales de caja.' };
+  }
+
+  const updatedFleet = current.atmFleet.map(a => {
+    if (a.id === atmId) {
+      return {
+        ...a,
+        cashVaultHNL: Math.min(a.maxCapacityHNL, a.cashVaultHNL + amountHNL)
+      };
+    }
+    return a;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        atmFleet: updatedFleet
+      }
+    },
+    successMessage: `Remesa de ${formatHNL(amountHNL)} cargada exitosamente en la bóveda del cajero ${atm.location}.`
+  };
+}
+
+/** 4. Afiliar Agente Comunitario "Caja Amiga" */
+export function affiliateBankingAgent(
+  state: GameState,
+  businessName: string,
+  department: string,
+  services: string[]
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const newAgent = {
+    id: `caja-${Date.now().toString().slice(-4)}`,
+    businessName,
+    department,
+    monthlyVolumeHNL: 350000,
+    commissionSharedHNL: 12000,
+    activeServices: services.length > 0 ? services : ['Depósitos en Efectivo', 'Retiros con Tarjeta', 'Pago de Luz y Agua']
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        bankingAgents: [newAgent, ...(current.bankingAgents || [])]
+      }
+    },
+    successMessage: `¡Nuevo Corresponsal "Caja Amiga" afiliado! ${businessName} en ${department}.`
+  };
+}
+
+/** 5. Fortalecer Flota de Transporte de Valores Blindados */
+export function upgradeArmoredTransportSecurity(
+  state: GameState
+): { updatedState: GameState; successMessage: string } {
+  const cost = 2800000;
+  if (state.financials.cashAndBCHReserves < cost) {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para adquirir nueva unidad blindada.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        armoredTransportFleet: {
+          ...current.armoredTransportFleet,
+          armoredTrucksCount: current.armoredTransportFleet.armoredTrucksCount + 1,
+          cashInTransitInsuredHNL: current.armoredTransportFleet.cashInTransitInsuredHNL + 30000000,
+          monthlyRouteCostHNL: current.armoredTransportFleet.monthlyRouteCostHNL + 35000
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - cost,
+        fixedAssetsBranches: state.financials.fixedAssetsBranches + cost
+      }
+    },
+    successMessage: `Camión blindado nivel balístico IV añadido a la flota de transporte de valores. Cobertura asegurada ampliada a ${formatHNL(current.armoredTransportFleet.cashInTransitInsuredHNL + 30000000)}.`
+  };
+}
+
+/** 6. Habilitar Autobanco o Lounge de Banca Privada */
+export function addDriveThruOrLounge(
+  state: GameState,
+  type: 'autobanco' | 'lounge'
+): { updatedState: GameState; successMessage: string } {
+  const cost = type === 'autobanco' ? 1200000 : 2500000;
+  if (state.financials.cashAndBCHReserves < cost) {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para esta adecuación arquitectónica.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const isAutobanco = type === 'autobanco';
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        driveThruLanesCount: isAutobanco ? current.driveThruLanesCount + 1 : current.driveThruLanesCount,
+        privateLoungesCount: !isAutobanco ? current.privateLoungesCount + 1 : current.privateLoungesCount
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - cost,
+        fixedAssetsBranches: state.financials.fixedAssetsBranches + cost
+      }
+    },
+    successMessage: isAutobanco 
+      ? `Carril de Autobanco Express inaugurado para agilizar transacciones vehiculares. Costo: ${formatHNL(cost)}.`
+      : `Salón VIP de Banca Privada inaugurado para captación de clientes de alto patrimonio patrimonial. Costo: ${formatHNL(cost)}.`
+  };
+}
+
+/** 7. Emitir Bonos Subordinados Tier 2 (Mercado de Capitales) */
+export function issueSubordinatedBond(
+  state: GameState,
+  seriesName: string,
+  faceValueHNL: number,
+  couponRateAnnualPct: number,
+  tenorYears: number,
+  tierCategory: 'Tier 2 Complementario' | 'Bono Sostenible Verde'
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const newBond: SubordinatedBondEmission = {
+    id: `bond-sub-${Date.now().toString().slice(-4)}`,
+    seriesName,
+    faceValueHNL,
+    couponRateAnnualPct,
+    tenorYears,
+    tierCategory,
+    status: 'En Circulación',
+    monthsElapsed: 0
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        subordinatedBonds: [newBond, ...(current.subordinatedBonds || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + faceValueHNL,
+        totalEquity: state.financials.totalEquity + (tierCategory === 'Tier 2 Complementario' ? Math.round(faceValueHNL * 0.5) : 0),
+        capitalAdequacyRatioCAR: +(state.financials.capitalAdequacyRatioCAR + (faceValueHNL / 100000000)).toFixed(1)
+      }
+    },
+    successMessage: `Emisión de ${seriesName} completada en el Mercado de Valores por ${formatHNL(faceValueHNL)} a ${tenorYears} años (Cupón: ${couponRateAnnualPct}%). CAR fortalecido.`
+  };
+}
+
+/** 8. Postular Postura en Subasta de Divisas BCH (Mesa Cambiaria USD) */
+export function submitFxBchBid(
+  state: GameState,
+  requestedUSD: number,
+  offeredRate: number
+): { updatedState: GameState; successMessage: string } {
+  const costHNL = Math.round(requestedUSD * offeredRate);
+  if (state.financials.cashAndBCHReserves < costHNL) {
+    return { updatedState: state, successMessage: `Liquidez en lempiras insuficiente para liquidar esta postura cambiaria (${formatHNL(costHNL)}).` };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const allocationRatio = offeredRate >= state.bch.exchangeRateHNLtoUSD ? 1.0 : 0.75;
+  const allocatedUSD = Math.round(requestedUSD * allocationRatio);
+  const status: FxAuctionBid['status'] = allocationRatio === 1.0 ? 'Adjudicado' : 'Parcial';
+
+  const newBid: FxAuctionBid = {
+    id: `fx-bid-${Date.now().toString().slice(-4)}`,
+    bidDate: `Mes ${state.gameMonth}`,
+    requestedUSD,
+    offeredExchangeRate: offeredRate,
+    allocatedUSD,
+    status
+  };
+
+  const actualCostHNL = Math.round(allocatedUSD * offeredRate);
+  const spreadProfitHNL = Math.round(allocatedUSD * 0.12); // Diferencial cambiario en mesa
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        fxBchBids: [newBid, ...(current.fxBchBids || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + spreadProfitHNL,
+        feeIncomeSwiftAndFX: state.financials.feeIncomeSwiftAndFX + spreadProfitHNL
+      }
+    },
+    successMessage: `Subasta de divisas BCH: Postura adjudicada por ${formatUSD(allocatedUSD)} a tipo de cambio L. ${offeredRate}. Margen cambiario devengado: ${formatHNL(spreadProfitHNL)}.`
+  };
+}
+
+/** 9. Invertir en Títulos Soberanos (Letras BCH o Bonos SEFIN) */
+export function investInSovereignAsset(
+  state: GameState,
+  securityType: 'Letra BCH (LRM)' | 'Bono Soberano SEFIN' | 'Certificado de Absorción',
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (state.financials.cashAndBCHReserves < amountHNL) {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para comprar este título soberano.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const yieldPct = securityType === 'Letra BCH (LRM)' ? 6.25 : (securityType === 'Bono Soberano SEFIN' ? 7.60 : 5.80);
+  const termMonths = securityType === 'Letra BCH (LRM)' ? 9 : (securityType === 'Bono Soberano SEFIN' ? 36 : 6);
+
+  const newAsset: SovereignHolding = {
+    id: `sov-${Date.now().toString().slice(-4)}`,
+    securityType,
+    principalHNL: amountHNL,
+    yieldPct,
+    termMonthsRemaining: termMonths,
+    liquidCollateralRatio: 1.0
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        sovereignHoldings: [newAsset, ...(current.sovereignHoldings || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL,
+        secondarySecuritiesValueHNL: (state.financials.secondarySecuritiesValueHNL || 0) + amountHNL
+      }
+    },
+    successMessage: `Inversión formalizada en ${securityType} por ${formatHNL(amountHNL)} a tasa garantizada del ${yieldPct}% anual.`
+  };
+}
+
+/** 10. Desembolsar Línea de Crédito Multilateral (BCIE o BID Invest) */
+export function drawMultilateralLine(
+  state: GameState,
+  institution: 'BCIE' | 'BID Invest' | 'IFC Banco Mundial',
+  amountUSD: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const line = (current.multilateralLines || []).find(l => l.institution === institution);
+  if (!line) return { updatedState: state, successMessage: 'Línea multilateral no configurada.' };
+
+  const available = line.totalFacilityUSD - line.drawnUSD;
+  if (amountUSD > available) {
+    return { updatedState: state, successMessage: `Cupo disponible insuficiente en línea de ${institution} ($${available.toLocaleString()} USD restante).` };
+  }
+
+  const disbursedHNL = Math.round(amountUSD * state.bch.exchangeRateHNLtoUSD);
+  const updatedLines = current.multilateralLines.map(l => {
+    if (l.institution === institution) {
+      return { ...l, drawnUSD: l.drawnUSD + amountUSD };
+    }
+    return l;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        multilateralLines: updatedLines
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + disbursedHNL,
+        interbankBorrowingBCH: state.financials.interbankBorrowingBCH + disbursedHNL
+      }
+    },
+    successMessage: `Desembolso de financiamiento multilateral con ${institution} por ${formatUSD(amountUSD)} (${formatHNL(disbursedHNL)}) liquidado en reservas.`
+  };
+}
+
+/** 11. Suscribir o Promover Fondo Mutuo Áureo */
+export function investInMutualFund(
+  state: GameState,
+  fundId: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const fund = (current.mutualFunds || []).find(f => f.id === fundId);
+  if (!fund) return { updatedState: state, successMessage: 'Fondo mutuo no encontrado.' };
+
+  const feeEarned = Math.round(amountHNL * 0.015);
+  const updatedFunds = current.mutualFunds.map(f => {
+    if (f.id === fundId) {
+      return {
+        ...f,
+        aumHNL: f.aumHNL + amountHNL,
+        investorCount: f.investorCount + 12
+      };
+    }
+    return f;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        mutualFunds: updatedFunds
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + feeEarned,
+        feeIncomePensionFunds: state.financials.feeIncomePensionFunds + feeEarned
+      }
+    },
+    successMessage: `Suscripción de ${formatHNL(amountHNL)} captada para el ${fund.fundName}. Comisión de colocación devengada: ${formatHNL(feeEarned)}.`
+  };
+}
+
+/** 12. Operar Liquidez Overnight en Mercado Interbancario */
+export function executeOvernightCall(
+  state: GameState,
+  direction: 'prestar' | 'tomar',
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (direction === 'prestar' && state.financials.cashAndBCHReserves < amountHNL) {
+    return { updatedState: state, successMessage: 'Reservas insuficientes para colocar dinero overnight.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const rate = state.bch.tpmRate + 0.35;
+  const isLending = direction === 'prestar';
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        overnightInterbankPositions: {
+          lentOvernightHNL: isLending ? amountHNL : 0,
+          borrowedOvernightHNL: !isLending ? amountHNL : 0,
+          weightedRatePct: rate
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: isLending ? state.financials.cashAndBCHReserves - amountHNL : state.financials.cashAndBCHReserves + amountHNL
+      }
+    },
+    successMessage: isLending 
+      ? `Se colocaron ${formatHNL(amountHNL)} en Call Overnight a tasa ${rate.toFixed(2)}%.` 
+      : `Se tomaron prestados ${formatHNL(amountHNL)} en Call Overnight a tasa ${rate.toFixed(2)}% para balancear encaje.`
+  };
+}
+
+/** 13. Ejecutar Simulador en Vivo de Pruebas de Estrés CNBS */
+export function executeAdvancedStressTest(
+  state: GameState,
+  scenarioId: 'devaluacion_hnl' | 'sequia_el_nino' | 'shock_tpm_bch' | 'crisis_liquidez_retiros'
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  let simulatedCAR = state.financials.capitalAdequacyRatioCAR;
+  let simulatedLCR = state.financials.liquidityCoverageRatioLCR;
+  let provAdd = 0;
+  let gap = 0;
+  let notice = '';
+  let sName = '';
+
+  if (scenarioId === 'devaluacion_hnl') {
+    sName = 'Choque Cambiario: Devaluación del 8.5% en HNL';
+    simulatedCAR = +(simulatedCAR - 1.9).toFixed(1);
+    simulatedLCR = +(simulatedLCR - 15.0).toFixed(1);
+    provAdd = 18500000;
+    gap = simulatedCAR < 10.0 ? Math.round((10.0 - simulatedCAR) * 20000000) : 0;
+    notice = 'La devaluación encarece los créditos denominados en USD y el fondeo internacional. Se recomienda cobertura forward obligatoria a importadores.';
+  } else if (scenarioId === 'sequia_el_nino') {
+    sName = 'Shock Climático: Pérdidas Agrícolas por Fenómeno El Niño';
+    simulatedCAR = +(simulatedCAR - 2.8).toFixed(1);
+    simulatedLCR = +(simulatedLCR - 22.0).toFixed(1);
+    provAdd = 28000000;
+    gap = simulatedCAR < 10.0 ? Math.round((10.0 - simulatedCAR) * 35000000) : 0;
+    notice = 'Impacto directo en fincas cafetaleras y cultivos de granos básicos en Olancho y Comayagua. Requiere activar fondos de garantía FOHDE.';
+  } else if (scenarioId === 'shock_tpm_bch') {
+    sName = 'Shock de Tasa: Alza Agresiva de 250 bps en TPM BCH';
+    simulatedCAR = +(simulatedCAR - 1.2).toFixed(1);
+    simulatedLCR = +(simulatedLCR - 10.0).toFixed(1);
+    provAdd = 12000000;
+    gap = 0;
+    notice = 'Aumento abrupto en el costo de depósitos a plazo fijo. El margen financiero se comprime temporalmente si no se indexa la cartera crediticia.';
+  } else {
+    sName = 'Crisis de Liquidez: Retiro Masivo del 15% de Depósitos';
+    simulatedCAR = +(simulatedCAR - 3.4).toFixed(1);
+    simulatedLCR = +(simulatedLCR - 45.0).toFixed(1);
+    provAdd = 35000000;
+    gap = simulatedCAR < 10.0 ? Math.round((10.0 - simulatedCAR) * 45000000) : 0;
+    notice = 'Prueba extrema de corrida bancaria. El banco debe activar la ventanilla de liquidez de última instancia con el BCH empeñando Bonos Soberanos.';
+  }
+
+  const result: StressSimulationResult = {
+    scenarioId,
+    scenarioName: sName,
+    simulatedCAR,
+    simulatedLCR,
+    provAdditionalHNL: provAdd,
+    capitalShortfallHNL: gap,
+    cnbsRegulatoryNotice: notice,
+    executedAtMonth: state.gameMonth
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        lastStressTest: result
+      }
+    },
+    successMessage: `Prueba de estrés simulada: ${sName}. CAR Proyectado: ${simulatedCAR}% (Mínimo CNBS: 10.0%). Brecha de Capital: ${formatHNL(gap)}.`
+  };
+}
+
+/** 14. Rebalancear Provisiones IFRS 9 por Tramos */
+export function rebalanceIfrs9Provisions(
+  state: GameState,
+  targetCoveragePct: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const currentEcl = current.ifrs9ProvisionsLedger.totalExpectedLossHNL;
+  const requiredProvisions = Math.round(currentEcl * (targetCoveragePct / 100));
+  const provisionDelta = requiredProvisions - state.financials.loanLossProvisions;
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        ifrs9ProvisionsLedger: {
+          ...current.ifrs9ProvisionsLedger,
+          coverageRatioPct: targetCoveragePct
+        }
+      },
+      financials: {
+        ...state.financials,
+        loanLossProvisions: requiredProvisions
+      }
+    },
+    successMessage: `Cobertura de provisiones IFRS 9 recalibrada al ${targetCoveragePct}%. Reservas totales constituidas: ${formatHNL(requiredProvisions)}.`
+  };
+}
+
+/** 15. Blindar Ciberseguridad y Escudo Antifraude */
+export function upgradeCyberSecurityFirewall(
+  state: GameState
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const currentTier = current.cyberSecurityCenter.securityFirewallTier;
+  if (currentTier >= 4) {
+    return { updatedState: state, successMessage: 'El banco ya cuenta con el Escudo Máximo de Ciberseguridad Tier 4 (Blindaje Militar).' };
+  }
+
+  const cost = currentTier * 1800000;
+  if (state.financials.cashAndBCHReserves < cost) {
+    return { updatedState: state, successMessage: `Liquidez insuficiente para actualizar firewall (${formatHNL(cost)} requerido).` };
+  }
+
+  const nextTier = (currentTier + 1) as 1 | 2 | 3 | 4;
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        cyberSecurityCenter: {
+          ...current.cyberSecurityCenter,
+          securityFirewallTier: nextTier,
+          pciDssComplianceScorePct: +(Math.min(99.9, current.cyberSecurityCenter.pciDssComplianceScorePct + 0.3)).toFixed(1)
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - cost,
+        technologyAndMarketingExpense: state.financials.technologyAndMarketingExpense + cost
+      }
+    },
+    successMessage: `Ciberseguridad bancaria actualizada a Tier ${nextTier}. Sistema de prevención de fraude en tiempo real activado.`
+  };
+}
+
+/** 16. Radicar Inspección AML / Cumplimiento UIF */
+export function fileAmlComplianceInspection(
+  state: GameState,
+  notes: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        amlCompliancePortal: {
+          ...current.amlCompliancePortal,
+          uifReportsSubmitted: current.amlCompliancePortal.uifReportsSubmitted + 1,
+          complianceClearanceRatePct: +Math.min(99.9, current.amlCompliancePortal.complianceClearanceRatePct + 0.1).toFixed(1)
+        }
+      }
+    },
+    successMessage: `Expediente de cumplimiento contra lavado de activos remitido a la UIF. Dictamen: Conforme. ${notes}`
+  };
+}
+
+/** 17. Aplicar Ajuste Estratégico de Tasas del Comité ALCO */
+export function executeAlcoRateAdjustment(
+  state: GameState
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const forecast = current.alcoInterestRateForecast;
+  const nimBoostHNL = Math.round(state.financials.totalAssets * (forecast.expectedNIMImprovementBps / 10000 / 12));
+
+  return {
+    updatedState: {
+      ...state,
+      financials: {
+        ...state.financials,
+        netInterestMargin: state.financials.netInterestMargin + nimBoostHNL,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + nimBoostHNL
+      }
+    },
+    successMessage: `Recomendación ALCO implementada: Tasa activa objetivo ajustada a ${forecast.recommendedActiveRatePct}% y pasiva a ${forecast.recommendedPassiveRatePct}%. Expansión estimada del NIM: +${forecast.expectedNIMImprovementBps} bps.`
+  };
+}
+
+/** 18. Dispersión Corporativa Cash Management (Planilla y Proveedores) */
+export function disperseCorporateCashManagement(
+  state: GameState,
+  payrollAmountHNL: number,
+  suppliersAmountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const totalDispersed = payrollAmountHNL + suppliersAmountHNL;
+  const feeHNL = Math.round(totalDispersed * 0.0035); // 0.35% comisión por servicio de dispersión masiva
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        corporateCashManagement: {
+          ...current.corporateCashManagement,
+          monthlyPayrollDispersalsHNL: current.corporateCashManagement.monthlyPayrollDispersalsHNL + payrollAmountHNL,
+          supplierPaymentsProcessedHNL: current.corporateCashManagement.supplierPaymentsProcessedHNL + suppliersAmountHNL,
+          feeGeneratedHNL: current.corporateCashManagement.feeGeneratedHNL + feeHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + feeHNL,
+        feeIncomePayrollServices: state.financials.feeIncomePayrollServices + feeHNL
+      }
+    },
+    successMessage: `Lote de dispersión corporativa procesado por ${formatHNL(totalDispersed)}. Comisión devengada: ${formatHNL(feeHNL)}.`
+  };
+}
+
+/** 19. Constituir Fideicomiso Bancario Empresarial */
+export function createCorporateFiduciaryTrust(
+  state: GameState,
+  trustName: string,
+  settlorClientName: string,
+  assetsHNL: number,
+  trustType: 'Garantía Crediticia' | 'Administración Inmobiliaria' | 'Pago de Infraestructura'
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const feeOpening = Math.round(assetsHNL * 0.004);
+  const monthlyFee = Math.round(assetsHNL * 0.0006);
+
+  const newTrust: CorporateTrustContract = {
+    id: `fidei-${Date.now().toString().slice(-4)}`,
+    trustName,
+    settlorClientName,
+    fiduciaryAssetsHNL: assetsHNL,
+    trustType,
+    monthlyFiduciaryFeeHNL: monthlyFee,
+    activeBeneficiariesCount: 8
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        fiduciaryTrustContracts: [newTrust, ...(current.fiduciaryTrustContracts || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + feeOpening,
+        totalFeeIncome: state.financials.totalFeeIncome + feeOpening
+      }
+    },
+    successMessage: `Fideicomiso ${trustType} constituido para ${trustName} (${settlorClientName}) por ${formatHNL(assetsHNL)}. Honorario de estructuración: ${formatHNL(feeOpening)}.`
+  };
+}
+
+/** 20. Afiliar Lote de Microseguros Populares */
+export function enrollMicroInsuranceBatch(
+  state: GameState,
+  productId: string,
+  newPoliciesCount: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const prod = (current.microInsurancePortfolio || []).find(p => p.id === productId);
+  if (!prod) return { updatedState: state, successMessage: 'Producto de microseguro no encontrado.' };
+
+  const premiumIncome = newPoliciesCount * prod.monthlyPremiumHNL;
+  const updatedProds = current.microInsurancePortfolio.map(p => {
+    if (p.id === productId) {
+      return {
+        ...p,
+        activePolicies: p.activePolicies + newPoliciesCount
+      };
+    }
+    return p;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        microInsurancePortfolio: updatedProds
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + premiumIncome,
+        totalFeeIncome: state.financials.totalFeeIncome + premiumIncome
+      }
+    },
+    successMessage: `Se emitieron ${newPoliciesCount.toLocaleString()} nuevas pólizas del ${prod.productName}. Primas recaudadas: ${formatHNL(premiumIncome)}.`
+  };
+}
+
+/** 21. Lanzar Campaña de Retención y Fidelización NPS */
+export function launchRetentionCampaign(
+  state: GameState,
+  budgetHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (state.financials.cashAndBCHReserves < budgetHNL) {
+    return { updatedState: state, successMessage: 'Fondos insuficientes para la campaña publicitaria.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const savedClients = Math.round(budgetHNL / 25000);
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        clientChurnPredictor: {
+          ...current.clientChurnPredictor,
+          overallNPSScore: Math.min(95, current.clientChurnPredictor.overallNPSScore + 4),
+          highRiskChurnClientsCount: Math.max(0, current.clientChurnPredictor.highRiskChurnClientsCount - savedClients),
+          activeLoyaltyCampaignsCount: current.clientChurnPredictor.activeLoyaltyCampaignsCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - budgetHNL,
+        technologyAndMarketingExpense: state.financials.technologyAndMarketingExpense + budgetHNL
+      }
+    },
+    successMessage: `Campaña de retención activada con inversión de ${formatHNL(budgetHNL)}. Score NPS sube a ${Math.min(95, current.clientChurnPredictor.overallNPSScore + 4)} puntos.`
+  };
+}
+
+/** 22. Desembolsar Préstamos Digitales Instantáneos con Firma Biométrica */
+export function disburseDigitalInstantLoanBatch(
+  state: GameState,
+  count: number,
+  totalHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (state.financials.cashAndBCHReserves < totalHNL) {
+    return { updatedState: state, successMessage: 'Liquidez insuficiente para fondear este lote digital.' };
+  }
+
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const feeEarned = Math.round(totalHNL * 0.02);
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        digitalInstantLoans: {
+          ...current.digitalInstantLoans,
+          disbursedThisMonthCount: current.digitalInstantLoans.disbursedThisMonthCount + count,
+          totalDisbursedHNL: current.digitalInstantLoans.totalDisbursedHNL + totalHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - totalHNL + feeEarned,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + totalHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + feeEarned
+      }
+    },
+    successMessage: `Lote de ${count} créditos digitales desembolsados en menos de 3 minutos por ${formatHNL(totalHNL)}. Comisión de apertura: ${formatHNL(feeEarned)}.`
+  };
+}
+
+/** 23. Simular Política de Dividendos para el Portal de Accionistas */
+export function simulateDividendDistribution(
+  state: GameState,
+  dividendPayoutRatioPct: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.advancedOperations || INITIAL_ADVANCED_OPERATIONS;
+  const netProfit = state.financials.currentMonthProfit || 15000000;
+  const totalDividendHNL = Math.round(netProfit * (dividendPayoutRatioPct / 100));
+  const perShare = +(totalDividendHNL / current.shareholdersPortal.sharesOutstanding).toFixed(2);
+  const retainedPct = 100 - dividendPayoutRatioPct;
+
+  return {
+    updatedState: {
+      ...state,
+      advancedOperations: {
+        ...current,
+        shareholdersPortal: {
+          ...current.shareholdersPortal,
+          declaredDividendPerShareHNL: perShare,
+          retainedEarningsRatioPct: retainedPct
+        }
+      }
+    },
+    successMessage: `Política de dividendos proyectada para Asamblea: Payout ${dividendPayoutRatioPct}% (${formatHNL(perShare)} por acción). Reinversión de utilidades retenidas: ${retainedPct}%.`
+  };
+}
+
 

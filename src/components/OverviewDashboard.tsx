@@ -121,6 +121,32 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </button>
       </div>
 
+      {/* Spotlight: Centro de Operaciones Avanzadas (24 Nuevas Características) */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 hover:border-indigo-400/50 rounded-xl p-5 shadow-sm transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-indigo-400 font-semibold">
+            <span className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30">NUEVO MÓDULO ESTRATÉGICO</span>
+            <span aria-hidden="true">·</span>
+            <span>24 Características · Red Departamental · Bonos Tier 2 · Estrés CNBS</span>
+          </div>
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-400" />
+            Centro de Operaciones Avanzadas
+          </h3>
+          <p className="text-xs text-slate-300 max-w-2xl">
+            Expansión de sucursales departamentales, cajeros inteligentes ATM, bonos subordinados de capital complementario, subasta cambiaria de divisas BCH, pruebas de estrés en vivo y cash management corporativo.
+          </p>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('advanced_ops')}
+          className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors whitespace-nowrap shrink-0 flex items-center justify-center gap-2 shadow-sm"
+        >
+          <span>Abrir Centro de Operaciones (24)</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* 2. Sección Central: Boletín Oficial BCH y Guerra de Mercado */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Boletín del Banco Central de Honduras */}

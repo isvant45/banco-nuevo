@@ -751,5 +751,205 @@ export interface GameState {
   lastMonthlyClosingSummary?: MonthlyClosingSummary;
   // Suite de 20 Características, Programas e Innovaciones Bancarias
   bankingPrograms20: AureoProgramsState;
+  // Centro de Operaciones Avanzadas: 24 Características en 4 Ejes Estratégicos
+  advancedOperations: AdvancedOperationsState;
+}
+
+export interface BranchDepartment {
+  id: string;
+  name: string;
+  capitalCity: string;
+  activeBranches: number;
+  totalEmployees: number;
+  depositsCollectedHNL: number;
+  loansDisbursedHNL: number;
+  monthlyOperatingCostHNL: number;
+  expansionCostHNL: number;
+  status: 'Operativa' | 'Planificada' | 'Cerrada';
+}
+
+export interface AtmUnit {
+  id: string;
+  location: string;
+  type: 'Multifunción Smart' | 'Básico Dispensador';
+  cashVaultHNL: number;
+  maxCapacityHNL: number;
+  monthlyTransactions: number;
+  monthlyFeeIncomeHNL: number;
+  maintenanceCostHNL: number;
+  uptimePct: number;
+}
+
+export interface BankingAgentPoint {
+  id: string;
+  businessName: string;
+  department: string;
+  monthlyVolumeHNL: number;
+  commissionSharedHNL: number;
+  activeServices: string[];
+}
+
+export interface SubordinatedBondEmission {
+  id: string;
+  seriesName: string;
+  faceValueHNL: number;
+  couponRateAnnualPct: number;
+  tenorYears: number;
+  tierCategory: 'Tier 2 Complementario' | 'Bono Sostenible Verde';
+  status: 'En Circulación' | 'Redimido' | 'Estructuración';
+  monthsElapsed: number;
+}
+
+export interface FxAuctionBid {
+  id: string;
+  bidDate: string;
+  requestedUSD: number;
+  offeredExchangeRate: number;
+  allocatedUSD: number;
+  status: 'Adjudicado' | 'Parcial' | 'No Asignado';
+}
+
+export interface SovereignHolding {
+  id: string;
+  securityType: 'Letra BCH (LRM)' | 'Bono Soberano SEFIN' | 'Certificado de Absorción';
+  principalHNL: number;
+  yieldPct: number;
+  termMonthsRemaining: number;
+  liquidCollateralRatio: number;
+}
+
+export interface MultilateralCreditLine {
+  id: string;
+  institution: 'BCIE' | 'BID Invest' | 'IFC Banco Mundial';
+  totalFacilityUSD: number;
+  drawnUSD: number;
+  spreadOverSofrPct: number;
+  dedicatedSector: 'Energía Renovable' | 'Pymes Exportadoras' | 'Infraestructura Vial';
+}
+
+export interface MutualFundTier {
+  id: string;
+  fundName: string;
+  aumHNL: number;
+  navPerShareHNL: number;
+  investorCount: number;
+  managementFeePct: number;
+  targetAssetAllocation: string;
+}
+
+export interface CorporateTrustContract {
+  id: string;
+  trustName: string;
+  settlorClientName: string;
+  fiduciaryAssetsHNL: number;
+  trustType: 'Garantía Crediticia' | 'Administración Inmobiliaria' | 'Pago de Infraestructura';
+  monthlyFiduciaryFeeHNL: number;
+  activeBeneficiariesCount: number;
+}
+
+export interface MicroInsuranceProduct {
+  id: string;
+  productName: string;
+  monthlyPremiumHNL: number;
+  activePolicies: number;
+  totalCoveragePerClaimHNL: number;
+  monthlyLossRatioPct: number;
+  underwriterPartner: string;
+}
+
+export interface StressSimulationResult {
+  scenarioId: 'devaluacion_hnl' | 'sequia_el_nino' | 'shock_tpm_bch' | 'crisis_liquidez_retiros';
+  scenarioName: string;
+  simulatedCAR: number;
+  simulatedLCR: number;
+  provAdditionalHNL: number;
+  capitalShortfallHNL: number;
+  cnbsRegulatoryNotice: string;
+  executedAtMonth: number;
+}
+
+export interface AdvancedOperationsState {
+  departmentBranches: BranchDepartment[];
+  atmFleet: AtmUnit[];
+  bankingAgents: BankingAgentPoint[];
+  armoredTransportFleet: {
+    armoredTrucksCount: number;
+    monthlyRouteCostHNL: number;
+    cashInTransitInsuredHNL: number;
+    riskIncidentsCount: number;
+  };
+  driveThruLanesCount: number;
+  privateLoungesCount: number;
+
+  subordinatedBonds: SubordinatedBondEmission[];
+  fxBchBids: FxAuctionBid[];
+  sovereignHoldings: SovereignHolding[];
+  multilateralLines: MultilateralCreditLine[];
+  mutualFunds: MutualFundTier[];
+  overnightInterbankPositions: {
+    lentOvernightHNL: number;
+    borrowedOvernightHNL: number;
+    weightedRatePct: number;
+  };
+
+  lastStressTest?: StressSimulationResult;
+  ifrs9ProvisionsLedger: {
+    stage1NormalHNL: number;
+    stage2WatchlistHNL: number;
+    stage3ImpairedHNL: number;
+    totalExpectedLossHNL: number;
+    coverageRatioPct: number;
+  };
+  cyberSecurityCenter: {
+    ddosBlockedAttacksCount: number;
+    suspiciousTxBlockedCount: number;
+    pciDssComplianceScorePct: number;
+    securityFirewallTier: 1 | 2 | 3 | 4;
+  };
+  amlCompliancePortal: {
+    transactionsOver10kScreened: number;
+    pepsAlertsTriggered: number;
+    uifReportsSubmitted: number;
+    complianceClearanceRatePct: number;
+  };
+  executiveAlcoMetrics: {
+    netInterestMarginNIM: number;
+    costOfFundsPct: number;
+    efficiencyRatioCIR: number;
+    returnOnEquityROE: number;
+    returnOnAssetsROA: number;
+  };
+  alcoInterestRateForecast: {
+    recommendedActiveRatePct: number;
+    recommendedPassiveRatePct: number;
+    expectedNIMImprovementBps: number;
+  };
+
+  corporateCashManagement: {
+    corporateClientsEnrolled: number;
+    monthlyPayrollDispersalsHNL: number;
+    supplierPaymentsProcessedHNL: number;
+    feeGeneratedHNL: number;
+  };
+  fiduciaryTrustContracts: CorporateTrustContract[];
+  microInsurancePortfolio: MicroInsuranceProduct[];
+  clientChurnPredictor: {
+    overallNPSScore: number;
+    highRiskChurnClientsCount: number;
+    automatedRetentionRetentionRatePct: number;
+    activeLoyaltyCampaignsCount: number;
+  };
+  digitalInstantLoans: {
+    disbursedThisMonthCount: number;
+    totalDisbursedHNL: number;
+    averageApprovalTimeMinutes: number;
+    badRatePct: number;
+  };
+  shareholdersPortal: {
+    sharesOutstanding: number;
+    bookValuePerShareHNL: number;
+    declaredDividendPerShareHNL: number;
+    retainedEarningsRatioPct: number;
+  };
 }
 

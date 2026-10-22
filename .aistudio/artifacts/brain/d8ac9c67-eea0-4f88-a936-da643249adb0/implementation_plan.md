@@ -1,129 +1,84 @@
-# Plan de Implementación: Suite de 20 Características, Programas e Innovaciones Bancarias para Áureo Bank
+# Plan de Implementación: Centro de Operaciones Avanzadas y 24 Nuevas Características Bancarias
 
-Ecosistema bancario integral y dinámico compuesto por 20 características, programas financieros e innovaciones estructuradas en 5 pilares estratégicos (Retail, Pyme, Agropecuario, Corporativo y Tesorería/Inversiones), con interfaz modular interactiva, liquidación mensual determinista y auditoría regulatoria CNBS/BCH.
-
----
-
-## Decisiones Críticas y Preferencias Confirmadas
-
-> [!IMPORTANT]
-> **Precedencia de Preferencias Confirmadas por el Usuario (Fase 1)**:
-> - **Orientación del Portafolio**: Ecosistema equilibrado abarcando Banca Retail, Pymes, Sector Agropecuario, Banca Corporativa y Tesorería/Inversiones Patrimoniales.
-> - **Arquitectura de Interfaz**: Módulos y tarjetas interactivas plenamente integradas en cada pestaña temática existente (con accesos directos, simuladores y modales de acción en vivo).
-> - **Automatización y Ciclo Contable**: Liquidación mensual automática determinista en cada pase de mes con registro detallado en bitácora contable, deducción obligatoria de cuotas, capitalización de rendimientos y auditoría de cumplimiento.
+El banco Áureo Bank expandirá su ecosistema operativo, financiero y regulatorio mediante una nueva suite de **24 características interactivas** organizadas en un **Centro de Operaciones Avanzadas** con simulación bancaria profunda de balance, liquidez, solvencia (IAC) y cumplimiento CNBS/BCH.
 
 ---
 
-## 1. Visión General del Ecosistema (20 Características & Programas)
+## 1. Arquitectura de las 24 Nuevas Características (4 Ejes Estratégicos)
 
-El sistema expande la simulación financiera de Áureo Bank Honduras implementando 20 programas operativos interactivos agrupados en 5 divisiones estratégicas:
+### Eje 1: Red Física, Canales y Logística Bancaria (Features 1 a 6)
+1. **Red Departamental de Sucursales**: Apertura y gestión de agencias en los 18 departamentos de Honduras (Tegucigalpa/MDC, San Pedro Sula, La Ceiba, Choluteca, Santa Rosa de Copán, Juticalpa, etc.) con costes de adecuación, nómina local, meta de captación de depósitos y volumen de créditos.
+2. **Parque Inteligente de Cajeros Automáticos (ATM Smart Fleet)**: Gestión de flota de cajeros (básicos vs. multifunción inteligentes), monitoreo de efectivo disponible, recarga de bóveda de ATM, comisiones interbancarias y costos de conectividad.
+3. **Red de Agentes Corresponsales ("Caja Amiga Áureo")**: Alianzas con pulperías, farmacias y ferreterías para corresponsalía bancaria en zonas periurbanas y rurales, con bajo capex y aumento masivo de inclusión financiera.
+4. **Logística y Bóveda Central de Transporte de Valores**: Programación de rutas de blindados inter-agencias, cobertura de seguros contra siniestros/asaltos y optimización de efectivo ocioso.
+5. **Autobanco y Canales Express de Ventanilla**: Infraestructura para atención ágil de alto flujo vehicular y comercial, reduciendo los tiempos de espera y descongestionando sucursales.
+6. **Salón VIP de Banca Privada (Áureo Private Lounge)**: Espacio exclusivo de asesoría patrimonial para clientes de alto patrimonio (HNW) que asegura depósitos a largo plazo y captación de fondos institucionales.
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│              ÁUREO BANK HONDURAS - SUITE DE 20 INNOVACIONES & PROGRAMAS                │
-├─────────────────────┬─────────────────────┬─────────────────────┬──────────────────────┤
-│ 1. BANCA PERSONAS   │ 2. PYME & COMERCIO  │ 3. AGRO & VERDE     │ 4. CORP & TRADE      │
-│ · Remesas QR Cash   │ · Línea Revolvente  │ · Cosecha Segura    │ · Factoring Digital  │
-│ · Puntos Rewards    │ · Mujer Emprende    │ · Eco-Crédito Verde │ · Cartas de Crédito  │
-│ · Redondeo Hucha    │ · POS Anticipo 24h  │ · Bono Prenda Café  │ · Mesa USD Forward   │
-│ · Adelanto Nómina   │ · Escrow Proveedores│                     │ · Fideicomisos Obras │
-│ · Seguros Protege   │                     │                     │                      │
-├─────────────────────┴─────────────────────┴─────────────────────┴──────────────────────┤
-│ 5. TESORERÍA, INVERSIONES PATRIMONIALES & REGULACIÓN CNBS/UIF                          │
-│ · DPF Escalonado Step-Up   · Mesa Repos Interbancarios BCH                             │
-│ · Semáforo Riesgo CNBS I-V · Portal UIF / Prevención Lavado ($10k+)                    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+### Eje 2: Mercado de Capitales, Tesorería y Divisas (Features 7 a 12)
+7. **Emisión de Bonos Subordinados y Corporativos**: Emisión de deuda en bolsa para computar en Capital Complementario (Tier 2) de la CNBS, fijando tasa cupón y plazo (3 a 7 años) para fondear proyectos de gran escala.
+8. **Mesa Cambiaria Activa (FX Spot y Subasta BCH)**: Operaciones de compraventa mayorista de USD/HNL en la subasta electrónica del Banco Central de Honduras, administración del diferencial cambiario y forwards de cobertura para importadores.
+9. **Portafolio de Inversión Soberana (Títulos BCH / SEFIN)**: Inversión activa de excedentes en Letras del BCH y Bonos del Tesoro con rendimiento garantizado, liquidez inmediata y elegibilidad de colateral.
+10. **Líneas Multilaterales de Crédito Internacional (BCIE, IFC, BID Invest)**: Acceso a líneas de financiamiento blando y concesional a largo plazo para fondeo de obras de energía renovable, exportaciones e infraestructura.
+11. **Fondo Mutuo de Liquidez Áureo (Asset Management)**: Fondo de inversión administrado que genera comisiones de gestión (AUM fee) sin consumir encaje bancario tradicional.
+12. **Mesa Interbancaria de Liquidez Diaria (Overnight / Call Money)**: Colocación y captación entre bancos hondureños para equilibrar con exactitud el cumplimiento de encaje bancario diario y arbitrar tasas del mercado monetario.
 
-### Detalle de las 20 Características:
+### Eje 3: Inteligencia Ejecutiva, Pruebas de Estrés y Cumplimiento CNBS (Features 13 a 18)
+13. **Simulador de Pruebas de Estrés CNBS (Stress Testing Engine)**: Simulador interactivo donde el usuario aplica choques macroeconómicos (devaluación severa del HNL, sequía climática en agro, shock de mora o alza abrupta de TPM del BCH) y evalúa el impacto en solvencia (IAC) y reservas.
+14. **Calculadora Dinámica de Provisiones IFRS 9 / CNBS por Tramos de Mora**: Matriz regulatoria de categorías crediticias (I-Normal a V-Pérdida) con reclasificaciones preventivas y cálculo dinámico de gasto por reservas.
+15. **Centro de Ciberseguridad y Escudo Antifraude**: Detección en tiempo real de transacciones sospechosas, mitigación de clonación de tarjetas y certificación PCI-DSS / ISO 27001 para blindar la reputación bancaria.
+16. **Matriz de Prevención de Lavado de Activos (AML/CFT & Oficialía de Cumplimiento)**: Monitoreo de transferencias atípicas mayores a USD 10,000, verificación de listas de Personas Políticamente Expuestas (PEPs) y reportes a la UIF.
+17. **Estado de Resultados y Balance General Dinámico (Auditoría Financiera)**: Desglose interactivo en tiempo real de Margen de Intermediación Financiera (NIM), ROE, ROA, Índice de Eficiencia Operativa (CIR) y Costo de Fondeo.
+18. **Comité de Activos y Pasivos Interactivo (ALCO Advisor)**: Herramienta estratégica de simulación de curvas de tasas de interés activas y pasivas para maximizar el margen financiero neto frente al ciclo del BCH.
 
-#### Pilar A: Banca Personas & Retail Digital (5)
-1. **Remesas Familiares ÁureoCash QR**: Recepción de remesas del exterior (USD), con liquidación directa en Lempiras con diferencial favorable (+L. 0.10 por USD) y retiro sin tarjeta en cajeros mediante código OTP/QR temporal de 6 dígitos.
-2. **Programa Áureo Rewards & Puntos Canjeables**: Acumulación automática de 1 punto por cada $1 gastado en tarjetas; canjeable con 1 clic por abono directo al saldo de la tarjeta o transferencias a cuentas de ahorro.
-3. **Micro-Ahorro Automático "Redondeo Inteligente"**: Opción de activar redondeo al múltiplo superior de L. 10 o L. 50 en cada compra con tarjeta, depositando los centavos en una hucha virtual con interés del TPM - 1.50%.
-4. **Adelanto de Salario 24/7 (Planilla Directa)**: Microcrédito de liquidez inmediata de hasta el 35% del salario mensual con comisión plana (2.5%), autoliquidable en la fecha de corte mensual de planilla.
-5. **Seguros Colectivos y Asistencia "Áureo Protege"**: Microseguro voluntario de desempleo y vida (L. 95/mes), que cubre hasta 3 cuotas mensuales de préstamos en caso de cesantía o mora sobrevenida.
-
-#### Pilar B: Pymes & Microfinanzas Productivas (4)
-6. **Línea de Crédito Revolvente para Capital de Trabajo Pyme**: Cupo pre-aprobado para abastecimiento y nómina con disposición instantánea; el cliente paga mensualmente intereses únicamente sobre el saldo dispuesto.
-7. **Programa "Mujer Emprende" con Tasa Bonificada**: Línea crediticia con subsidio de tasa (-2.00% anual) y garantía parcial FOHDE para microempresas de liderazgo femenino.
-8. **POS Áureo Smart con Anticipo Inmediato de Ventas**: Módulo de comercios afiliados que permite descontar el 80% de las ventas en tarjeta de forma adelantada con una tasa de factoraje del 1.8%.
-9. **Cuentas Escrow / Custodia Segura de Proveedores**: Depósitos en custodia mercantil condicionados a la verificación de entregas de mercancía o servicios contratados entre clientes del banco.
-
-#### Pilar C: Sector Agropecuario & Sostenibilidad Verde (3)
-10. **Crédito Estacional Cafetalero "Cosecha Segura"**: Préstamo con amortización semestral/anual coincidente con el ciclo de corte y exportación de café, integrado a póliza climática paramétrica.
-11. **Línea Verde "Eco-Crédito Renovable"**: Financiamiento a mediano/largo plazo (hasta 84 meses) con tasa preferencial para compra de paneles solares, bio-digestores y sistemas de riego por goteo.
-12. **Bono de Prenda & Pignoración de Café**: Colateralización de inventarios certificados de café almacenados en Almacenes Generales de Depósito (AGD) como garantía líquida de bajo riesgo (Categoría CNBS I).
-
-#### Pilar D: Banca Corporativa, Factoring & Comercio Exterior (4)
-13. **Factoring Electrónico y Confirming Corporativo**: Descuento digital de facturas a 30, 60 y 90 días para proveedores de grandes cadenas corporativas con cobro de comisión por cesión de crédito.
-14. **Cartas de Crédito y Cartas Fianza (Trade Finance)**: Emisión de garantías comerciales internacionales y avales para licitaciones públicas de infraestructura, devengando comisiones trimestrales.
-15. **Mesa Cambiaria USD Spot & FX Forward Corporativo**: Coberturas cambiarias a plazo fijo para importadores/exportadores, fijando el tipo de cambio futuro contra la volatilidad del dólar.
-16. **Fideicomisos de Administración Inmobiliaria**: Gestión de patrimonios autónomos para proyectos de construcción vertical en San Pedro Sula y Tegucigalpa con liberación escalonada de fondos por avance de obra.
-
-#### Pilar E: Tesorería, Inversiones Patrimoniales & Regulación (4)
-17. **DPF Digital Step-Up con Tasa Creciente**: Certificados a plazo fijo con escala progresiva de tasa trimestral (ej. T1: 7.5%, T2: 8.5%, T3: 9.5%, T4: 10.5%), penalizando el rescate temprano.
-18. **Mesa Interbancaria de Repos y Ventanilla BCH**: Colocación y captación nocturna de liquidez a 1, 7 y 14 días para optimizar la posición de encaje legal (12% reglamentario).
-19. **Calificador Regulatorio CNBS & Alerta Temprana de Mora**: Monitor automatizado de categorías de riesgo (I a V) que calcula reservas matemáticas mínimas de provisión y sugiere refinanciamientos automáticos.
-20. **Portal de Auditoría y Cumplimiento Regulatorio CNBS / UIF**: Sistema de detección y reporte obligatorio de transacciones en efectivo mayores a $10,000 USD (formulario de origen lícito de fondos) y archivo de reportes ROS.
+### Eje 4: Soluciones Corporativas, Retail y Retención de Clientes (Features 19 a 24)
+19. **Banca Transaccional Corporativa & Cash Management**: Módulo integral de recaudación masiva de servicios públicos, pago a proveedores y factoring digital con cobro de comisión por dispersión.
+20. **Fideicomisos Bancarios de Garantía y Administración**: Estructuración de contratos fiduciarios para proyectos de vivienda social, centros comerciales y obras públicas, devengando comisiones recurrentes fiduciarias.
+21. **Microseguros Bancaseguros Populares**: Distribución de pólizas de bajo costo (salud ambulatoria, vida familiar, seguro agrícola paramétrico) integradas a cuentas de ahorro.
+22. **Motor de Retención & Scoring NPS (Predictor de Churn)**: Monitoreo de satisfacción de clientes, lealtad y activación de campañas preventivas de retención antes de que los cuentahabientes migren a la competencia.
+23. **Crédito de Consumo Express con Firma Digital**: Motor de aprobación biométrica inmediata para préstamos personales y créditos de nómina en menos de 3 minutos para usuarios calificados.
+24. **Portal del Accionista y Política de Dividendos**: Simulación de distribución de dividendos en efectivo vs. capitalización de utilidades para fortalecer el capital social primario (Tier 1) de cara a la asamblea anual.
 
 ---
 
-## 2. Experiencia de Usuario & Diseño Visual (SaaS Dashboard Standard)
+## 2. Modificaciones Técnicas en el Código
 
-Siguiendo las directrices de `frontend-design` y `references/3_saas_dashboard.md`:
+### 2.1 Modelo de Datos (`/src/game/types.ts`)
+- Añadir interfaces para:
+  - `BranchDepartment`: Datos de red física por departamento (departamento, sucursales activas, empleados, capex, depósitos captados).
+  - `AtmFleet`: Flota de cajeros (total cajeros, cajeros inteligentes, disponibilidad de efectivo, tasa de falla, ingresos por comisión).
+  - `BankingAgentNetwork`: Agentes corresponsales comunitarios (puntos activos, transacciones promedio, comisión).
+  - `CapitalMarketTreasury`: Bonos subordinados emitidos, cartera soberana BCH, posición en subasta FX, fondos mutuos gestionados.
+  - `StressTestScenario`: Definición de parámetros de estrés (shock de mora, shock cambiario, shock de tasa, impacto en IAC).
+  - `CorporateFiduciary`: Fideicomisos activos, cartera de factoring y comisiones devengadas.
+  - `AdvancedOperationsState`: Estado consolidado que agrupa todas las 24 características con sus métricas y estados de activación.
 
-### A. Paleta y Superficies
-- **Lienzo Principal (60%)**: Slate ultra-profundo `bg-slate-950` con paneles `bg-slate-900/90` y bordes de 1px en `border-slate-800`.
-- **Superficies Estructurales (30%)**: Fondos tenues `bg-slate-900/50` y separadores de cabello `border-slate-800/80` sin anidación de tarjetas dentro de tarjetas.
-- **Acentos de Alto Contenido (10%)**:
-  - Oro Áureo / Amber institucional (`text-amber-400`, `bg-amber-500/20`, `border-amber-500/40`) para la banca privada, treasury y lealtad.
-  - Esmeralda BCH (`text-emerald-400`, `bg-emerald-500/20`, `border-emerald-500/40`) para liquidez, eco-crédito y desembolsos aprobados.
-  - Azul Corporativo (`text-sky-400`, `bg-sky-500/20`, `border-sky-500/40`) para trade finance, factoring y convenios.
-  - Carmesí Regulador (`text-rose-400`, `bg-rose-500/20`, `border-rose-500/40`) para morosidad, alertas CNBS y límites de encaje.
+### 2.2 Motor Económico (`/src/game/economyEngine.ts`)
+- Extender el ciclo mensual (`advanceMonth`):
+  - Liquidación de ingresos por comisiones de red física (ATM, agentes, sucursales) y costes operativos.
+  - Pago de cupones de bonos corporativos e ingresos por títulos soberanos del BCH.
+  - Ingresos por fideicomisos, cash management corporativo y bancaseguros.
+  - Cálculo interactivo de las pruebas de estrés sin romper el estado base del juego.
+  - Actualización de depósitos captados por la red física y aumento de base de clientes.
 
-### B. Tipografía y Cifras Tabulares
-- **Titulares**: `Plus Jakarta Sans` y `Outfit` con peso equilibrado (Semibold 600) y `text-wrap: balance`.
-- **Cuerpo**: `Public Sans` o `DM Sans` con legibilidad de 13px a 15px.
-- **Cifras Financieras**: Estricto uso de `tabular-nums` con formato de moneda estándar en Lempiras (`L.`) y Dólares (`$`).
+### 2.3 Componente Principal: Centro de Operaciones Avanzadas (`/src/components/AdvancedOperationsHub.tsx`)
+- Crear un componente de primer nivel con sub-pestañas intuitivas y herramientas interactivas:
+  1. **Red Física & Canales** (Sucursales por departamento, simulador de cajeros ATM, agentes comunitarios, bóveda y autobanco).
+  2. **Mercado de Capitales & Tesorería** (Emisión de bonos, mesa FX BCH, portafolio soberano, líneas internacionales y fondos mutuos).
+  3. **Inteligencia Ejecutiva & Pruebas de Estrés** (Simulador en vivo de choques macroeconómicos, matriz de provisiones IFRS 9, ciberseguridad y comité ALCO).
+  4. **Soluciones Corporativas & Clientes** (Cash management, fideicomisos, bancaseguros, retención de clientes y portal del accionista).
+- Diseñado con estética premium (Tailwind CSS, badges de estado, gráficos de barras de progreso, controles numéricos y botones de acción rápida).
 
-### C. Navegación y Acceso
-- Cada una de las 20 características estará alojada en su pestaña temática respectiva (Banca Retail, Pymes, Agro/Verde, Corporativa, Tesorería & Inversiones, y Auditoría CNBS), con una barra superior de filtrado rápido y un catálogo interactivo con botones de acción directa (Simular, Contratar, Desembolsar, Liquidar, Auditar).
+### 2.4 Integración en Navegación y Vistas (`/src/App.tsx`, `/src/components/OverviewDashboard.tsx`)
+- Añadir el botón y acceso directo "Centro de Operaciones" en la barra de navegación superior.
+- Integrar widgets de resumen en el Dashboard general (resumen de sucursales activas, bonos en circulación y estado de solvencia ante pruebas de estrés).
 
 ---
 
-## 3. Decisiones de Producto y Reglas de Negocio
-
-### Decisión 1: Automatización Mensual vs. Intervención del Banquero
-- **Enfoque Adoptado**: Liquidación mensual automática determinista ejecutada al presionar "Avanzar Mes", sincronizada con el motor de devengo de intereses, cobro de comisiones de seguros, amortización de cuotas, redondeo de huchas y actualización de semáforos CNBS.
-- **Beneficio**: El usuario puede activar/desactivar programas o suscribir contratos en cualquier momento, y el cierre mensual consolida todos los efectos en el estado de resultados y balance general.
-
-### Decisión 2: Trazabilidad y Bitácora de Auditoría
-- **Enfoque Adoptado**: Bitácora enriquecida con categorías (Crédito, Captación, Comercio Exterior, Cumplimiento CNBS, Tesorería) y métricas de impacto en rentabilidad (ROA, ROE, NIM y ratio de morosidad).
-
----
-
-## 4. Arquitectura Técnica y Modelo de Datos
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                             ESTRUCTURA DE DATOS                          │
-├───────────────────────────────────┬──────────────────────────────────────┤
-│ src/game/types.ts                 │ · Definición de los 20 programas     │
-│                                   │ · Interfaces de contratos activos    │
-│                                   │ · Registros contables y auditoría    │
-├───────────────────────────────────┼──────────────────────────────────────┤
-│ src/game/economyEngine.ts         │ · Generadores iniciales de contratos │
-│                                   │ · Liquidación mensual determinista   │
-│                                   │ · Cálculos de comisiones y devengos  │
-├───────────────────────────────────┼──────────────────────────────────────┤
-│ src/components/                   │ · Modales interactivos para cada     │
-│   ProgramsSuiteModal.tsx          │   uno de los 20 programas            │
-│   BankingDivisionTabs.tsx         │ · Tarjetas operativas por división   │
-│   AuditoriaCNBSPanel.tsx          │ · Monitor regulatorio y alertas UIF  │
-└───────────────────────────────────┴──────────────────────────────────────┘
-```
-
-### Plan de Verificación de Integridad
-1. Ejecutar tests de regresión existentes (`node --import tsx --test tests/*.test.ts`) para garantizar que la lógica mensual existente permanezca intacta.
-2. Compilar con `compile_applet` y validar sintaxis con `lint_applet` sin errores ni advertencias de tipo.
+## 3. Pruebas y Validación
+- Crear pruebas unitarias automáticas en `/tests/advancedOperations.test.ts` verificando:
+  - Inicialización limpia de las 24 características.
+  - Apertura de sucursales departamentales y cálculo de impacto en balance.
+  - Emisión de bonos subordinados e incremento en Capital Tier 2.
+  - Ejecución del simulador de estrés CNBS y cálculo matemático de solvencia (IAC).
+  - Liquidación mensual automática sin discrepancias contables.
+- Validar compilación limpia mediante `compile_applet` y verificación estática con `lint_applet`.

@@ -66,6 +66,7 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const navItems = [
     { id: 'overview', label: 'Directorio' },
+    { id: 'advanced_ops', label: 'Centro de Operaciones (24)' },
     { id: 'programs20', label: '20 Programas & Clientes' },
     { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
     { id: 'divisions', label: '6 Bancas y Clientes' },
