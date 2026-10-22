@@ -1,0 +1,1 @@
+export { sound } from './audioFx';

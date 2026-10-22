@@ -59,7 +59,7 @@ import {
   disburseDigitalInstantLoanBatch,
   simulateDividendDistribution
 } from '../game/economyEngine';
-import { sound } from '../game/soundEffects';
+import { sound } from '../game/audioFx';
 
 interface Props {
   state: GameState;

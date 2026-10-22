@@ -12,7 +12,8 @@ import {
   Percent, 
   FileCheck2, 
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Building2
 } from 'lucide-react';
 
 interface OverviewDashboardProps {

@@ -2594,6 +2594,102 @@ export const INITIAL_ADVANCED_OPERATIONS: AdvancedOperationsState = {
       monthlyOperatingCostHNL: 0,
       expansionCostHNL: 5500000,
       status: 'Planificada'
+    },
+    {
+      id: 'dep-santa-barbara',
+      name: 'Santa Bárbara',
+      capitalCity: 'Santa Bárbara',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3700000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-valle',
+      name: 'Valle',
+      capitalCity: 'San Lorenzo / Nacaome',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3600000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-la-paz',
+      name: 'La Paz',
+      capitalCity: 'La Paz',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3500000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-intibuca',
+      name: 'Intibucá',
+      capitalCity: 'La Esperanza',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3600000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-lempira',
+      name: 'Lempira',
+      capitalCity: 'Gracias',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3600000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-ocotepeque',
+      name: 'Ocotepeque',
+      capitalCity: 'Nueva Ocotepeque',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 3900000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-colon',
+      name: 'Colón',
+      capitalCity: 'Tocoa / Trujillo',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 4100000,
+      status: 'Planificada'
+    },
+    {
+      id: 'dep-gracias-a-dios',
+      name: 'Gracias a Dios',
+      capitalCity: 'Puerto Lempira (La Mosquitia)',
+      activeBranches: 0,
+      totalEmployees: 0,
+      depositsCollectedHNL: 0,
+      loansDisbursedHNL: 0,
+      monthlyOperatingCostHNL: 0,
+      expansionCostHNL: 6000000,
+      status: 'Planificada'
     }
   ],
 

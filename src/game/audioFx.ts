@@ -176,6 +176,16 @@ class SoundEngine {
     this.playRejectBuzzer();
   }
 
+  // Alias para caja registradora / operaciones monetarias
+  public playCashRegister() {
+    this.playCashChime();
+  }
+
+  // Alias para sirena de advertencia / estrés
+  public playWarningSiren() {
+    this.playRejectBuzzer();
+  }
+
   // Alias para jingle de mejora técnica
   public playUpgradeJingle() {
     this.playApprovalStamp();
