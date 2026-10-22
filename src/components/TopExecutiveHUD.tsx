@@ -66,6 +66,7 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const navItems = [
     { id: 'overview', label: 'Directorio' },
+    { id: 'programs20', label: '20 Programas & Clientes' },
     { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
     { id: 'divisions', label: '6 Bancas y Clientes' },
     { id: 'pos_acquiring', label: `Comercios POS (${state.posMerchants.length})` },
@@ -76,7 +77,7 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
     { id: 'treasury', label: 'Tesorería y Mercado Secundario' },
     { id: 'operations', label: 'Eficiencia Operativa' },
     { id: 'experts', label: 'Opiniones Expertos' },
-    { id: 'innovations', label: '10 Innovaciones' },
+    { id: 'innovations', label: 'Módulos Institucionales' },
     { id: 'board_staff', label: 'Talento y Directiva' },
     { id: 'branches', label: 'Sucursales' }
   ];

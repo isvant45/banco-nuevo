@@ -22,7 +22,8 @@ import {
   ExpertOpinion,
   TenInnovationsState,
   BchMoneyDeskState,
-  FxForwardContract
+  FxForwardContract,
+  AureoProgramsState
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -2004,6 +2005,472 @@ export const INITIAL_FX_FORWARDS: FxForwardContract[] = [
   }
 ];
 
+export const INITIAL_BANKING_PROGRAMS_20: AureoProgramsState = {
+  programs: [
+    // 1. Pilar Retail (1 a 5)
+    {
+      id: 'prog-remesas-qr',
+      number: 1,
+      pillar: 'retail',
+      name: 'Remesas Familiares ÁureoCash QR',
+      tagline: 'Acreditación directa y retiro sin tarjeta en cajeros mediante PIN/QR temporal',
+      status: 'activo',
+      monthlyVolumeHNL: 18500000,
+      monthlyNetIncomeHNL: 645000,
+      participantsCount: 3420,
+      keyMetricLabel: 'Diferencial Cambiario',
+      keyMetricValue: '+L. 0.10 por USD',
+      description: 'Canal de recepción de divisas de USA y España con tipo de cambio preferencial y retiro inmediato con código seguro de 6 dígitos sin necesidad de tarjeta plástica.'
+    },
+    {
+      id: 'prog-rewards-multicomercio',
+      number: 2,
+      pillar: 'retail',
+      name: 'Áureo Rewards & Puntos Canjeables',
+      tagline: 'Fidelización multi-comercio: 1 punto por dólar para abono a saldo o combustible',
+      status: 'optimizado',
+      monthlyVolumeHNL: 24800000,
+      monthlyNetIncomeHNL: 380000,
+      participantsCount: 6850,
+      keyMetricLabel: 'Puntos Circulantes',
+      keyMetricValue: '1,420,000 pts',
+      description: 'Programa de recompensas sobre consumos con tarjetas de débito y crédito. Cada punto equivale a L. 0.25 aplicable directo al saldo de la tarjeta o transferencias.'
+    },
+    {
+      id: 'prog-redondeo-hucha',
+      number: 3,
+      pillar: 'retail',
+      name: 'Micro-Ahorro Automático "Hucha Digital"',
+      tagline: 'Redondeo al múltiplo de L. 10 / L. 50 en consumos con tarjeta para ahorro remunerado',
+      status: 'activo',
+      monthlyVolumeHNL: 4200000,
+      monthlyNetIncomeHNL: 145000,
+      participantsCount: 4120,
+      keyMetricLabel: 'Tasa Rendimiento Hucha',
+      keyMetricValue: '4.25% anual',
+      description: 'Ahorro invisible en cada transacción cotidiana. La diferencia se transfiere a un sub-bolsillo remunerado mensualmente con interés capitalizable.'
+    },
+    {
+      id: 'prog-adelanto-salario',
+      number: 4,
+      pillar: 'retail',
+      name: 'Adelanto de Salario 24/7 en Planilla',
+      tagline: 'Línea de liquidez pre-aprobada hasta el 35% de nómina con auto-cancelación mensual',
+      status: 'activo',
+      monthlyVolumeHNL: 8900000,
+      monthlyNetIncomeHNL: 222500,
+      participantsCount: 1250,
+      keyMetricLabel: 'Comisión Plana',
+      keyMetricValue: '2.5% por retiro',
+      description: 'Disposición instantánea de fondos devengados por empleados bajo convenio corporativo de nómina, descontado automáticamente el día de pago sin mora.'
+    },
+    {
+      id: 'prog-seguros-protege',
+      number: 5,
+      pillar: 'retail',
+      name: 'Seguros Colectivos "Áureo Protege"',
+      tagline: 'Microseguro de vida y cesantía (L. 95/mes) que cubre hasta 3 cuotas crediticias',
+      status: 'en_expansion',
+      monthlyVolumeHNL: 1450000,
+      monthlyNetIncomeHNL: 420000,
+      participantsCount: 5200,
+      keyMetricLabel: 'Cobertura por Siniestro',
+      keyMetricValue: 'Hasta 3 cuotas',
+      description: 'Póliza colectiva con débito automático en cuenta que ampara al cliente ante desempleo involuntario o accidentes personales, blindando el índice de morosidad bancario.'
+    },
+
+    // 2. Pilar Pyme (6 a 9)
+    {
+      id: 'prog-linea-revolvente-pyme',
+      number: 6,
+      pillar: 'pyme',
+      name: 'Línea de Crédito Revolvente Capital de Trabajo',
+      tagline: 'Cupo ágil para inventario y proveedores pagando intereses solo por el monto dispuesto',
+      status: 'optimizado',
+      monthlyVolumeHNL: 48000000,
+      monthlyNetIncomeHNL: 890000,
+      participantsCount: 380,
+      keyMetricLabel: 'Tasa Activa Media',
+      keyMetricValue: '17.2% anual',
+      description: 'Facilidad de tesorería empresarial que permite desembolsar y amortizar de forma flexible según el ciclo de cobranza comercial de la Pyme.'
+    },
+    {
+      id: 'prog-mujer-emprende',
+      number: 7,
+      pillar: 'pyme',
+      name: 'Programa "Mujer Emprende" con Tasa Bonificada',
+      tagline: 'Subsidio de tasa (-2.00% anual) con aval de garantía del fondo FOHDE',
+      status: 'activo',
+      monthlyVolumeHNL: 21500000,
+      monthlyNetIncomeHNL: 345000,
+      participantsCount: 290,
+      keyMetricLabel: 'Aval FOHDE Cobertura',
+      keyMetricValue: '70% de garantía',
+      description: 'Iniciativa de inclusión financiera y género que facilita crédito productivo con tasas preferenciales y acompañamiento gerencial a lideresas empresariales.'
+    },
+    {
+      id: 'prog-pos-anticipo-24h',
+      number: 8,
+      pillar: 'pyme',
+      name: 'POS Áureo Smart con Anticipo de Ventas',
+      tagline: 'Factoraje express de hasta el 80% del flujo en tarjeta con comisión del 1.8%',
+      status: 'optimizado',
+      monthlyVolumeHNL: 32000000,
+      monthlyNetIncomeHNL: 576000,
+      participantsCount: 410,
+      keyMetricLabel: 'Anticipo Inmediato',
+      keyMetricValue: '80% ventas fin semana',
+      description: 'Permite a gasolineras, farmacias y supermercados disponer de su cobranza de tarjetas antes de la compensación habitual bancaria.'
+    },
+    {
+      id: 'prog-escrow-custodia',
+      number: 9,
+      pillar: 'pyme',
+      name: 'Cuentas Escrow / Custodia Segura de Proveedores',
+      tagline: 'Fondos en custodia mercantil liberados tras confirmación y guía de remisión',
+      status: 'activo',
+      monthlyVolumeHNL: 16500000,
+      monthlyNetIncomeHNL: 247500,
+      participantsCount: 85,
+      keyMetricLabel: 'Comisión Fiduciaria',
+      keyMetricValue: '1.5% del monto',
+      description: 'Intermediación segura para compraventas entre distribuidores y minoristas. Los fondos permanecen bloqueados en Áureo Bank hasta el acta de entrega conforme.'
+    },
+
+    // 3. Pilar Agropecuario & Verde (10 a 12)
+    {
+      id: 'prog-cosecha-segura-cafe',
+      number: 10,
+      pillar: 'agro',
+      name: 'Crédito Estacional Cafetalero "Cosecha Segura"',
+      tagline: 'Amortización semestral/anual atada al ciclo de corte con seguro climático paramétrico',
+      status: 'en_expansion',
+      monthlyVolumeHNL: 65000000,
+      monthlyNetIncomeHNL: 1150000,
+      participantsCount: 145,
+      keyMetricLabel: 'Plazo de Gracia',
+      keyMetricValue: 'Hasta cosecha (6m)',
+      description: 'Financiamiento agroindustrial para cooperativas de Marcala, Santa Bárbara y El Paraíso, estructurado para liquidarse con las liquidaciones de exportación de café.'
+    },
+    {
+      id: 'prog-eco-credito-verde',
+      number: 11,
+      pillar: 'agro',
+      name: 'Eco-Crédito Verde y Eficiencia Renovable',
+      tagline: 'Fondos multilaterales BCIE para paneles solares y sistemas de riego hasta 84 meses',
+      status: 'activo',
+      monthlyVolumeHNL: 38000000,
+      monthlyNetIncomeHNL: 580000,
+      participantsCount: 65,
+      keyMetricLabel: 'CO2 Evitado Anual',
+      keyMetricValue: '4,850 tons',
+      description: 'Línea ambiental para transición solar en maquilas, granjas avícolas y fincas, con tasa blanda respaldada por organismos multilaterales internacionales.'
+    },
+    {
+      id: 'prog-bono-prenda-agd',
+      number: 12,
+      pillar: 'agro',
+      name: 'Bono de Prenda & Pignoración de Café en AGD',
+      tagline: 'Financiamiento sobre café certificado en Almacenes Generales de Depósito (AGD)',
+      status: 'optimizado',
+      monthlyVolumeHNL: 52000000,
+      monthlyNetIncomeHNL: 890000,
+      participantsCount: 52,
+      keyMetricLabel: 'Categoría CNBS',
+      keyMetricValue: 'Categoría I (Líquida)',
+      description: 'Crédito prendario garantizado con certificados de depósito warrant. Si el exportador requiere liquidez, pignora el grano a precio de mercado de futuros de Nueva York.'
+    },
+
+    // 4. Pilar Corporativo & Comercio Exterior (13 a 16)
+    {
+      id: 'prog-factoring-confirming',
+      number: 13,
+      pillar: 'corporativo',
+      name: 'Factoring Electrónico y Confirming Corporativo',
+      tagline: 'Descuento digital de facturas a 30/60/90 días para proveedores de grandes cadenas',
+      status: 'activo',
+      monthlyVolumeHNL: 78000000,
+      monthlyNetIncomeHNL: 1420000,
+      participantsCount: 195,
+      keyMetricLabel: 'Plazo Medio Facturas',
+      keyMetricValue: '58 días',
+      description: 'Adquisición de carteras de proveedores con cesión irrevocable de cobro a pagadores triple-A (maquilas de Villanueva y cadenas minoristas nacionales).'
+    },
+    {
+      id: 'prog-cartas-credito-trade',
+      number: 14,
+      pillar: 'corporativo',
+      name: 'Cartas de Crédito y Avales de Comercio Exterior',
+      tagline: 'Trade finance irrevocable respaldado por red de bancos corresponsales de Nueva York',
+      status: 'activo',
+      monthlyVolumeHNL: 45000000,
+      monthlyNetIncomeHNL: 720000,
+      participantsCount: 78,
+      keyMetricLabel: 'Comisión de Emisión',
+      keyMetricValue: '0.75% trimestral',
+      description: 'Emisión de cartas de crédito de importación para maquinaria y fertilizantes, y fianzas de cumplimiento para licitaciones del Fondo Vial de SEFIN.'
+    },
+    {
+      id: 'prog-mesa-usd-forward',
+      number: 15,
+      pillar: 'corporativo',
+      name: 'Mesa Cambiaria USD Spot & FX Forward Cobertura',
+      tagline: 'Contratos forward para fijar tipo de cambio y blindar costos de importación',
+      status: 'optimizado',
+      monthlyVolumeHNL: 62000000,
+      monthlyNetIncomeHNL: 980000,
+      participantsCount: 64,
+      keyMetricLabel: 'Volumen Cobertura USD',
+      keyMetricValue: '$2.5M cubiertos',
+      description: 'Instrumentos derivados de divisas a plazo que protegen los márgenes de importadores de trigo y combustible frente a devaluaciones del Lempira.'
+    },
+    {
+      id: 'prog-fideicomisos-inmobiliarios',
+      number: 16,
+      pillar: 'corporativo',
+      name: 'Fideicomisos de Garantía y Administración Inmobiliaria',
+      tagline: 'Patrimonios autónomos para torres residenciales y parques industriales con desembolso por hito',
+      status: 'activo',
+      monthlyVolumeHNL: 85000000,
+      monthlyNetIncomeHNL: 1250000,
+      participantsCount: 22,
+      keyMetricLabel: 'Activos en Custodia',
+      keyMetricValue: 'L. 850M AUM',
+      description: 'Estructuración fiduciaria que administra preventas y desembolsa créditos de construcción exclusivamente contra dictámenes de avance de obra firmados por peritos.'
+    },
+
+    // 5. Pilar Tesorería, Inversiones & Cumplimiento (17 a 20)
+    {
+      id: 'prog-dpf-step-up',
+      number: 17,
+      pillar: 'tesoreria_regulacion',
+      name: 'DPF Digital Step-Up con Tasa Creciente',
+      tagline: 'Depósito a plazo fijo cuya tasa pasiva aumenta cada 3 meses premiando la permanencia',
+      status: 'activo',
+      monthlyVolumeHNL: 95000000,
+      monthlyNetIncomeHNL: 540000,
+      participantsCount: 140,
+      keyMetricLabel: 'Escala Rendimiento',
+      keyMetricValue: '7.5% a 10.5%',
+      description: 'Fondeo de captación a largo plazo que escala la tasa trimestralmente (Mes 1-3: 7.5%, Mes 4-6: 8.5%, Mes 7-9: 9.5%, Mes 10-12: 10.5%), blindando la liquidez.'
+    },
+    {
+      id: 'prog-mesa-repos-interbancaria',
+      number: 18,
+      pillar: 'tesoreria_regulacion',
+      name: 'Mesa Interbancaria de Repos y Subasta Nocturna BCH',
+      tagline: 'Manejo activo del encaje legal obligatorio (12%) mediante reportos a 7, 14 y 28 días',
+      status: 'optimizado',
+      monthlyVolumeHNL: 110000000,
+      monthlyNetIncomeHNL: 890000,
+      participantsCount: 6,
+      keyMetricLabel: 'Spread Interbancario',
+      keyMetricValue: '+0.50% vs TPM',
+      description: 'Colocación de excedentes de caja o captación de liquidez de última instancia con Letras del BCH y bancos competidores (Atlántida, Ficohsa, BAC).'
+    },
+    {
+      id: 'prog-calificador-riesgo-cnbs',
+      number: 19,
+      pillar: 'tesoreria_regulacion',
+      name: 'Calificador Inteligente CNBS & Alerta Temprana de Mora',
+      tagline: 'Modelación regulatoria de categorías I a V con provisión automática y rescate de cartera',
+      status: 'activo',
+      monthlyVolumeHNL: 55294191,
+      monthlyNetIncomeHNL: 620000,
+      participantsCount: 48,
+      keyMetricLabel: 'Cobertura Provisiones',
+      keyMetricValue: '104.9% requerida',
+      description: 'Motor algorítmico que monitorea atrasos de 30, 60 y 90+ días, sugiriendo renegociaciones inmediatas antes de que el crédito migre a castigo de capital.'
+    },
+    {
+      id: 'prog-portal-uif-cumplimiento',
+      number: 20,
+      pillar: 'tesoreria_regulacion',
+      name: 'Portal de Auditoría y Cumplimiento Regulatorio CNBS / UIF',
+      tagline: 'Declaración obligatoria de origen de fondos ($10,000+ USD) y archivo de reportes ROS',
+      status: 'optimizado',
+      monthlyVolumeHNL: 34000000,
+      monthlyNetIncomeHNL: 180000,
+      participantsCount: 512,
+      keyMetricLabel: 'Índice Auditoría AML',
+      keyMetricValue: '98.5% Favorable',
+      description: 'Módulo de gobernanza y prevención de lavado de activos conforme a la Ley Especial de la CNBS, con trazabilidad digital y bloqueo de operaciones atípicas.'
+    }
+  ],
+
+  remesasQrTransactions: [
+    {
+      id: 'rem-qr-01',
+      senderCountry: 'Estados Unidos',
+      beneficiaryName: 'Marlon Roberto Enamorado',
+      amountUSD: 450,
+      amountHNL: 11241,
+      exchangeRateUsed: 24.98,
+      qrPinCode: '894201',
+      status: 'Acreditado_Cuenta'
+    },
+    {
+      id: 'rem-qr-02',
+      senderCountry: 'España',
+      beneficiaryName: 'Suyapa Maritza Carvajal',
+      amountUSD: 600,
+      amountHNL: 14988,
+      exchangeRateUsed: 24.98,
+      qrPinCode: '315792',
+      status: 'Pendiente_Cajero'
+    },
+    {
+      id: 'rem-qr-03',
+      senderCountry: 'Estados Unidos',
+      beneficiaryName: 'Carlos Adolfo Pineda',
+      amountUSD: 350,
+      amountHNL: 8743,
+      exchangeRateUsed: 24.98,
+      qrPinCode: '640188',
+      status: 'Cobrado'
+    }
+  ],
+
+  rewardsSystem: {
+    totalPointsIssued: 1420000,
+    totalPointsRedeemed: 650000,
+    exchangeRatePerPointHNL: 0.25,
+    activeEnrolledCardholders: 6850
+  },
+
+  microSavingsHuchas: {
+    totalEnrolledClients: 4120,
+    totalAccumulatedHNL: 4200000,
+    annualYieldPct: 4.25,
+    roundingThreshold: 10
+  },
+
+  salaryAdvanceLedger: {
+    totalAdvancesDisbursedHNL: 8900000,
+    activeAdvancesCount: 1250,
+    flatFeePct: 2.5,
+    repaymentRatePct: 99.2
+  },
+
+  insuranceProtege: {
+    enrolledPoliciesCount: 5200,
+    monthlyPremiumHNL: 95,
+    claimsPaidThisYearHNL: 480000,
+    lossRatioPct: 18.5
+  },
+
+  pymeRevolvingLines: {
+    totalApprovedLimitHNL: 65000000,
+    totalDrawnBalanceHNL: 48000000,
+    annualInterestRatePct: 17.2,
+    activePymesCount: 380
+  },
+
+  mujerEmprendeProgram: {
+    enrolledBusinessesCount: 290,
+    totalPortfolioHNL: 21500000,
+    fohdeGuaranteeCoveragePct: 70,
+    subsidizedRatePct: 13.5
+  },
+
+  smartPosAdvances: {
+    participatingMerchantsCount: 410,
+    advancedSalesVolumeHNL: 32000000,
+    discountFeePct: 1.8
+  },
+
+  escrowCustodyAccounts: {
+    activeEscrowsCount: 85,
+    fundsInCustodyHNL: 16500000,
+    annualCustodyFeePct: 1.5
+  },
+
+  agroCosechaSegura: {
+    coveredFincasCount: 145,
+    seasonalFinancingHNL: 65000000,
+    harvestCollectionMonth: 3,
+    climateInsuranceActive: true
+  },
+
+  ecoCreditoVerde: {
+    financedProjectsCount: 65,
+    totalGreenPortfolioHNL: 38000000,
+    bcieSubsidyYieldPct: 1.25,
+    co2TonsAvoided: 4850
+  },
+
+  bonoPrendaCafeAgd: {
+    storedBagsQuintales: 34000,
+    warrantValueHNL: 85000000,
+    pawnLoanDisbursedHNL: 52000000,
+    internationalPriceUSD: 245.50
+  },
+
+  factoringConfirming: {
+    discountedInvoicesCount: 195,
+    outstandingFactoringHNL: 78000000,
+    avgDiscountRatePct: 14.8,
+    defaultRatePct: 0.85
+  },
+
+  tradeLettersOfCredit: {
+    issuedLettersCount: 78,
+    totalGuaranteedAmountUSD: 45000000,
+    commissionRatePct: 0.75
+  },
+
+  fxCorporateDesk: {
+    activeSpotVolumeMonthlyUSD: 14500000,
+    hedgedVolumeUSD: 2500000,
+    monthlySpreadEarningsHNL: 980000
+  },
+
+  realEstateTrusts: {
+    activeTrustsCount: 22,
+    managedAssetsHNL: 850000000,
+    fiduciaryCommissionMonthlyHNL: 1250000
+  },
+
+  stepUpDpfTranches: [
+    {
+      id: 'step-01',
+      clientName: 'Inversiones Morazán S.A.',
+      principalHNL: 15000000,
+      currentMonthInTerm: 4,
+      currentRatePct: 8.50,
+      nextQuarterRatePct: 9.50
+    },
+    {
+      id: 'step-02',
+      clientName: 'Fundación Médica Hondureña',
+      principalHNL: 8000000,
+      currentMonthInTerm: 8,
+      currentRatePct: 9.50,
+      nextQuarterRatePct: 10.50
+    }
+  ],
+
+  interbankReposOverview: {
+    overnightVolumeHNL: 110000000,
+    weightedAverageRepoRatePct: 6.25,
+    collateralCoverageRatio: 1.15
+  },
+
+  cnbsRiskScoringEngine: {
+    evaluatedPortfoliosCount: 1840,
+    portfolioWeightedRiskPct: 2.69,
+    requiredProvisionHNL: 55294191,
+    currentProvisionCoveragePct: 104.9
+  },
+
+  uifCompliancePortal: {
+    declarations10kFiledCount: 512,
+    suspiciousRosReportsGenerated: 14,
+    complianceAuditScorePct: 98.5,
+    lastInspectionDateLabel: 'Enero 2026'
+  }
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -2060,5 +2527,8 @@ export const INITIAL_GAME_STATE: GameState = {
   innovations: INITIAL_INNOVATIONS,
   // Mesa de Dinero BCH, Forwards y Cierre Mensual Obligatorio
   bchMoneyDesk: INITIAL_BCH_MONEY_DESK,
-  fxForwards: INITIAL_FX_FORWARDS
+  fxForwards: INITIAL_FX_FORWARDS,
+  // Suite de 20 Características, Programas e Innovaciones Bancarias
+  bankingPrograms20: INITIAL_BANKING_PROGRAMS_20
 };
+

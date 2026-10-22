@@ -574,6 +574,145 @@ export interface BchMoneyDeskState {
   }[];
 }
 
+export interface AureoProgramItem {
+  id: string;
+  number: number;
+  pillar: 'retail' | 'pyme' | 'agro' | 'corporativo' | 'tesoreria_regulacion';
+  name: string;
+  tagline: string;
+  status: 'activo' | 'optimizado' | 'en_expansion';
+  monthlyVolumeHNL: number;
+  monthlyNetIncomeHNL: number;
+  participantsCount: number;
+  keyMetricLabel: string;
+  keyMetricValue: string;
+  description: string;
+}
+
+export interface AureoProgramsState {
+  programs: AureoProgramItem[];
+  remesasQrTransactions: {
+    id: string;
+    senderCountry: 'Estados Unidos' | 'España' | 'Canadá' | 'México';
+    beneficiaryName: string;
+    amountUSD: number;
+    amountHNL: number;
+    exchangeRateUsed: number;
+    qrPinCode: string;
+    status: 'Cobrado' | 'Acreditado_Cuenta' | 'Pendiente_Cajero';
+  }[];
+  rewardsSystem: {
+    totalPointsIssued: number;
+    totalPointsRedeemed: number;
+    exchangeRatePerPointHNL: number;
+    activeEnrolledCardholders: number;
+  };
+  microSavingsHuchas: {
+    totalEnrolledClients: number;
+    totalAccumulatedHNL: number;
+    annualYieldPct: number;
+    roundingThreshold: 10 | 50;
+  };
+  salaryAdvanceLedger: {
+    totalAdvancesDisbursedHNL: number;
+    activeAdvancesCount: number;
+    flatFeePct: number;
+    repaymentRatePct: number;
+  };
+  insuranceProtege: {
+    enrolledPoliciesCount: number;
+    monthlyPremiumHNL: number;
+    claimsPaidThisYearHNL: number;
+    lossRatioPct: number;
+  };
+  pymeRevolvingLines: {
+    totalApprovedLimitHNL: number;
+    totalDrawnBalanceHNL: number;
+    annualInterestRatePct: number;
+    activePymesCount: number;
+  };
+  mujerEmprendeProgram: {
+    enrolledBusinessesCount: number;
+    totalPortfolioHNL: number;
+    fohdeGuaranteeCoveragePct: number;
+    subsidizedRatePct: number;
+  };
+  smartPosAdvances: {
+    participatingMerchantsCount: number;
+    advancedSalesVolumeHNL: number;
+    discountFeePct: number;
+  };
+  escrowCustodyAccounts: {
+    activeEscrowsCount: number;
+    fundsInCustodyHNL: number;
+    annualCustodyFeePct: number;
+  };
+  agroCosechaSegura: {
+    coveredFincasCount: number;
+    seasonalFinancingHNL: number;
+    harvestCollectionMonth: number;
+    climateInsuranceActive: boolean;
+  };
+  ecoCreditoVerde: {
+    financedProjectsCount: number;
+    totalGreenPortfolioHNL: number;
+    bcieSubsidyYieldPct: number;
+    co2TonsAvoided: number;
+  };
+  bonoPrendaCafeAgd: {
+    storedBagsQuintales: number;
+    warrantValueHNL: number;
+    pawnLoanDisbursedHNL: number;
+    internationalPriceUSD: number;
+  };
+  factoringConfirming: {
+    discountedInvoicesCount: number;
+    outstandingFactoringHNL: number;
+    avgDiscountRatePct: number;
+    defaultRatePct: number;
+  };
+  tradeLettersOfCredit: {
+    issuedLettersCount: number;
+    totalGuaranteedAmountUSD: number;
+    commissionRatePct: number;
+  };
+  fxCorporateDesk: {
+    activeSpotVolumeMonthlyUSD: number;
+    hedgedVolumeUSD: number;
+    monthlySpreadEarningsHNL: number;
+  };
+  realEstateTrusts: {
+    activeTrustsCount: number;
+    managedAssetsHNL: number;
+    fiduciaryCommissionMonthlyHNL: number;
+  };
+  stepUpDpfTranches: {
+    id: string;
+    clientName: string;
+    principalHNL: number;
+    currentMonthInTerm: number;
+    currentRatePct: number;
+    nextQuarterRatePct: number;
+  }[];
+  interbankReposOverview: {
+    overnightVolumeHNL: number;
+    weightedAverageRepoRatePct: number;
+    collateralCoverageRatio: number;
+  };
+  cnbsRiskScoringEngine: {
+    evaluatedPortfoliosCount: number;
+    portfolioWeightedRiskPct: number;
+    requiredProvisionHNL: number;
+    currentProvisionCoveragePct: number;
+  };
+  uifCompliancePortal: {
+    declarations10kFiledCount: number;
+    suspiciousRosReportsGenerated: number;
+    complianceAuditScorePct: number;
+    lastInspectionDateLabel: string;
+  };
+}
+
 export interface GameState {
   bankName: string;
   gameMonth: number; // 1 = Enero 2026, 2 = Febrero 2026...
@@ -610,4 +749,7 @@ export interface GameState {
   bchMoneyDesk: BchMoneyDeskState;
   fxForwards: FxForwardContract[];
   lastMonthlyClosingSummary?: MonthlyClosingSummary;
+  // Suite de 20 Características, Programas e Innovaciones Bancarias
+  bankingPrograms20: AureoProgramsState;
 }
+

@@ -51,8 +51,21 @@ test('interbank acquisition records deposits or loans once and keeps division to
     const key=assets?'totalLoans':'totalDeposits';assert.equal(result.divisions.corporativa[key],state.divisions.corporativa[key]+offer.faceValueHNL);
   }
 });
-test('merchant and payroll balance edits update cash and deposits',()=>{
- const state=fresh(); const m={...state.posMerchants[0],bankAccountBalanceHNL:state.posMerchants[0].bankAccountBalanceHNL+1000};
- const result=updatePosMerchant(state,m);assert.equal(result.financials.depositsPublicTotal,state.financials.depositsPublicTotal+1000);assert.equal(addPosMerchant(state,state.posMerchants[0]),state);
- const p={...state.payrollAgreements[0],bankAccountBalanceHNL:state.payrollAgreements[0].bankAccountBalanceHNL+2000};assert.equal(updatePayrollAgreement(state,p).financials.cashAndBCHReserves,state.financials.cashAndBCHReserves+2000);
+ test('merchant and payroll balance edits update cash and deposits',()=>{
+  const state=fresh(); const m={...state.posMerchants[0],bankAccountBalanceHNL:state.posMerchants[0].bankAccountBalanceHNL+1000};
+  const result=updatePosMerchant(state,m);assert.equal(result.financials.depositsPublicTotal,state.financials.depositsPublicTotal+1000);assert.equal(addPosMerchant(state,state.posMerchants[0]),state);
+  const p={...state.payrollAgreements[0],bankAccountBalanceHNL:state.payrollAgreements[0].bankAccountBalanceHNL+2000};assert.equal(updatePayrollAgreement(state,p).financials.cashAndBCHReserves,state.financials.cashAndBCHReserves+2000);
+ });
+
+test('20 banking programs are present, advance each month and remain finite', () => {
+  const state = fresh();
+  assert.equal(state.bankingPrograms20.programs.length, 20);
+  const advanced = advanceGameMonth(state);
+  assert.equal(advanced.bankingPrograms20.programs.length, 20);
+  finite(advanced.bankingPrograms20);
+  for (const prog of advanced.bankingPrograms20.programs) {
+    assert.ok(prog.monthlyVolumeHNL > 0, `Program ${prog.number} volume`);
+    assert.ok(prog.monthlyNetIncomeHNL > 0, `Program ${prog.number} income`);
+  }
 });
+

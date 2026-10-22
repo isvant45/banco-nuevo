@@ -49,8 +49,10 @@ import { MonthlyClosingSummaryModal } from './components/MonthlyClosingSummaryMo
 import { FxAndForwardsModal } from './components/FxAndForwardsModal';
 import { ClientActionsModal } from './components/ClientActionsModal';
 import { StressTestingModal } from './components/StressTestingModal';
+import { ProgramsSuite20View } from './components/ProgramsSuite20View';
+import { restoreGameState } from './game/savedState';
 
-const STORAGE_KEY = 'aureo-bank-sim-state-v4';
+const STORAGE_KEY = 'aureo-bank-sim-state-v5';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -58,10 +60,7 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Verificar que tenga las propiedades nuevas de Mesa de Dinero y Forwards
-        if (parsed.secondarySecurities && parsed.bchMoneyDesk && parsed.fxForwards) {
-          return parsed;
-        }
+        return restoreGameState(parsed);
       }
     } catch {
       // Ignorar error al parsear storage
@@ -1079,6 +1078,14 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'programs20' && (
+          <ProgramsSuite20View
+            state={gameState}
+            onUpdateState={setGameState}
+            onNavigateTab={setActiveTab}
+          />
+        )}
+
         {activeTab === 'bch_money_desk' && (
           <BchMoneyDeskView
             state={gameState}
@@ -1180,6 +1187,7 @@ export default function App() {
             onRunStressTest={handleRunStressTest}
             onExecuteFxBid={handleExecuteFxBid}
             onPlaceInterbankCallMoney={handlePlaceCallMoney}
+            onNavigateTab={setActiveTab}
           />
         )}
 

@@ -11,7 +11,8 @@ import {
   Scale, 
   Percent, 
   FileCheck2, 
-  AlertCircle 
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -93,6 +94,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <span className="font-semibold text-emerald-400">{formatPct(fin.returnOnEquityROE)}</span>
           </div>
         </div>
+      </div>
+
+      {/* Spotlight: Suite de 20 Programas e Innovaciones Bancarias */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-slate-800 hover:border-amber-500/30 rounded-xl p-5 shadow-sm transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-amber-400 font-semibold">
+            <span>20 Programas Financieros Activos</span>
+            <span aria-hidden="true">·</span>
+            <span>Retail · Pyme · Agro · Corporativo · Regulación</span>
+          </div>
+          <h3 className="text-base font-bold text-white">
+            Suite Integral de Programas e Innovaciones Bancarias
+          </h3>
+          <p className="text-xs text-slate-300 max-w-2xl">
+            Remesas QR, Rewards, Hucha Digital, Factoring, Líneas Verdes, Bono de Prenda, Cartas de Crédito, DPF Step-Up y Auditoría CNBS/UIF. Todos integrados con liquidación mensual.
+          </p>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('programs20')}
+          className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 transition-colors whitespace-nowrap shrink-0 flex items-center justify-center gap-2 shadow-sm"
+        >
+          <span>Abrir Catálogo de 20 Programas</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* 2. Sección Central: Boletín Oficial BCH y Guerra de Mercado */}

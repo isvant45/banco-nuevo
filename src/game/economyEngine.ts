@@ -20,8 +20,11 @@ import {
   FxForwardContract,
   YieldCurvePoint,
   MonthlyClosingSummary,
-  BchRepoOperation
+  BchRepoOperation,
+  AureoProgramsState,
+  AureoProgramItem
 } from './types';
+import { INITIAL_BANKING_PROGRAMS_20 } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
 const HN_FIRST_NAMES = ['Carlos', 'Ana', 'José', 'Suyapa', 'Roberto', 'María', 'Luis', 'Daniela', 'Rigoberto', 'Xiomara', 'Mario', 'Gissel', 'Edgar', 'Brenda', 'Héctor', 'Karla', 'Mauricio', 'Miriam'];
@@ -1045,6 +1048,9 @@ export function advanceGameMonth(state: GameState): GameState {
     nsfrPct: 118.5
   };
 
+  // 14. Suite de 20 Características, Programas e Innovaciones Bancarias
+  const { updatedPrograms: newBankingPrograms20 } = advanceBankingPrograms20(state, nextMonth, tpmDelta, newExchangeRate);
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -1089,7 +1095,8 @@ export function advanceGameMonth(state: GameState): GameState {
     innovations: updatedInnovations,
     bchMoneyDesk: updatedBchMoneyDesk,
     fxForwards: updatedFxForwards,
-    lastMonthlyClosingSummary: monthlyClosingSummary
+    lastMonthlyClosingSummary: monthlyClosingSummary,
+    bankingPrograms20: newBankingPrograms20
   };
 }
 
@@ -2045,3 +2052,898 @@ export function runMacroStressScenario(
     }
   };
 }
+
+/**
+ * Liquidación y actualización mensual automática de las 20 características y programas bancarios
+ */
+export function advanceBankingPrograms20(
+  state: GameState,
+  nextMonth: number,
+  tpmDelta: number,
+  newExchangeRate: number
+): {
+  updatedPrograms: AureoProgramsState;
+  totalProgramNetIncome: number;
+} {
+  const base = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  // 1. Remesas QR
+  const remesasVol = Math.round(18500000 * (1 + (Math.random() * 0.06 - 0.02)));
+  const remesasIncome = Math.round(remesasVol * 0.035);
+  const updatedRemesasTxs = (base.remesasQrTransactions || []).map(tx => ({
+    ...tx,
+    status: tx.status === 'Pendiente_Cajero' ? ('Cobrado' as const) : tx.status
+  }));
+  if (updatedRemesasTxs.length < 5) {
+    updatedRemesasTxs.push({
+      id: `rem-qr-${nextMonth}-${Date.now().toString().slice(-4)}`,
+      senderCountry: Math.random() > 0.4 ? 'Estados Unidos' : 'España',
+      beneficiaryName: `${HN_FIRST_NAMES[Math.floor(Math.random() * HN_FIRST_NAMES.length)]} ${HN_LAST_NAMES[Math.floor(Math.random() * HN_LAST_NAMES.length)]}`,
+      amountUSD: Math.round(350 + Math.random() * 400),
+      amountHNL: Math.round((350 + Math.random() * 400) * newExchangeRate),
+      exchangeRateUsed: +(newExchangeRate + 0.10).toFixed(2),
+      qrPinCode: Math.floor(100000 + Math.random() * 900000).toString(),
+      status: 'Acreditado_Cuenta'
+    });
+  }
+
+  // 2. Rewards
+  const newPoints = Math.round(110000 + Math.random() * 30000);
+  const redeemedPoints = Math.round(60000 + Math.random() * 20000);
+  const rewardsVol = Math.round(24800000 * (1 + (Math.random() * 0.05)));
+  const rewardsNetIncome = Math.round(380000 + (Math.random() * 30000 - 15000));
+  const updatedRewards = {
+    ...base.rewardsSystem,
+    totalPointsIssued: base.rewardsSystem.totalPointsIssued + newPoints,
+    totalPointsRedeemed: base.rewardsSystem.totalPointsRedeemed + redeemedPoints,
+    activeEnrolledCardholders: base.rewardsSystem.activeEnrolledCardholders + Math.floor(35 + Math.random() * 20)
+  };
+
+  // 3. Micro-Ahorro Hucha
+  const roundingAdded = Math.round(380000 + Math.random() * 60000);
+  const monthlyHuchaYield = (base.microSavingsHuchas.annualYieldPct / 100 / 12);
+  const huchaInterest = Math.round(base.microSavingsHuchas.totalAccumulatedHNL * monthlyHuchaYield);
+  const updatedHucha = {
+    ...base.microSavingsHuchas,
+    totalAccumulatedHNL: base.microSavingsHuchas.totalAccumulatedHNL + roundingAdded + huchaInterest,
+    totalEnrolledClients: base.microSavingsHuchas.totalEnrolledClients + Math.floor(25 + Math.random() * 30)
+  };
+  const huchaVol = updatedHucha.totalAccumulatedHNL;
+  const huchaIncome = Math.round(145000 + (Math.random() * 20000 - 10000));
+
+  // 4. Adelanto de Salario
+  const advanceVol = Math.round(8900000 * (1 + (Math.random() * 0.04 - 0.02)));
+  const advanceFee = Math.round(advanceVol * 0.025);
+  const updatedAdvances = {
+    ...base.salaryAdvanceLedger,
+    totalAdvancesDisbursedHNL: advanceVol,
+    activeAdvancesCount: Math.round(1200 + Math.random() * 80)
+  };
+
+  // 5. Seguros Protege
+  const activePolicies = base.insuranceProtege.enrolledPoliciesCount + Math.floor(40 + Math.random() * 25);
+  const premiumCollected = activePolicies * base.insuranceProtege.monthlyPremiumHNL;
+  const claimsPaid = Math.round(premiumCollected * 0.18);
+  const insuranceIncome = premiumCollected - claimsPaid;
+  const updatedInsurance = {
+    ...base.insuranceProtege,
+    enrolledPoliciesCount: activePolicies,
+    claimsPaidThisYearHNL: base.insuranceProtege.claimsPaidThisYearHNL + claimsPaid
+  };
+
+  // 6. Línea Revolvente Pyme
+  const pymeRevVol = Math.round(48000000 * (1 + (Math.random() * 0.04 - 0.01)));
+  const pymeRevIncome = Math.round(pymeRevVol * (base.pymeRevolvingLines.annualInterestRatePct / 100 / 12));
+  const updatedPymeRev = {
+    ...base.pymeRevolvingLines,
+    totalDrawnBalanceHNL: pymeRevVol,
+    activePymesCount: base.pymeRevolvingLines.activePymesCount + Math.floor(2 + Math.random() * 3)
+  };
+
+  // 7. Mujer Emprende
+  const mujerVol = Math.round(21500000 * 1.015);
+  const mujerIncome = Math.round(mujerVol * (base.mujerEmprendeProgram.subsidizedRatePct / 100 / 12));
+  const updatedMujer = {
+    ...base.mujerEmprendeProgram,
+    totalPortfolioHNL: mujerVol,
+    enrolledBusinessesCount: base.mujerEmprendeProgram.enrolledBusinessesCount + 4
+  };
+
+  // 8. Smart POS Anticipos
+  const posSalesVol = Math.round(32000000 * (1 + (Math.random() * 0.06 - 0.02)));
+  const posFactorIncome = Math.round(posSalesVol * 0.018);
+  const updatedPosAdvances = {
+    ...base.smartPosAdvances,
+    advancedSalesVolumeHNL: posSalesVol,
+    participatingMerchantsCount: base.smartPosAdvances.participatingMerchantsCount + 3
+  };
+
+  // 9. Escrow Custodia
+  const escrowVol = Math.round(16500000 * (1 + (Math.random() * 0.05 - 0.02)));
+  const escrowIncome = Math.round(escrowVol * (base.escrowCustodyAccounts.annualCustodyFeePct / 100 / 12));
+  const updatedEscrow = {
+    ...base.escrowCustodyAccounts,
+    fundsInCustodyHNL: escrowVol
+  };
+
+  // 10. Cosecha Segura Café
+  const agroVol = Math.round(65000000 * (1 + (Math.random() * 0.03)));
+  const agroIncome = Math.round(agroVol * (0.145 / 12));
+  const updatedAgro = {
+    ...base.agroCosechaSegura,
+    seasonalFinancingHNL: agroVol,
+    coveredFincasCount: base.agroCosechaSegura.coveredFincasCount + 2
+  };
+
+  // 11. Eco-Crédito Verde
+  const ecoVol = Math.round(38000000 * 1.02);
+  const ecoIncome = Math.round(ecoVol * (0.115 / 12));
+  const updatedEco = {
+    ...base.ecoCreditoVerde,
+    totalGreenPortfolioHNL: ecoVol,
+    co2TonsAvoided: base.ecoCreditoVerde.co2TonsAvoided + 320,
+    financedProjectsCount: base.ecoCreditoVerde.financedProjectsCount + 2
+  };
+
+  // 12. Bono Prenda Café AGD
+  const bonoVol = Math.round(52000000 * (1 + (Math.random() * 0.04 - 0.02)));
+  const bonoIncome = Math.round(bonoVol * (0.138 / 12));
+  const updatedBono = {
+    ...base.bonoPrendaCafeAgd,
+    pawnLoanDisbursedHNL: bonoVol
+  };
+
+  // 13. Factoring Confirming
+  const factVol = Math.round(78000000 * (1 + (Math.random() * 0.05 - 0.01)));
+  const factIncome = Math.round(factVol * (base.factoringConfirming.avgDiscountRatePct / 100 / 12));
+  const updatedFact = {
+    ...base.factoringConfirming,
+    outstandingFactoringHNL: factVol,
+    discountedInvoicesCount: base.factoringConfirming.discountedInvoicesCount + 12
+  };
+
+  // 14. Cartas de Crédito Trade Finance
+  const tradeVol = Math.round(45000000 * (1 + (Math.random() * 0.04 - 0.02)));
+  const tradeIncome = Math.round(tradeVol * (base.tradeLettersOfCredit.commissionRatePct / 100 / 4));
+  const updatedTrade = {
+    ...base.tradeLettersOfCredit,
+    issuedLettersCount: base.tradeLettersOfCredit.issuedLettersCount + 3
+  };
+
+  // 15. Mesa Forward USD
+  const fwdDeskVol = Math.round(62000000 * (1 + (Math.random() * 0.05)));
+  const fwdDeskIncome = Math.round(980000 + (Math.random() * 80000 - 40000));
+  const updatedFwdDesk = {
+    ...base.fxCorporateDesk,
+    activeSpotVolumeMonthlyUSD: Math.round(base.fxCorporateDesk.activeSpotVolumeMonthlyUSD * 1.02),
+    monthlySpreadEarningsHNL: fwdDeskIncome
+  };
+
+  // 16. Fideicomisos Inmobiliarios
+  const fidVol = Math.round(850000000 * 1.01);
+  const fidIncome = Math.round(fidVol * (0.015 / 12));
+  const updatedFid = {
+    ...base.realEstateTrusts,
+    managedAssetsHNL: fidVol,
+    fiduciaryCommissionMonthlyHNL: fidIncome
+  };
+
+  // 17. DPF Step-Up
+  const updatedTranches = (base.stepUpDpfTranches || []).map(t => {
+    const nextMonthInTerm = t.currentMonthInTerm + 1;
+    let rate = t.currentRatePct;
+    let nextRate = t.nextQuarterRatePct;
+    if (nextMonthInTerm % 3 === 0) {
+      rate = Math.min(10.75, rate + 1.0);
+      nextRate = Math.min(11.0, rate + 1.0);
+    }
+    return {
+      ...t,
+      currentMonthInTerm: nextMonthInTerm,
+      currentRatePct: rate,
+      nextQuarterRatePct: nextRate
+    };
+  });
+  const dpfStepVol = Math.round(95000000 * 1.01);
+  const dpfStepIncome = Math.round(540000 + (Math.random() * 40000 - 20000));
+
+  // 18. Repos Interbancarios
+  const repoVol = Math.round(110000000 + (Math.random() * 10000000 - 5000000));
+  const repoIncome = Math.round(repoVol * ((state.bch.tpmRate + 0.5) / 100 / 12));
+  const updatedRepos = {
+    ...base.interbankReposOverview,
+    overnightVolumeHNL: repoVol,
+    weightedAverageRepoRatePct: +(state.bch.tpmRate + 0.5).toFixed(2)
+  };
+
+  // 19. Calificador CNBS
+  const cnbsRiskVol = state.financials.loanPortfolioPastDue;
+  const cnbsIncome = Math.round(620000);
+  const updatedCnbsRisk = {
+    ...base.cnbsRiskScoringEngine,
+    requiredProvisionHNL: cnbsRiskVol,
+    portfolioWeightedRiskPct: +(state.financials.delinquencyRatioNPL || 2.69).toFixed(2)
+  };
+
+  // 20. Portal UIF Cumplimiento
+  const uifVol = Math.round(34000000 * (1 + (Math.random() * 0.05)));
+  const uifIncome = Math.round(180000);
+  const updatedUif = {
+    ...base.uifCompliancePortal,
+    declarations10kFiledCount: base.uifCompliancePortal.declarations10kFiledCount + Math.floor(18 + Math.random() * 12),
+    complianceAuditScorePct: +Math.min(99.5, base.uifCompliancePortal.complianceAuditScorePct + 0.1).toFixed(1)
+  };
+
+  // Array consolidado de los 20 programas actualizados
+  const updatedProgramList: AureoProgramItem[] = (base.programs || []).map(p => {
+    switch (p.number) {
+      case 1: return { ...p, monthlyVolumeHNL: remesasVol, monthlyNetIncomeHNL: remesasIncome, keyMetricValue: '+L. 0.10 por USD' };
+      case 2: return { ...p, monthlyVolumeHNL: rewardsVol, monthlyNetIncomeHNL: rewardsNetIncome, keyMetricValue: `${updatedRewards.totalPointsIssued.toLocaleString()} pts` };
+      case 3: return { ...p, monthlyVolumeHNL: huchaVol, monthlyNetIncomeHNL: huchaIncome, keyMetricValue: `${updatedHucha.annualYieldPct}% anual` };
+      case 4: return { ...p, monthlyVolumeHNL: advanceVol, monthlyNetIncomeHNL: advanceFee };
+      case 5: return { ...p, monthlyVolumeHNL: premiumCollected, monthlyNetIncomeHNL: insuranceIncome, participantsCount: activePolicies };
+      case 6: return { ...p, monthlyVolumeHNL: pymeRevVol, monthlyNetIncomeHNL: pymeRevIncome, participantsCount: updatedPymeRev.activePymesCount };
+      case 7: return { ...p, monthlyVolumeHNL: mujerVol, monthlyNetIncomeHNL: mujerIncome, participantsCount: updatedMujer.enrolledBusinessesCount };
+      case 8: return { ...p, monthlyVolumeHNL: posSalesVol, monthlyNetIncomeHNL: posFactorIncome };
+      case 9: return { ...p, monthlyVolumeHNL: escrowVol, monthlyNetIncomeHNL: escrowIncome };
+      case 10: return { ...p, monthlyVolumeHNL: agroVol, monthlyNetIncomeHNL: agroIncome };
+      case 11: return { ...p, monthlyVolumeHNL: ecoVol, monthlyNetIncomeHNL: ecoIncome, keyMetricValue: `${updatedEco.co2TonsAvoided} tons CO2` };
+      case 12: return { ...p, monthlyVolumeHNL: bonoVol, monthlyNetIncomeHNL: bonoIncome };
+      case 13: return { ...p, monthlyVolumeHNL: factVol, monthlyNetIncomeHNL: factIncome };
+      case 14: return { ...p, monthlyVolumeHNL: tradeVol, monthlyNetIncomeHNL: tradeIncome };
+      case 15: return { ...p, monthlyVolumeHNL: fwdDeskVol, monthlyNetIncomeHNL: fwdDeskIncome };
+      case 16: return { ...p, monthlyVolumeHNL: fidVol, monthlyNetIncomeHNL: fidIncome };
+      case 17: return { ...p, monthlyVolumeHNL: dpfStepVol, monthlyNetIncomeHNL: dpfStepIncome };
+      case 18: return { ...p, monthlyVolumeHNL: repoVol, monthlyNetIncomeHNL: repoIncome };
+      case 19: return { ...p, monthlyVolumeHNL: cnbsRiskVol, monthlyNetIncomeHNL: cnbsIncome };
+      case 20: return { ...p, monthlyVolumeHNL: uifVol, monthlyNetIncomeHNL: uifIncome, keyMetricValue: `${updatedUif.complianceAuditScorePct}% Favorable` };
+      default: return p;
+    }
+  });
+
+  const totalProgramNetIncome = updatedProgramList.reduce((acc, p) => acc + (p.monthlyNetIncomeHNL || 0), 0);
+
+  const updatedPrograms: AureoProgramsState = {
+    programs: updatedProgramList,
+    remesasQrTransactions: updatedRemesasTxs,
+    rewardsSystem: updatedRewards,
+    microSavingsHuchas: updatedHucha,
+    salaryAdvanceLedger: updatedAdvances,
+    insuranceProtege: updatedInsurance,
+    pymeRevolvingLines: updatedPymeRev,
+    mujerEmprendeProgram: updatedMujer,
+    smartPosAdvances: updatedPosAdvances,
+    escrowCustodyAccounts: updatedEscrow,
+    agroCosechaSegura: updatedAgro,
+    ecoCreditoVerde: updatedEco,
+    bonoPrendaCafeAgd: updatedBono,
+    factoringConfirming: updatedFact,
+    tradeLettersOfCredit: updatedTrade,
+    fxCorporateDesk: updatedFwdDesk,
+    realEstateTrusts: updatedFid,
+    stepUpDpfTranches: updatedTranches,
+    interbankReposOverview: updatedRepos,
+    cnbsRiskScoringEngine: updatedCnbsRisk,
+    uifCompliancePortal: updatedUif
+  };
+
+  return {
+    updatedPrograms,
+    totalProgramNetIncome
+  };
+}
+
+// -------------------------------------------------------------
+// FUNCIONES DE ACCIÓN INTERACTIVA PARA LOS 20 PROGRAMAS BANCARIOS
+// -------------------------------------------------------------
+
+/** 1. Remesas Familiares ÁureoCash QR */
+export function executeRemittanceCashQR(
+  state: GameState,
+  senderCountry: 'Estados Unidos' | 'España' | 'Canadá' | 'México',
+  beneficiaryName: string,
+  amountUSD: number
+): { updatedState: GameState; successMessage: string } {
+  const rate = +(state.bch.exchangeRateHNLtoUSD + 0.10).toFixed(2);
+  const amountHNL = Math.round(amountUSD * rate);
+  const pin = Math.floor(100000 + Math.random() * 900000).toString();
+  const feeIncome = Math.round(amountUSD * 0.035 * state.bch.exchangeRateHNLtoUSD);
+
+  const newTx = {
+    id: `rem-qr-${Date.now().toString().slice(-5)}`,
+    senderCountry,
+    beneficiaryName,
+    amountUSD,
+    amountHNL,
+    exchangeRateUsed: rate,
+    qrPinCode: pin,
+    status: 'Pendiente_Cajero' as const
+  };
+
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        remesasQrTransactions: [newTx, ...(current.remesasQrTransactions || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + feeIncome,
+        feeIncomeRemittances: state.financials.feeIncomeRemittances + feeIncome
+      }
+    },
+    successMessage: `Remesa emitida por ${formatUSD(amountUSD)} desde ${senderCountry}. PIN QR Generado: ${pin}. Beneficiario: ${beneficiaryName}.`
+  };
+}
+
+/** 2. Áureo Rewards Puntos */
+export function redeemAureoRewardsPoints(
+  state: GameState,
+  pointsToRedeem: number,
+  targetClientId?: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  const available = current.rewardsSystem.totalPointsIssued - current.rewardsSystem.totalPointsRedeemed;
+  if (pointsToRedeem > available) {
+    return { updatedState: state, successMessage: 'Puntos insuficientes en el fondo de recompensas.' };
+  }
+  const cashValueHNL = Math.round(pointsToRedeem * current.rewardsSystem.exchangeRatePerPointHNL);
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        rewardsSystem: {
+          ...current.rewardsSystem,
+          totalPointsRedeemed: current.rewardsSystem.totalPointsRedeemed + pointsToRedeem
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves - cashValueHNL)
+      }
+    },
+    successMessage: `Se canjearon ${pointsToRedeem.toLocaleString()} Puntos Áureo Rewards por ${formatHNL(cashValueHNL)} acreditados exitosamente.`
+  };
+}
+
+/** 3. Micro-Ahorro Hucha Digital */
+export function configureMicroSavings(
+  state: GameState,
+  threshold: 10 | 50,
+  additionalDepositHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        microSavingsHuchas: {
+          ...current.microSavingsHuchas,
+          roundingThreshold: threshold,
+          totalAccumulatedHNL: current.microSavingsHuchas.totalAccumulatedHNL + additionalDepositHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        depositsPublicTotal: state.financials.depositsPublicTotal + additionalDepositHNL
+      }
+    },
+    successMessage: `Configuración de Hucha Digital actualizada al múltiplo de L. ${threshold}. Fondos acumulados: ${formatHNL(current.microSavingsHuchas.totalAccumulatedHNL + additionalDepositHNL)}.`
+  };
+}
+
+/** 4. Adelanto de Salario 24/7 */
+export function disburseSalaryAdvance(
+  state: GameState,
+  employeeName: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const feeHNL = Math.round(amountHNL * 0.025);
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        salaryAdvanceLedger: {
+          ...current.salaryAdvanceLedger,
+          totalAdvancesDisbursedHNL: current.salaryAdvanceLedger.totalAdvancesDisbursedHNL + amountHNL,
+          activeAdvancesCount: current.salaryAdvanceLedger.activeAdvancesCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL + feeHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + feeHNL
+      }
+    },
+    successMessage: `Adelanto de salario concedido a ${employeeName} por ${formatHNL(amountHNL)}. Comisión plana cobrada: ${formatHNL(feeHNL)}.`
+  };
+}
+
+/** 5. Seguros Colectivos Áureo Protege */
+export function enrollClientInInsuranceProtege(
+  state: GameState,
+  clientId: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  const premium = current.insuranceProtege.monthlyPremiumHNL;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        insuranceProtege: {
+          ...current.insuranceProtege,
+          enrolledPoliciesCount: current.insuranceProtege.enrolledPoliciesCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + premium,
+        totalFeeIncome: state.financials.totalFeeIncome + premium
+      }
+    },
+    successMessage: `Cliente suscrito a la póliza Áureo Protege (Prima: L. ${premium}/mes). Blindaje contra cesantía y accidentes activo.`
+  };
+}
+
+/** 6. Línea de Crédito Revolvente Pyme */
+export function drawPymeRevolvingCredit(
+  state: GameState,
+  pymeName: string,
+  drawAmountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        pymeRevolvingLines: {
+          ...current.pymeRevolvingLines,
+          totalDrawnBalanceHNL: current.pymeRevolvingLines.totalDrawnBalanceHNL + drawAmountHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - drawAmountHNL,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + drawAmountHNL
+      }
+    },
+    successMessage: `Disposición de línea revolvente por ${formatHNL(drawAmountHNL)} efectuada por ${pymeName}.`
+  };
+}
+
+/** 7. Programa Mujer Emprende */
+export function approveMujerEmprendeCredit(
+  state: GameState,
+  businessName: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        mujerEmprendeProgram: {
+          ...current.mujerEmprendeProgram,
+          totalPortfolioHNL: current.mujerEmprendeProgram.totalPortfolioHNL + amountHNL,
+          enrolledBusinessesCount: current.mujerEmprendeProgram.enrolledBusinessesCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + amountHNL
+      }
+    },
+    successMessage: `Crédito bonificado "Mujer Emprende" por ${formatHNL(amountHNL)} otorgado a ${businessName} con respaldo FOHDE al 70%.`
+  };
+}
+
+/** 8. POS Smart Anticipo de Ventas */
+export function advancePosSalesImmediate(
+  state: GameState,
+  merchantId: string,
+  advanceAmountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const feeHNL = Math.round(advanceAmountHNL * 0.018);
+  const netDisbursed = advanceAmountHNL - feeHNL;
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        smartPosAdvances: {
+          ...current.smartPosAdvances,
+          advancedSalesVolumeHNL: current.smartPosAdvances.advancedSalesVolumeHNL + advanceAmountHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - netDisbursed,
+        totalFeeIncome: state.financials.totalFeeIncome + feeHNL
+      }
+    },
+    successMessage: `Anticipo express del 80% liquidado. Monto bruto: ${formatHNL(advanceAmountHNL)}. Comisión retenida: ${formatHNL(feeHNL)}.`
+  };
+}
+
+/** 9. Cuentas Escrow Custodia */
+export function createEscrowContract(
+  state: GameState,
+  buyerName: string,
+  sellerName: string,
+  amountHNL: number,
+  conditionDescription: string
+): { updatedState: GameState; successMessage: string } {
+  const feeHNL = Math.round(amountHNL * 0.015);
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        escrowCustodyAccounts: {
+          ...current.escrowCustodyAccounts,
+          activeEscrowsCount: current.escrowCustodyAccounts.activeEscrowsCount + 1,
+          fundsInCustodyHNL: current.escrowCustodyAccounts.fundsInCustodyHNL + amountHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + amountHNL + feeHNL,
+        depositsPublicTotal: state.financials.depositsPublicTotal + amountHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + feeHNL
+      }
+    },
+    successMessage: `Contrato Escrow aperturado entre ${buyerName} y ${sellerName} por ${formatHNL(amountHNL)}. Condición: ${conditionDescription}.`
+  };
+}
+
+/** 10. Crédito Estacional Cosecha Segura */
+export function disburseAgroCosechaSegura(
+  state: GameState,
+  cooperativeName: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        agroCosechaSegura: {
+          ...current.agroCosechaSegura,
+          seasonalFinancingHNL: current.agroCosechaSegura.seasonalFinancingHNL + amountHNL,
+          coveredFincasCount: current.agroCosechaSegura.coveredFincasCount + 3
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + amountHNL
+      }
+    },
+    successMessage: `Financiamiento de corte y cosecha cafetalera por ${formatHNL(amountHNL)} otorgado a ${cooperativeName} con seguro climático.`
+  };
+}
+
+/** 11. Eco-Crédito Verde Renovable */
+export function disburseEcoCreditoVerde(
+  state: GameState,
+  projectName: string,
+  amountHNL: number,
+  projectType: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  const co2Estimate = Math.round(amountHNL / 12500);
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        ecoCreditoVerde: {
+          ...current.ecoCreditoVerde,
+          totalGreenPortfolioHNL: current.ecoCreditoVerde.totalGreenPortfolioHNL + amountHNL,
+          co2TonsAvoided: current.ecoCreditoVerde.co2TonsAvoided + co2Estimate,
+          financedProjectsCount: current.ecoCreditoVerde.financedProjectsCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + amountHNL
+      }
+    },
+    successMessage: `Eco-Crédito Verde formalizado para ${projectName} (${projectType}) por ${formatHNL(amountHNL)}. Reducción estimada: ${co2Estimate} tons CO2/año.`
+  };
+}
+
+/** 12. Bono de Prenda Café AGD */
+export function issueBonoPrendaCafe(
+  state: GameState,
+  warehouseName: string,
+  quintales: number,
+  warrantValueHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const loanDisbursed = Math.round(warrantValueHNL * 0.70); // 70% LTV
+  const feeHNL = Math.round(loanDisbursed * 0.012);
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        bonoPrendaCafeAgd: {
+          ...current.bonoPrendaCafeAgd,
+          storedBagsQuintales: current.bonoPrendaCafeAgd.storedBagsQuintales + quintales,
+          warrantValueHNL: current.bonoPrendaCafeAgd.warrantValueHNL + warrantValueHNL,
+          pawnLoanDisbursedHNL: current.bonoPrendaCafeAgd.pawnLoanDisbursedHNL + loanDisbursed
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - loanDisbursed + feeHNL,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + loanDisbursed,
+        totalFeeIncome: state.financials.totalFeeIncome + feeHNL
+      }
+    },
+    successMessage: `Bono de prenda emitido sobre ${quintales.toLocaleString()} qq de café en ${warehouseName}. Desembolso prendario: ${formatHNL(loanDisbursed)}.`
+  };
+}
+
+/** 13. Factoring Electrónico */
+export function discountFactoringInvoice(
+  state: GameState,
+  supplierName: string,
+  payerName: string,
+  invoiceAmountHNL: number,
+  termDays: number
+): { updatedState: GameState; successMessage: string } {
+  const discountRate = 0.148;
+  const discountSpread = Math.round(invoiceAmountHNL * (discountRate * (termDays / 365)));
+  const netPaid = invoiceAmountHNL - discountSpread;
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        factoringConfirming: {
+          ...current.factoringConfirming,
+          outstandingFactoringHNL: current.factoringConfirming.outstandingFactoringHNL + invoiceAmountHNL,
+          discountedInvoicesCount: current.factoringConfirming.discountedInvoicesCount + 1
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves - netPaid,
+        loanPortfolioCurrent: state.financials.loanPortfolioCurrent + invoiceAmountHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + discountSpread
+      }
+    },
+    successMessage: `Factura de ${supplierName} pagadera por ${payerName} descontada a ${termDays} días. Monto facial: ${formatHNL(invoiceAmountHNL)}. Margen retenido: ${formatHNL(discountSpread)}.`
+  };
+}
+
+/** 14. Cartas de Crédito Trade Finance */
+export function issueTradeLetterOfCredit(
+  state: GameState,
+  importerName: string,
+  beneficiaryBank: string,
+  amountUSD: number
+): { updatedState: GameState; successMessage: string } {
+  const commUSD = amountUSD * 0.0075;
+  const commHNL = Math.round(commUSD * state.bch.exchangeRateHNLtoUSD);
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        tradeLettersOfCredit: {
+          ...current.tradeLettersOfCredit,
+          issuedLettersCount: current.tradeLettersOfCredit.issuedLettersCount + 1,
+          totalGuaranteedAmountUSD: current.tradeLettersOfCredit.totalGuaranteedAmountUSD + amountUSD
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + commHNL,
+        feeIncomeSwiftAndFX: state.financials.feeIncomeSwiftAndFX + commHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + commHNL
+      }
+    },
+    successMessage: `Carta de crédito irrevocable emitida para ${importerName} ante ${beneficiaryBank} por ${formatUSD(amountUSD)}. Comisión cobrada: ${formatHNL(commHNL)}.`
+  };
+}
+
+/** 15. Mesa Cambiaria Forward */
+export function createCorporateFxForward(
+  state: GameState,
+  clientName: string,
+  companyName: string,
+  amountUSD: number,
+  agreedRateHNL: number,
+  termDays: 30 | 60 | 90 | 180
+): { updatedState: GameState; successMessage: string } {
+  return createFxForwardContract(state, clientName, companyName, amountUSD, agreedRateHNL, termDays);
+}
+
+/** 16. Fideicomisos Inmobiliarios */
+export function createRealEstateTrust(
+  state: GameState,
+  projectName: string,
+  developerName: string,
+  assetValueHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const feeHNL = Math.round(assetValueHNL * 0.005);
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        realEstateTrusts: {
+          ...current.realEstateTrusts,
+          activeTrustsCount: current.realEstateTrusts.activeTrustsCount + 1,
+          managedAssetsHNL: current.realEstateTrusts.managedAssetsHNL + assetValueHNL
+        }
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + feeHNL,
+        totalFeeIncome: state.financials.totalFeeIncome + feeHNL
+      }
+    },
+    successMessage: `Patrimonio autónomo fiduciario constituido para ${projectName} (${developerName}) por ${formatHNL(assetValueHNL)}. Comisión de apertura: ${formatHNL(feeHNL)}.`
+  };
+}
+
+/** 17. DPF Step-Up Digital */
+export function openStepUpDpfDeposit(
+  state: GameState,
+  clientName: string,
+  principalHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  const newTranche = {
+    id: `step-${Date.now().toString().slice(-4)}`,
+    clientName,
+    principalHNL,
+    currentMonthInTerm: 1,
+    currentRatePct: 7.50,
+    nextQuarterRatePct: 8.50
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        stepUpDpfTranches: [newTranche, ...(current.stepUpDpfTranches || [])]
+      },
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + principalHNL,
+        depositsPublicTotal: state.financials.depositsPublicTotal + principalHNL
+      }
+    },
+    successMessage: `DPF Step-Up aperturado a nombre de ${clientName} por ${formatHNL(principalHNL)}. Tasa inicial: 7.50% (Escala hasta 10.50%).`
+  };
+}
+
+/** 18. Repos Interbancarios BCH */
+export function executeInterbankRepoTrade(
+  state: GameState,
+  counterpartyBank: string,
+  amountHNL: number,
+  termDays: 7 | 14 | 28,
+  ratePct: number
+): { updatedState: GameState; successMessage: string } {
+  return openBchRepoOperation(state, amountHNL, termDays, ratePct);
+}
+
+/** 19. Calificador de Riesgo CNBS */
+export function reclassifyCnbsLoanWorkout(
+  state: GameState,
+  clientId: string,
+  workoutType: 'condonacion_mora' | 'ampliar_plazo_36m' | 'dacion_garantia'
+): { updatedState: GameState; successMessage: string } {
+  const target = state.clients.find(c => c.id === clientId) || state.clients[0];
+  if (!target) {
+    return { updatedState: state, successMessage: 'Cliente no encontrado.' };
+  }
+
+  const updatedClients = state.clients.map(c => {
+    if (c.id === target.id) {
+      if (workoutType === 'condonacion_mora') {
+        return {
+          ...c,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanBalanceHNL: Math.round(c.loanBalanceHNL * 0.85),
+          notes: 'Reestructurado con condonación de recargos moratorios conforme a resolución CNBS.'
+        };
+      } else if (workoutType === 'ampliar_plazo_36m') {
+        return {
+          ...c,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanMonthsRemaining: 36,
+          loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.65),
+          notes: 'Plazo ampliado a 36 meses reduciendo la cuota al 65%.'
+        };
+      } else {
+        return {
+          ...c,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanBalanceHNL: 0,
+          hasLoan: false,
+          notes: 'Deuda saldada mediante dación en pago de activo en garantía.'
+        };
+      }
+    }
+    return c;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      financials: {
+        ...state.financials,
+        loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - (target.pastDueAmountHNL || 0)),
+        loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.round((target.pastDueAmountHNL || 0) * 0.5))
+      }
+    },
+    successMessage: `Acuerdo de renegociación regulatoria CNBS ejecutado con éxito para ${target.name}. Cartera regularizada a Categoría I.`
+  };
+}
+
+/** 20. Portal UIF Cumplimiento Regulatorio */
+export function fileUifComplianceDeclaration(
+  state: GameState,
+  clientName: string,
+  amountUSD: number,
+  sourceOfFunds: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.bankingPrograms20 || INITIAL_BANKING_PROGRAMS_20;
+  return {
+    updatedState: {
+      ...state,
+      bankingPrograms20: {
+        ...current,
+        uifCompliancePortal: {
+          ...current.uifCompliancePortal,
+          declarations10kFiledCount: current.uifCompliancePortal.declarations10kFiledCount + 1,
+          complianceAuditScorePct: +Math.min(99.9, current.uifCompliancePortal.complianceAuditScorePct + 0.05).toFixed(1)
+        }
+      }
+    },
+    successMessage: `Formulario de origen de fondos ($10,000+ USD) radicado ante UIF para ${clientName} (${formatUSD(amountUSD)}). Origen: ${sourceOfFunds}. Auditoría favorable.`
+  };
+}
+

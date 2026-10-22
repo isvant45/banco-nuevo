@@ -24,13 +24,15 @@ interface BankingInnovationsTabProps {
   onRunStressTest: (scenario: string) => void;
   onExecuteFxBid: (amountUSD: number) => void;
   onPlaceInterbankCallMoney: (amountHNL: number, isLending: boolean) => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export function BankingInnovationsTab({
   gameState,
   onRunStressTest,
   onExecuteFxBid,
-  onPlaceInterbankCallMoney
+  onPlaceInterbankCallMoney,
+  onNavigateTab
 }: BankingInnovationsTabProps) {
   const { innovations, bch, financials } = gameState;
   const [fxBidAmount, setFxBidAmount] = useState<number>(1000000);
@@ -94,6 +96,18 @@ export function BankingInnovationsTab({
             </p>
           </div>
         </div>
+
+        {onNavigateTab && (
+          <button
+            onClick={() => {
+              sound.playClick();
+              onNavigateTab('programs20');
+            }}
+            className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-colors shrink-0"
+          >
+            Ver 20 Programas & Clientes
+          </button>
+        )}
       </div>
 
       {/* Grid de las 10 Innovaciones */}
