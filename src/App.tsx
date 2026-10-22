@@ -12,9 +12,18 @@ import {
   CorporatePayrollAgreement,
   CompetitorId
 } from './game/types';
-import { restoreGameState } from './game/savedState';
 import { INITIAL_GAME_STATE } from './game/initialState';
-import { advanceGameMonth, formatHNL, evaluateClientDivisionUpgrade, addPosMerchant, updatePosMerchant, addPayrollAgreement, updatePayrollAgreement, buyInterbankPortfolio, approveCreditByOfficer, approveCreditByExecutiveBoard, negotiateClientDebt } from './game/economyEngine';
+import { 
+  advanceGameMonth, 
+  formatHNL, 
+  evaluateClientDivisionUpgrade,
+  executeExtraordinaryLoanPrepayment,
+  recalibrateClientCreditLimit,
+  openBchRepoOperation,
+  executeInterbankCallDeal,
+  createFxForwardContract,
+  runMacroStressScenario
+} from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
 import { OverviewDashboard } from './components/OverviewDashboard';
@@ -35,8 +44,13 @@ import { ExpertOpinionsTab } from './components/ExpertOpinionsTab';
 import { BankingInnovationsTab } from './components/BankingInnovationsTab';
 import { FinancialStatementsModal } from './components/FinancialStatementsModal';
 import { InterbankPortfolioMarketModal } from './components/InterbankPortfolioMarketModal';
+import { BchMoneyDeskView } from './components/BchMoneyDeskView';
+import { MonthlyClosingSummaryModal } from './components/MonthlyClosingSummaryModal';
+import { FxAndForwardsModal } from './components/FxAndForwardsModal';
+import { ClientActionsModal } from './components/ClientActionsModal';
+import { StressTestingModal } from './components/StressTestingModal';
 
-const STORAGE_KEY = 'aureo-bank-sim-state-v3';
+const STORAGE_KEY = 'aureo-bank-sim-state-v4';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -44,16 +58,28 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return restoreGameState(parsed);
+        // Verificar que tenga las propiedades nuevas de Mesa de Dinero y Forwards
+        if (parsed.secondarySecurities && parsed.bchMoneyDesk && parsed.fxForwards) {
+          return parsed;
+        }
       }
     } catch {
       // Ignorar error al parsear storage
     }
-    return structuredClone(INITIAL_GAME_STATE);
+    return INITIAL_GAME_STATE;
   });
 
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+
+  // Modales de Cierre Contable Obligatorio, Mesa de Dinero y Estrés
+  const [isMonthlyClosingModalOpen, setIsMonthlyClosingModalOpen] = useState<boolean>(false);
+  const [isFxForwardsModalOpen, setIsFxForwardsModalOpen] = useState<boolean>(false);
+  const [isStressTestingModalOpen, setIsStressTestingModalOpen] = useState<boolean>(false);
+
+  // Estado del Modal de Acciones Financieras Directas del Cliente
+  const [selectedClientForActions, setSelectedClientForActions] = useState<IndividualClient | null>(null);
+  const [isClientActionsModalOpen, setIsClientActionsModalOpen] = useState<boolean>(false);
 
   // Estado del Modal de Edición de Cliente
   const [selectedClientToEdit, setSelectedClientToEdit] = useState<IndividualClient | null>(null);
@@ -78,12 +104,53 @@ export default function App() {
     }
   }, [gameState]);
 
-  // Avanzar un mes
+  // Avanzar un mes con liquidación obligatoria y apertura de auditoría
   const handleAdvanceMonth = () => {
     sound.playMonthEndBell();
     const updated = advanceGameMonth(gameState);
     setGameState(updated);
-    setShowSummaryModal(true);
+    setIsMonthlyClosingModalOpen(true);
+  };
+
+  // Operaciones de Mesa de Dinero BCH y Reportos
+  const handleOpenRepo = (amountHNL: number, termDays: 7 | 14 | 28, ratePct: number) => {
+    const res = openBchRepoOperation(gameState, amountHNL, termDays, ratePct);
+    setGameState(res.updatedState);
+  };
+
+  // Préstamos Interbancarios Call Money
+  const handleExecuteCallDeal = (bankId: CompetitorId, amountHNL: number, direction: 'prestar' | 'pedir_prestado') => {
+    const res = executeInterbankCallDeal(gameState, bankId, amountHNL, direction);
+    setGameState(res.updatedState);
+  };
+
+  // Coberturas Cambiarias Forward USD/HNL
+  const handleCreateForward = (
+    clientName: string, 
+    companyName: string, 
+    amountUSD: number, 
+    agreedRateHNL: number, 
+    termDays: 30 | 60 | 90 | 180
+  ) => {
+    const res = createFxForwardContract(gameState, clientName, companyName, amountUSD, agreedRateHNL, termDays);
+    setGameState(res.updatedState);
+  };
+
+  // Acciones Directas del Cliente: Abono a capital y Límite de Crédito
+  const handleExtraordinaryPrepayment = (clientId: string, amountHNL: number) => {
+    const res = executeExtraordinaryLoanPrepayment(gameState, clientId, amountHNL);
+    setGameState(res.updatedState);
+  };
+
+  const handleRecalibrateLimit = (clientId: string, newLimitHNL: number, notes: string) => {
+    const res = recalibrateClientCreditLimit(gameState, clientId, newLimitHNL, notes);
+    setGameState(res.updatedState);
+  };
+
+  // Pruebas de Estrés Macroeconómicas CNBS
+  const handleRunStressTestScenario = (scenario: 'cafe_remesas' | 'fed_rate_hike' | 'sequia_agro') => {
+    const res = runMacroStressScenario(gameState, scenario);
+    setGameState(res.updatedState);
   };
 
   // Reiniciar partida
@@ -91,7 +158,7 @@ export default function App() {
     if (window.confirm('¿Deseas reiniciar la simulación de Áureo Bank desde Enero 2026? Se restablecerán todos los valores iniciales y la base de datos de clientes.')) {
       sound.playClick();
       localStorage.removeItem(STORAGE_KEY);
-      setGameState(structuredClone(INITIAL_GAME_STATE));
+      setGameState(INITIAL_GAME_STATE);
       setActiveTab('overview');
       setShowSummaryModal(false);
     }
@@ -619,13 +686,37 @@ export default function App() {
 
   // Aprobar solicitud de crédito respetando límite de asesores
   const handleApproveCredit = (applicationId: string) => {
+    const app = gameState.pendingApplications.find(a => a.id === applicationId);
+    if (!app) return;
+
+    if (gameState.financials.cashAndBCHReserves < app.requestedAmount) {
+      sound.playRejectBuzzer();
+      alert('Liquidez en caja insuficiente para desembolsar este crédito.');
+      return;
+    }
+
     setGameState(prev => {
-      const app = prev.pendingApplications.find(a => a.id === applicationId);
-      if (!app) return prev;
-      const result = app.requestedAmount > 20000000
-        ? approveCreditByExecutiveBoard(prev, applicationId)
-        : approveCreditByOfficer(prev, applicationId);
-      return result.updatedState;
+      const remainingApps = prev.pendingApplications.filter(a => a.id !== applicationId);
+      const targetDiv = prev.divisions[app.division];
+
+      return {
+        ...prev,
+        pendingApplications: remainingApps,
+        advisorApprovalsUsedThisMonth: (prev.advisorApprovalsUsedThisMonth || 0) + 1,
+        divisions: {
+          ...prev.divisions,
+          [app.division]: {
+            ...targetDiv,
+            totalLoans: targetDiv.totalLoans + app.requestedAmount,
+            clientCount: targetDiv.clientCount + 1
+          }
+        },
+        financials: {
+          ...prev.financials,
+          cashAndBCHReserves: prev.financials.cashAndBCHReserves - app.requestedAmount,
+          loanPortfolioCurrent: prev.financials.loanPortfolioCurrent + app.requestedAmount
+        }
+      };
     });
   };
 
@@ -789,17 +880,60 @@ export default function App() {
 
   // Guardar modificaciones o nuevo comercio POS
   const handleSavePosMerchant = (merchant: PosMerchant, isNew: boolean) => {
-    setGameState(prev => isNew ? addPosMerchant(prev, merchant) : updatePosMerchant(prev, merchant));
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      let updatedMerchants = [...prev.posMerchants];
+      if (isNew) {
+        updatedMerchants = [merchant, ...updatedMerchants];
+      } else {
+        updatedMerchants = updatedMerchants.map(m => m.id === merchant.id ? merchant : m);
+      }
+      return {
+        ...prev,
+        posMerchants: updatedMerchants
+      };
+    });
   };
 
   // Guardar modificaciones o nuevo convenio de planilla con cuenta obligatoria
   const handleSavePayrollAgreement = (agreement: CorporatePayrollAgreement, isNew: boolean) => {
-    setGameState(prev => isNew ? addPayrollAgreement(prev, agreement) : updatePayrollAgreement(prev, agreement));
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      let updatedAgreements = [...prev.payrollAgreements];
+      if (isNew) {
+        updatedAgreements = [agreement, ...updatedAgreements];
+      } else {
+        updatedAgreements = updatedAgreements.map(a => a.id === agreement.id ? agreement : a);
+      }
+      return {
+        ...prev,
+        payrollAgreements: updatedAgreements
+      };
+    });
   };
 
   // M&A Interbancario: Compra de cartera
   const handleBuyInterbankOffer = (offerId: string) => {
-    setGameState(prev => buyInterbankPortfolio(prev, offerId).updatedState);
+    sound.playCoinClink();
+    setGameState(prev => {
+      const offer = prev.interbankOffers?.find(o => o.id === offerId);
+      if (!offer || prev.financials.cashAndBCHReserves < offer.offerPriceHNL) {
+        alert('Fondos insuficientes en reservas de caja para adquirir esta cartera.');
+        return prev;
+      }
+      const newOffers = prev.interbankOffers?.map(o => o.id === offerId ? { ...o, status: 'comprado' as const } : o);
+      const isAsset = offer.portfolioType === 'activos_creditos';
+      return {
+        ...prev,
+        interbankOffers: newOffers,
+        financials: {
+          ...prev.financials,
+          cashAndBCHReserves: prev.financials.cashAndBCHReserves - offer.offerPriceHNL,
+          loanPortfolioCurrent: isAsset ? prev.financials.loanPortfolioCurrent + offer.faceValueHNL : prev.financials.loanPortfolioCurrent,
+          depositsPublicTotal: !isAsset ? prev.financials.depositsPublicTotal + offer.faceValueHNL : prev.financials.depositsPublicTotal
+        }
+      };
+    });
   };
 
   // Cambiar estrategia de mercadeo
@@ -876,7 +1010,47 @@ export default function App() {
   };
 
   const handleNegotiateDebtWorkout = (clientId: string, type: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago') => {
-    setGameState(prev => negotiateClientDebt(prev, clientId, type).updatedState);
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const updatedClients = prev.clients.map(c => {
+        if (c.id === clientId) {
+          if (type === 'reestructurar_quitas') {
+            return {
+              ...c,
+              cnbsCategory: 'I - Normal' as const,
+              pastDueDays: 0,
+              pastDueAmountHNL: 0,
+              loanBalanceHNL: Math.round(c.loanBalanceHNL * 0.85),
+              notes: 'Reestructurado con quita del 15% de intereses moratorios.'
+            };
+          } else if (type === 'ampliar_plazo') {
+            return {
+              ...c,
+              cnbsCategory: 'I - Normal' as const,
+              pastDueDays: 0,
+              pastDueAmountHNL: 0,
+              loanTermMonths: 36,
+              loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.6),
+              notes: 'Plazo extendido a 36 meses reduciendo cuota al 60%.'
+            };
+          } else {
+            return {
+              ...c,
+              cnbsCategory: 'I - Normal' as const,
+              pastDueDays: 0,
+              pastDueAmountHNL: 0,
+              loanBalanceHNL: 0,
+              notes: 'Liquidado mediante dación en pago de garantía hipotecaria/prendaria.'
+            };
+          }
+        }
+        return c;
+      });
+      return {
+        ...prev,
+        clients: updatedClients
+      };
+    });
   };
 
   return (
@@ -890,6 +1064,9 @@ export default function App() {
         onSelectTab={setActiveTab}
         onOpenFinancialStatements={() => setIsFinancialsModalOpen(true)}
         onOpenInterbankMarket={() => setIsInterbankModalOpen(true)}
+        onOpenMonthlySummary={() => setIsMonthlyClosingModalOpen(true)}
+        onOpenFxForwards={() => setIsFxForwardsModalOpen(true)}
+        onOpenStressTesting={() => setIsStressTestingModalOpen(true)}
       />
 
       {/* Contenido Principal según la Pestaña Activa */}
@@ -902,6 +1079,15 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'bch_money_desk' && (
+          <BchMoneyDeskView
+            state={gameState}
+            onOpenRepo={handleOpenRepo}
+            onExecuteCallDeal={handleExecuteCallDeal}
+            onNavigateTab={setActiveTab}
+          />
+        )}
+
         {activeTab === 'divisions' && (
           <BankingDivisionsTab
             state={gameState}
@@ -910,6 +1096,10 @@ export default function App() {
             onOpenClient360={handleOpenClient360}
             onToggleClientGuaranteed={handleToggleClientGuaranteed}
             onAddClient={handleAddClientToDivision}
+            onOpenClientActions={(c) => {
+              setSelectedClientForActions(c);
+              setIsClientActionsModalOpen(true);
+            }}
           />
         )}
 
@@ -1023,7 +1213,7 @@ export default function App() {
       {/* Modal de Expediente 360° y Robo/Captación de Cartera */}
       {isClient360ModalOpen && selectedClientFor360 && (
         <Client360Modal
-          client={gameState.clients.find(c => c.id === selectedClientFor360.id) || selectedClientFor360}
+          client={selectedClientFor360}
           isOpen={true}
           onClose={() => setIsClient360ModalOpen(false)}
           onBuyoutLoan={handleBuyoutRivalLoan}
@@ -1061,6 +1251,50 @@ export default function App() {
         <MonthSummaryModal
           state={gameState}
           onClose={() => setShowSummaryModal(false)}
+        />
+      )}
+
+      {/* Modal de Cierre Contable Mensual Obligatorio (Auditoría de Cuotas, Límites y Tasas) */}
+      {isMonthlyClosingModalOpen && (
+        <MonthlyClosingSummaryModal
+          isOpen={true}
+          onClose={() => setIsMonthlyClosingModalOpen(false)}
+          state={gameState}
+          onRenegotiateDebt={handleNegotiateDebtWorkout}
+          onNavigateTab={setActiveTab}
+        />
+      )}
+
+      {/* Modal de Subasta de Divisas BCH & Contratos Forward */}
+      {isFxForwardsModalOpen && (
+        <FxAndForwardsModal
+          isOpen={true}
+          onClose={() => setIsFxForwardsModalOpen(false)}
+          state={gameState}
+          onCreateForward={handleCreateForward}
+          onTradeFxSpot={handleTradeFX}
+        />
+      )}
+
+      {/* Modal de Pruebas de Estrés Macroeconómico CNBS */}
+      {isStressTestingModalOpen && (
+        <StressTestingModal
+          isOpen={true}
+          onClose={() => setIsStressTestingModalOpen(false)}
+          state={gameState}
+          onRunStressTest={handleRunStressTestScenario}
+        />
+      )}
+
+      {/* Modal de Acciones Financieras Directas del Cliente (Abono capital, Límites) */}
+      {isClientActionsModalOpen && selectedClientForActions && (
+        <ClientActionsModal
+          isOpen={true}
+          onClose={() => setIsClientActionsModalOpen(false)}
+          client={selectedClientForActions}
+          onExtraordinaryPrepayment={handleExtraordinaryPrepayment}
+          onRecalibrateLimit={handleRecalibrateLimit}
+          onRenegotiateDebt={handleNegotiateDebtWorkout}
         />
       )}
 

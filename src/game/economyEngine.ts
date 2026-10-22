@@ -15,7 +15,12 @@ import {
   ExpertOpinion,
   TenInnovationsState,
   CompetitorId,
-  SwiftTransaction
+  SwiftTransaction,
+  BchMoneyDeskState,
+  FxForwardContract,
+  YieldCurvePoint,
+  MonthlyClosingSummary,
+  BchRepoOperation
 } from './types';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -241,8 +246,29 @@ export function advanceGameMonth(state: GameState): GameState {
   if (state.marketingAggressiveness === 'Ultra Agresiva (Robo de Cartera)') marketStealMultiplier = 1.85;
   if (state.marketingAggressiveness === 'Prudente Conservadora') marketStealMultiplier = 0.75;
 
+  // 3. Indexación dinámica por TPM del BCH y elasticidad frente a competidores
+  const tpmDelta = +(newTPM - state.bch.tpmRate).toFixed(2);
+  const indexedDivisionsSummary: MonthlyClosingSummary['indexedDivisionsSummary'] = [];
+
   (Object.keys(updatedDivisions) as BankingDivisionId[]).forEach(divId => {
     const div = { ...updatedDivisions[divId] };
+    const oldLending = div.avgLendingRate;
+    const oldDeposit = div.avgDepositRate;
+
+    // Si varió la TPM del BCH, indexar tasas activas y pasivas con pass-through institucional
+    if (tpmDelta !== 0) {
+      div.avgLendingRate = +(Math.max(10.0, Math.min(32.0, div.avgLendingRate + tpmDelta * 0.85))).toFixed(2);
+      div.avgDepositRate = +(Math.max(2.5, Math.min(12.0, div.avgDepositRate + tpmDelta * 0.60))).toFixed(2);
+      indexedDivisionsSummary.push({
+        divisionId: divId,
+        divisionName: div.name,
+        oldLendingRate: oldLending,
+        newLendingRate: div.avgLendingRate,
+        oldDepositRate: oldDeposit,
+        newDepositRate: div.avgDepositRate
+      });
+    }
+
     const monthlyLendingRate = (div.avgLendingRate / 100) / 12;
     const monthlyDepositRate = (div.avgDepositRate / 100) / 12;
 
@@ -285,7 +311,19 @@ export function advanceGameMonth(state: GameState): GameState {
     updatedDivisions[divId] = div;
   });
 
-  // 4. Actualización Mensual Individual de Clientes (Cuentas, Préstamos, Tarjetas, Mora y Promoción Automática)
+  // 4. Actualización Mensual Individual Obligatoria de Clientes
+  // (Cuotas con Débito Flexible, Capitalización de Rendimientos, Ajuste de Límites por Mora/Score y Promoción Automática)
+  let loansProcessedCount = 0;
+  let loansFullyPaidCount = 0;
+  let loansPartialOrOverdueCount = 0;
+  let totalAmortizationCollectedHNL = 0;
+  let totalInterestCollectedHNL = 0;
+  let limitsIncreasedCount = 0;
+  let limitsReducedCount = 0;
+  let totalLimitExpansionHNL = 0;
+  let totalDepositInterestCapitalizedHNL = 0;
+  const delinquentClientsNotices: MonthlyClosingSummary['delinquentClientsNotices'] = [];
+
   const upgradeNotifs: GameEventNotification[] = [];
   const updatedClients: IndividualClient[] = state.clients.map(client => {
     // Si el cliente fue vendido a un banco competidor, ya no opera en Áureo
@@ -296,44 +334,77 @@ export function advanceGameMonth(state: GameState): GameState {
     const divConfig = updatedDivisions[client.division] || updatedDivisions.personas;
     const monthlyDepositRate = (divConfig.avgDepositRate / 100) / 12;
 
-    // A. Rendimiento de cuenta bancaria e ingresos mensuales
-    let newBalance = Math.round(client.accountBalanceHNL * (1 + monthlyDepositRate));
-    // Pequeño flujo regular de ingresos o salarios acreditados
+    // A. Rendimiento de cuenta bancaria e intereses capitalizados
+    const interestEarned = Math.round(client.accountBalanceHNL * monthlyDepositRate);
+    totalDepositInterestCapitalizedHNL += interestEarned;
+    let newBalance = client.accountBalanceHNL + interestEarned;
+    // Flujo regular de salarios o depósitos del mes
     const regularInflow = Math.round(client.accountBalanceHNL * (0.005 + Math.random() * 0.015));
     newBalance += regularInflow;
 
-    // B. Cuotas de Préstamo y Cobranza / Mora
+    // B. Préstamos y Financiamiento: Indexación de Tasa y Débito Flexible de Cuotas
     let loanBal = client.loanBalanceHNL;
     let monthsRem = client.loanMonthsRemaining;
     let pastDays = client.pastDueDays;
     let pastAmt = client.pastDueAmountHNL;
     let cnbs = client.cnbsCategory;
+    let loanRate = client.loanInterestRateAnnual;
+    let monthlyPay = client.loanMonthlyPaymentHNL;
+    let lastAmortStatus: 'al_dia' | 'aviso_previo_insuficiencia' | 'renegociado' = 'al_dia';
+    let lastAmortNotice = '';
+    let lastQuotaDeducted = 0;
 
     if (client.hasLoan && monthsRem > 0 && loanBal > 0) {
-      const paymentDue = client.loanMonthlyPaymentHNL;
-      const canPay = client.guaranteedPayment || newBalance >= paymentDue;
+      loansProcessedCount++;
+      // Indexación de tasa del préstamo si cambió la TPM del BCH
+      if (tpmDelta !== 0) {
+        loanRate = +(Math.max(8.0, Math.min(34.0, loanRate + tpmDelta * 0.85))).toFixed(2);
+        const rMonthly = (loanRate / 100) / 12;
+        monthlyPay = Math.round((loanBal * rMonthly) / (1 - Math.pow(1 + rMonthly, -monthsRem)));
+      }
 
-      if (canPay) {
-        // Pago exitoso de cuota
+      const paymentDue = monthlyPay;
+      const canPayInFull = client.guaranteedPayment || newBalance >= paymentDue;
+
+      if (canPayInFull) {
+        // Débito completo exitoso
         if (!client.guaranteedPayment) {
           newBalance = Math.max(0, newBalance - paymentDue);
         }
-        const amortization = Math.min(loanBal, paymentDue * 0.75);
-        loanBal = Math.max(0, loanBal - amortization);
+        const monthlyInterest = Math.round(loanBal * ((loanRate / 100) / 12));
+        const capitalAmortization = Math.min(loanBal, Math.max(1, paymentDue - monthlyInterest));
+
+        totalAmortizationCollectedHNL += capitalAmortization;
+        totalInterestCollectedHNL += monthlyInterest;
+        loanBal = Math.max(0, loanBal - capitalAmortization);
         monthsRem = Math.max(0, monthsRem - 1);
         pastDays = 0;
         pastAmt = 0;
         cnbs = 'I - Normal';
+        lastAmortStatus = 'al_dia';
+        lastQuotaDeducted = paymentDue;
+        lastAmortNotice = `Cuota debitada exitosamente por ${formatHNL(paymentDue)}. Préstamo al día.`;
 
-        // Si terminó de pagar el préstamo
+        // Si canceló la totalidad de la deuda
         if (loanBal <= 0 || monthsRem <= 0) {
           loanBal = 0;
           monthsRem = 0;
+          loansFullyPaidCount++;
+          lastAmortNotice = `¡Préstamo cancelado en su totalidad! Saldo en L. 0.00.`;
         }
       } else {
-        // Incumplimiento: entra o incrementa días de mora
+        // Débito flexible con aviso previo y renegociación sugerida
+        loansPartialOrOverdueCount++;
+        const partialDebit = Math.max(0, newBalance - 100); // Se debita lo disponible dejando L. 100 de cortesía
+        newBalance = newBalance - partialDebit;
+        const shortfall = paymentDue - partialDebit;
+
+        totalAmortizationCollectedHNL += Math.round(partialDebit * 0.5);
+        totalInterestCollectedHNL += Math.round(partialDebit * 0.5);
+        pastAmt += shortfall;
         pastDays += 30;
-        pastAmt += paymentDue;
+
+        // Clasificación de Riesgo según CNBS
         if (pastDays >= 180) {
           cnbs = 'V - Pérdida';
         } else if (pastDays >= 90) {
@@ -343,26 +414,69 @@ export function advanceGameMonth(state: GameState): GameState {
         } else {
           cnbs = 'II - Especial';
         }
+
+        lastAmortStatus = 'aviso_previo_insuficiencia';
+        lastQuotaDeducted = partialDebit;
+        const suggestedAction: 'reestructurar_plazo' | 'quita_interes' | 'dacion_garantia' = 
+          pastDays >= 90 ? 'dacion_garantia' : (pastDays >= 60 ? 'reestructurar_plazo' : 'quita_interes');
+
+        lastAmortNotice = `Aviso Previo: Insuficiencia de fondos. Se aplicó débito flexible de ${formatHNL(partialDebit)}, cuota pendiente: ${formatHNL(shortfall)} (${pastDays} días mora - Cat. CNBS ${cnbs.split(' - ')[0]}). Sugerencia: renegociar deuda.`;
+
+        delinquentClientsNotices.push({
+          clientId: client.id,
+          clientName: client.name,
+          division: client.division,
+          loanType: client.loanType,
+          monthlyPaymentHNL: paymentDue,
+          accountBalanceHNL: newBalance,
+          shortfallHNL: shortfall,
+          pastDueDays: pastDays,
+          cnbsCategory: cnbs,
+          suggestedAction
+        });
       }
     }
 
-    // C. Tarjeta de Crédito (Pagos y Consumos)
+    // C. Tarjeta de Crédito: Consumos, Pagos y Ajuste Dinámico de Límites
     let cardBal = client.creditCardBalanceHNL;
-    if (client.hasCreditCard && cardBal > 0) {
-      const minPay = Math.round(cardBal * 0.2);
-      if (client.guaranteedPayment || newBalance >= minPay) {
-        if (!client.guaranteedPayment) {
-          newBalance = Math.max(0, newBalance - minPay);
+    let cardLimit = client.creditCardLimitHNL;
+
+    if (client.hasCreditCard) {
+      if (cardBal > 0) {
+        const minPay = Math.round(cardBal * 0.2);
+        if (client.guaranteedPayment || newBalance >= minPay) {
+          if (!client.guaranteedPayment) {
+            newBalance = Math.max(0, newBalance - minPay);
+          }
+          cardBal = Math.max(0, cardBal - minPay);
+        } else {
+          // Interés moratorio rotativo
+          cardBal = Math.round(cardBal * (1 + 0.32 / 12));
         }
-        cardBal = Math.max(0, cardBal - minPay);
-      } else {
-        // Interés moratorio rotativo
-        cardBal = Math.round(cardBal * (1 + 0.32 / 12));
       }
-      // Consumo mensual regular si tiene límite
-      if (client.creditCardLimitHNL > cardBal) {
-        const newCharge = Math.round((client.creditCardLimitHNL - cardBal) * (0.05 + Math.random() * 0.1));
+
+      // Consumo regular si dispone de límite libre
+      if (cardLimit > cardBal) {
+        const newCharge = Math.round((cardLimit - cardBal) * (0.05 + Math.random() * 0.1));
         cardBal += newCharge;
+      }
+
+      // Ajuste Dinámico de Límites Crediticios cada Mes
+      if (pastDays === 0 && client.equifaxScore >= 700) {
+        // Cliente puntual con buen score: incremento automático prudente (+8%)
+        const expansion = Math.round(cardLimit * 0.08);
+        cardLimit += expansion;
+        limitsIncreasedCount++;
+        totalLimitExpansionHNL += expansion;
+      } else if (pastDays >= 30) {
+        // Cliente con mora: congelamiento y reducción preventiva del límite disponible si pasa de 60 días
+        if (pastDays >= 60) {
+          const reducedLimit = Math.max(cardBal, Math.round(cardLimit * 0.85));
+          if (reducedLimit < cardLimit) {
+            cardLimit = reducedLimit;
+            limitsReducedCount++;
+          }
+        }
       }
     }
 
@@ -396,12 +510,18 @@ export function advanceGameMonth(state: GameState): GameState {
       accountBalanceHNL: newBalance,
       hasLoan: loanBal > 0,
       loanBalanceHNL: loanBal,
+      loanMonthlyPaymentHNL: monthlyPay,
+      loanInterestRateAnnual: loanRate,
       loanMonthsRemaining: monthsRem,
       pastDueDays: pastDays,
       pastDueAmountHNL: pastAmt,
       cnbsCategory: cnbs,
+      creditCardLimitHNL: cardLimit,
       creditCardBalanceHNL: cardBal,
-      pensionBalanceHNL: pensionBal
+      pensionBalanceHNL: pensionBal,
+      lastMonthlyAmortizationStatus: lastAmortStatus,
+      lastAmortizationNotice: lastAmortNotice,
+      lastQuotaDeductedHNL: lastQuotaDeducted
     };
   });
 
@@ -839,6 +959,92 @@ export function advanceGameMonth(state: GameState): GameState {
     }
   };
 
+  // 13. Mesa de Dinero BCH, Encaje Legal y Forwards Cambiarios
+  const requiredReserveHNL = Math.round(totalNewDeposits * (state.bch.reserveRequirementPct / 100));
+  const previousBchCash = state.bchMoneyDesk?.cashInBchCurrentAccountHNL || 345000000;
+  const depositDelta = totalNewDeposits - (state.financials.depositsPublicTotal || 2340000000);
+  const updatedBchCash = Math.max(0, Math.round(previousBchCash + depositDelta * 0.15 + (Math.random() * 4000000 - 2000000)));
+
+  const reserveSurplusOrDeficit = updatedBchCash - requiredReserveHNL;
+  const isReserveCompliant = reserveSurplusOrDeficit >= 0;
+  let bchPenaltyIncurred = 0;
+  let emergencyRepoActive = false;
+
+  if (!isReserveCompliant) {
+    emergencyRepoActive = true;
+    bchPenaltyIncurred = Math.round(Math.abs(reserveSurplusOrDeficit) * 0.0075);
+  }
+
+  // Curva de Rendimientos Soberana BCH
+  const updatedYieldCurve: YieldCurvePoint[] = (state.bchMoneyDesk?.yieldCurve || [
+    { termLabel: '7 días', termDays: 7, bchYieldPct: 5.75, previousYieldPct: 5.75, trend: 'estable' },
+    { termLabel: '28 días', termDays: 28, bchYieldPct: 5.95, previousYieldPct: 5.90, trend: 'alza' },
+    { termLabel: '91 días', termDays: 91, bchYieldPct: 6.30, previousYieldPct: 6.25, trend: 'alza' },
+    { termLabel: '182 días', termDays: 182, bchYieldPct: 6.85, previousYieldPct: 6.80, trend: 'alza' },
+    { termLabel: '364 días', termDays: 364, bchYieldPct: 7.45, previousYieldPct: 7.40, trend: 'alza' }
+  ]).map(p => {
+    const oldYield = p.bchYieldPct;
+    const newYield = +(p.bchYieldPct + tpmDelta * 0.9 + (Math.random() * 0.04 - 0.02)).toFixed(2);
+    return {
+      ...p,
+      bchYieldPct: newYield,
+      previousYieldPct: oldYield,
+      trend: newYield > oldYield ? 'alza' as const : (newYield < oldYield ? 'baja' as const : 'estable' as const)
+    };
+  });
+
+  // Repos activos y contratos forward
+  const updatedActiveRepos: BchRepoOperation[] = (state.bchMoneyDesk?.activeRepos || []).map(r => ({
+    ...r,
+    monthsRemaining: Math.max(0, r.monthsRemaining - 1),
+    status: r.monthsRemaining <= 1 ? 'liquidado' as const : 'activo' as const
+  }));
+
+  const updatedFxForwards: FxForwardContract[] = (state.fxForwards || []).map(f => ({
+    ...f,
+    monthsRemaining: Math.max(0, f.monthsRemaining - 1),
+    status: f.monthsRemaining <= 1 ? 'liquidado' as const : 'activo' as const
+  }));
+
+  const updatedBchMoneyDesk: BchMoneyDeskState = {
+    cashInBchCurrentAccountHNL: updatedBchCash,
+    requiredReserveHNL,
+    reserveSurplusOrDeficitHNL: reserveSurplusOrDeficit,
+    isCompliant: isReserveCompliant,
+    emergencyRepoActive,
+    activeRepos: updatedActiveRepos,
+    yieldCurve: updatedYieldCurve,
+    dailyInterbankCallOffers: state.bchMoneyDesk?.dailyInterbankCallOffers || []
+  };
+
+  const monthlyClosingSummary: MonthlyClosingSummary = {
+    month: nextMonth,
+    year: currentYear,
+    monthLabel: fullLabel,
+    loansProcessedCount,
+    loansFullyPaidCount,
+    loansPartialOrOverdueCount,
+    totalAmortizationCollectedHNL,
+    totalInterestCollectedHNL,
+    delinquentClientsNotices,
+    tpmOldPct: state.bch.tpmRate,
+    tpmNewPct: newTPM,
+    tpmDeltaPct: tpmDelta,
+    indexedDivisionsSummary,
+    limitsIncreasedCount,
+    limitsReducedCount,
+    totalLimitExpansionHNL,
+    totalDepositInterestCapitalizedHNL,
+    requiredReserveHNL,
+    actualReserveHNL: updatedBchCash,
+    reserveSurplusOrDeficitHNL: reserveSurplusOrDeficit,
+    isReserveCompliant,
+    bchPenaltyIncurredHNL: bchPenaltyIncurred,
+    carPct: newCAR,
+    lcrPct: newLCR,
+    nsfrPct: 118.5
+  };
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -880,7 +1086,10 @@ export function advanceGameMonth(state: GameState): GameState {
     interbankOffers: state.interbankOffers || [],
     dynamicAlerts: updatedAlerts,
     expertOpinions: updatedExpertOpinions,
-    innovations: updatedInnovations
+    innovations: updatedInnovations,
+    bchMoneyDesk: updatedBchMoneyDesk,
+    fxForwards: updatedFxForwards,
+    lastMonthlyClosingSummary: monthlyClosingSummary
   };
 }
 
@@ -1543,4 +1752,296 @@ export function autoApproveAllOfficerEligibleCredits(state: GameState): { update
   });
 
   return { updatedState: curState, count, totalApproved };
+}
+
+/**
+ * Aplica un abono extraordinario a capital sobre un préstamo existente,
+ * debitando los fondos de la cuenta del cliente y reduciendo el saldo deudor y la cuota.
+ */
+export function executeExtraordinaryLoanPrepayment(
+  state: GameState,
+  clientId: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client || !client.hasLoan || client.loanBalanceHNL <= 0) {
+    return { updatedState: state, successMessage: 'El cliente no tiene un préstamo activo para amortizar.' };
+  }
+
+  if (client.accountBalanceHNL < amountHNL) {
+    return { updatedState: state, successMessage: 'Fondos insuficientes en la cuenta del cliente para realizar el abono extraordinario.' };
+  }
+
+  const actualAmortization = Math.min(client.loanBalanceHNL, amountHNL);
+  const newAccountBalance = client.accountBalanceHNL - actualAmortization;
+  const newLoanBalance = Math.max(0, client.loanBalanceHNL - actualAmortization);
+  const isFullyPaid = newLoanBalance === 0;
+
+  // Recalcular cuota mensual reducida si aún queda saldo
+  let newMonthlyPayment = 0;
+  if (!isFullyPaid && client.loanMonthsRemaining > 0) {
+    const monthlyRate = (client.loanInterestRateAnnual / 100) / 12;
+    newMonthlyPayment = Math.round((newLoanBalance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -client.loanMonthsRemaining)));
+  }
+
+  const updatedClients = state.clients.map(c => {
+    if (c.id === clientId) {
+      return {
+        ...c,
+        accountBalanceHNL: newAccountBalance,
+        loanBalanceHNL: newLoanBalance,
+        loanMonthlyPaymentHNL: newMonthlyPayment,
+        hasLoan: !isFullyPaid,
+        loanMonthsRemaining: isFullyPaid ? 0 : c.loanMonthsRemaining,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        cnbsCategory: 'I - Normal' as const,
+        lastMonthlyAmortizationStatus: 'al_dia' as const,
+        lastAmortizationNotice: `Abono extraordinario a capital aplicado por ${formatHNL(actualAmortization)}. Saldo actual: ${formatHNL(newLoanBalance)}.`
+      };
+    }
+    return c;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      financials: {
+        ...state.financials,
+        loanPortfolioCurrent: Math.max(0, state.financials.loanPortfolioCurrent - actualAmortization),
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + actualAmortization
+      }
+    },
+    successMessage: isFullyPaid 
+      ? `¡Préstamo cancelado en su totalidad con el abono de ${formatHNL(actualAmortization)}!` 
+      : `Abono a capital de ${formatHNL(actualAmortization)} ejecutado. Nueva cuota mensual: ${formatHNL(newMonthlyPayment)}.`
+  };
+}
+
+/**
+ * Recalibra manual o institucionalmente el límite crediticio de un cliente
+ */
+export function recalibrateClientCreditLimit(
+  state: GameState,
+  clientId: string,
+  newLimitHNL: number,
+  notes: string
+): { updatedState: GameState; successMessage: string } {
+  const updatedClients = state.clients.map(c => {
+    if (c.id === clientId) {
+      return {
+        ...c,
+        creditCardLimitHNL: newLimitHNL,
+        notes: notes ? `${c.notes || ''} · [Límite ajustado a ${formatHNL(newLimitHNL)}: ${notes}]` : c.notes
+      };
+    }
+    return c;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients
+    },
+    successMessage: `Límite de crédito recalibrado a ${formatHNL(newLimitHNL)} correctamente.`
+  };
+}
+
+/**
+ * Abre una operación de Reporto (Repo) con el Banco Central de Honduras o entidad autorizada
+ */
+export function openBchRepoOperation(
+  state: GameState,
+  amountHNL: number,
+  termDays: 7 | 14 | 28,
+  ratePct: number
+): { updatedState: GameState; successMessage: string } {
+  const newRepo: BchRepoOperation = {
+    id: `repo-${Date.now().toString().slice(-5)}`,
+    type: 'repo_bch_liquidez',
+    counterparty: 'Banco Central de Honduras (BCH)',
+    termDays,
+    amountHNL,
+    interestRatePct: ratePct,
+    monthsRemaining: Math.ceil(termDays / 30),
+    collateralAsset: 'Letra de Regulación Monetaria BCH-LRM',
+    status: 'activo'
+  };
+
+  const updatedRepos = [newRepo, ...(state.bchMoneyDesk?.activeRepos || [])];
+  const newBchCash = (state.bchMoneyDesk?.cashInBchCurrentAccountHNL || 345000000) + amountHNL;
+  const surplus = newBchCash - (state.bchMoneyDesk?.requiredReserveHNL || 280800000);
+
+  return {
+    updatedState: {
+      ...state,
+      financials: {
+        ...state.financials,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + amountHNL,
+        interbankBorrowingBCH: state.financials.interbankBorrowingBCH + amountHNL
+      },
+      bchMoneyDesk: {
+        ...(state.bchMoneyDesk || {} as any),
+        cashInBchCurrentAccountHNL: newBchCash,
+        reserveSurplusOrDeficitHNL: surplus,
+        isCompliant: surplus >= 0,
+        activeRepos: updatedRepos
+      }
+    },
+    successMessage: `Operación de Reporto por ${formatHNL(amountHNL)} a ${termDays} días concertada con el BCH a tasa ${ratePct}%.`
+  };
+}
+
+/**
+ * Ejecuta una operación de Call Money en el Mercado Interbancario con un banco hondureño
+ */
+export function executeInterbankCallDeal(
+  state: GameState,
+  bankId: CompetitorId,
+  amountHNL: number,
+  direction: 'prestar' | 'pedir_prestado'
+): { updatedState: GameState; successMessage: string } {
+  const bank = state.competitors.find(b => b.id === bankId);
+  const bankName = bank?.name || 'Banco Competidor';
+
+  if (direction === 'prestar') {
+    if (state.financials.cashAndBCHReserves < amountHNL) {
+      return { updatedState: state, successMessage: 'Reservas de caja insuficientes para prestar liquidez.' };
+    }
+
+    return {
+      updatedState: {
+        ...state,
+        financials: {
+          ...state.financials,
+          cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL
+        },
+        innovations: {
+          ...(state.innovations as any),
+          interbankCallMoney: {
+            lentAmountHNL: ((state.innovations?.interbankCallMoney?.lentAmountHNL || 0) + amountHNL),
+            borrowedAmountHNL: state.innovations?.interbankCallMoney?.borrowedAmountHNL || 0,
+            callRatePct: state.bch.tpmRate + 0.35
+          }
+        }
+      },
+      successMessage: `Se colocaron ${formatHNL(amountHNL)} en Call Money a ${bankName} a tasa ${(state.bch.tpmRate + 0.35).toFixed(2)}%.`
+    };
+  } else {
+    return {
+      updatedState: {
+        ...state,
+        financials: {
+          ...state.financials,
+          cashAndBCHReserves: state.financials.cashAndBCHReserves + amountHNL
+        },
+        innovations: {
+          ...(state.innovations as any),
+          interbankCallMoney: {
+            lentAmountHNL: state.innovations?.interbankCallMoney?.lentAmountHNL || 0,
+            borrowedAmountHNL: ((state.innovations?.interbankCallMoney?.borrowedAmountHNL || 0) + amountHNL),
+            callRatePct: state.bch.tpmRate + 0.55
+          }
+        }
+      },
+      successMessage: `Se tomaron prestados ${formatHNL(amountHNL)} en Call Money de ${bankName} a tasa ${(state.bch.tpmRate + 0.55).toFixed(2)}%.`
+    };
+  }
+}
+
+/**
+ * Emite un nuevo contrato Forward cambiario no entregable (NDF) USD/HNL
+ */
+export function createFxForwardContract(
+  state: GameState,
+  clientName: string,
+  companyName: string,
+  amountUSD: number,
+  agreedRateHNL: number,
+  termDays: 30 | 60 | 90 | 180
+): { updatedState: GameState; successMessage: string } {
+  const premiumFeeHNL = Math.round(amountUSD * 0.12);
+  const newForward: FxForwardContract = {
+    id: `fwd-${Date.now().toString().slice(-5)}`,
+    clientName,
+    companyName,
+    direction: 'venta_usd_a_cliente',
+    amountUSD,
+    agreedRateHNL,
+    marketRateAtAgreementHNL: state.bch.exchangeRateHNLtoUSD,
+    termDays,
+    monthsRemaining: Math.ceil(termDays / 30),
+    premiumFeeHNL,
+    status: 'activo'
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      fxForwards: [newForward, ...(state.fxForwards || [])],
+      financials: {
+        ...state.financials,
+        feeIncomeSwiftAndFX: state.financials.feeIncomeSwiftAndFX + premiumFeeHNL,
+        cashAndBCHReserves: state.financials.cashAndBCHReserves + premiumFeeHNL
+      }
+    },
+    successMessage: `Contrato Forward USD/HNL acordado con ${companyName} por ${formatUSD(amountUSD)} a L. ${agreedRateHNL}. Comisión cobrada: ${formatHNL(premiumFeeHNL)}.`
+  };
+}
+
+/**
+ * Ejecuta una prueba de estrés macroeconómica integral de la CNBS
+ */
+export function runMacroStressScenario(
+  state: GameState,
+  scenario: 'cafe_remesas' | 'fed_rate_hike' | 'sequia_agro'
+): { updatedState: GameState; impact: { simCAR: number; simLCR: number; provIncreaseHNL: number; capitalGapHNL: number; analysis: string } } {
+  let simCAR = state.financials.capitalAdequacyRatioCAR;
+  let simLCR = state.financials.liquidityCoverageRatioLCR;
+  let provIncreaseHNL = 0;
+  let capitalGapHNL = 0;
+  let analysis = '';
+
+  if (scenario === 'cafe_remesas') {
+    simCAR = +(simCAR - 2.4).toFixed(1);
+    simLCR = +(simLCR - 22.0).toFixed(1);
+    provIncreaseHNL = 14500000;
+    capitalGapHNL = simCAR < 10.0 ? Math.round((10.0 - simCAR) * 25000000) : 0;
+    analysis = 'Choque de caída del 20% en café y remesas: Aumento en mora comercial en Valle de Sula y Comayagua. Requiere constituir L. 14.5M en provisiones adicionales.';
+  } else if (scenario === 'fed_rate_hike') {
+    simCAR = +(simCAR - 1.8).toFixed(1);
+    simLCR = +(simLCR - 18.0).toFixed(1);
+    provIncreaseHNL = 9800000;
+    capitalGapHNL = 0;
+    analysis = 'Alza agresiva de la Reserva Federal: Presión devaluatoria sobre el Lempira y aumento del costo de corresponsalía en Dólares. LCR se mantiene sobre 100%.';
+  } else {
+    simCAR = +(simCAR - 3.1).toFixed(1);
+    simLCR = +(simLCR - 25.0).toFixed(1);
+    provIncreaseHNL = 21000000;
+    capitalGapHNL = simCAR < 10.0 ? Math.round((10.0 - simCAR) * 30000000) : 0;
+    analysis = 'Sequía severa en el Corredor Seco y Pérdidas Agrícolas: Impacta la cartera PYME agropecuaria y cooperativas. Exige refuerzo de provisiones anticíclicas.';
+  }
+
+  return {
+    updatedState: {
+      ...state,
+      innovations: {
+        ...(state.innovations as any),
+        stressTesting: {
+          lastScenarioRun: scenario === 'cafe_remesas' ? 'Choque Café & Remesas' : scenario === 'fed_rate_hike' ? 'Alza Tasas Fed USD' : 'Sequía Corredor Seco',
+          simulatedCAR: simCAR,
+          simulatedLCR: simLCR,
+          capitalGapHNL
+        }
+      }
+    },
+    impact: {
+      simCAR,
+      simLCR,
+      provIncreaseHNL,
+      capitalGapHNL,
+      analysis
+    }
+  };
 }

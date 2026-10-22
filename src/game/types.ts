@@ -87,6 +87,10 @@ export interface IndividualClient {
   pensionFundEnrolled?: boolean;
   pensionFundProfile?: 'Conservador' | 'Moderado' | 'Crecimiento';
   pensionBalanceHNL?: number;
+  // Actualización mensual de cuota y amortización obligatoria
+  lastMonthlyAmortizationStatus?: 'al_dia' | 'aviso_previo_insuficiencia' | 'renegociado';
+  lastAmortizationNotice?: string;
+  lastQuotaDeductedHNL?: number;
   // Expediente 360°: Productos en la competencia para robo de cartera / atracción
   otherBankProducts: OtherBankProduct[];
 }
@@ -467,6 +471,109 @@ export interface TenInnovationsState {
   };
 }
 
+export interface BchRepoOperation {
+  id: string;
+  type: 'repo_bch_liquidez' | 'repo_inversion';
+  counterparty: 'Banco Central de Honduras (BCH)' | 'Banco Ficohsa' | 'Banco Atlántida' | 'BAC Credomatic' | 'Banpaís' | 'Banco de Occidente';
+  termDays: 7 | 14 | 28;
+  amountHNL: number;
+  interestRatePct: number;
+  monthsRemaining: number;
+  collateralAsset: string;
+  status: 'activo' | 'vencido' | 'liquidado';
+}
+
+export interface FxForwardContract {
+  id: string;
+  clientName: string;
+  companyName: string;
+  direction: 'venta_usd_a_cliente' | 'compra_usd_a_cliente';
+  amountUSD: number;
+  agreedRateHNL: number;
+  marketRateAtAgreementHNL: number;
+  termDays: 30 | 60 | 90 | 180;
+  monthsRemaining: number;
+  premiumFeeHNL: number;
+  status: 'activo' | 'liquidado' | 'cancelado';
+}
+
+export interface YieldCurvePoint {
+  termLabel: string; // '7 días', '28 días', '91 días', '182 días', '364 días'
+  termDays: number;
+  bchYieldPct: number;
+  previousYieldPct: number;
+  trend: 'alza' | 'estable' | 'baja';
+}
+
+export interface MonthlyClosingSummary {
+  month: number;
+  year: number;
+  monthLabel: string;
+  // Cuotas y Préstamos
+  loansProcessedCount: number;
+  loansFullyPaidCount: number;
+  loansPartialOrOverdueCount: number;
+  totalAmortizationCollectedHNL: number;
+  totalInterestCollectedHNL: number;
+  delinquentClientsNotices: {
+    clientId: string;
+    clientName: string;
+    division: BankingDivisionId;
+    loanType: string;
+    monthlyPaymentHNL: number;
+    accountBalanceHNL: number;
+    shortfallHNL: number;
+    pastDueDays: number;
+    cnbsCategory: string;
+    suggestedAction: 'reestructurar_plazo' | 'quita_interes' | 'dacion_garantia';
+  }[];
+  // Indexación de Tasas por TPM
+  tpmOldPct: number;
+  tpmNewPct: number;
+  tpmDeltaPct: number;
+  indexedDivisionsSummary: {
+    divisionId: BankingDivisionId;
+    divisionName: string;
+    oldLendingRate: number;
+    newLendingRate: number;
+    oldDepositRate: number;
+    newDepositRate: number;
+  }[];
+  // Ajustes de Límites de Crédito
+  limitsIncreasedCount: number;
+  limitsReducedCount: number;
+  totalLimitExpansionHNL: number;
+  // Intereses Pasivos Capitalizados
+  totalDepositInterestCapitalizedHNL: number;
+  // Cumplimiento de Encaje Legal BCH
+  requiredReserveHNL: number;
+  actualReserveHNL: number;
+  reserveSurplusOrDeficitHNL: number;
+  isReserveCompliant: boolean;
+  bchPenaltyIncurredHNL: number;
+  // Ratios Regulatorios
+  carPct: number;
+  lcrPct: number;
+  nsfrPct: number;
+}
+
+export interface BchMoneyDeskState {
+  cashInBchCurrentAccountHNL: number;
+  requiredReserveHNL: number;
+  reserveSurplusOrDeficitHNL: number;
+  isCompliant: boolean;
+  emergencyRepoActive: boolean;
+  activeRepos: BchRepoOperation[];
+  yieldCurve: YieldCurvePoint[];
+  dailyInterbankCallOffers: {
+    bankId: CompetitorId;
+    bankName: string;
+    offeredRatePct: number;
+    availableAmountHNL: number;
+    direction: 'ofrece_liquidez' | 'demanda_liquidez';
+  }[];
+}
+
 export interface GameState {
   bankName: string;
   gameMonth: number; // 1 = Enero 2026, 2 = Febrero 2026...
@@ -499,4 +606,8 @@ export interface GameState {
   dynamicAlerts: DynamicAlert[];
   expertOpinions: ExpertOpinion[];
   innovations: TenInnovationsState;
+  // Mesa de Dinero BCH, Forwards y Cierre Mensual Obligatorio
+  bchMoneyDesk: BchMoneyDeskState;
+  fxForwards: FxForwardContract[];
+  lastMonthlyClosingSummary?: MonthlyClosingSummary;
 }

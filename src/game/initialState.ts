@@ -20,7 +20,9 @@ import {
   InterbankPortfolioOffer,
   DynamicAlert,
   ExpertOpinion,
-  TenInnovationsState
+  TenInnovationsState,
+  BchMoneyDeskState,
+  FxForwardContract
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -1938,6 +1940,70 @@ export const INITIAL_FINANCIALS: BankFinancialStatements = {
   netIncome: 15955500
 };
 
+export const INITIAL_BCH_MONEY_DESK: BchMoneyDeskState = {
+  cashInBchCurrentAccountHNL: 345000000,
+  requiredReserveHNL: 280800000, // 12% de ~2,340,000,000 depósitos
+  reserveSurplusOrDeficitHNL: 64200000,
+  isCompliant: true,
+  emergencyRepoActive: false,
+  activeRepos: [
+    {
+      id: 'repo-bch-01',
+      type: 'repo_bch_liquidez',
+      counterparty: 'Banco Central de Honduras (BCH)',
+      termDays: 14,
+      amountHNL: 50000000,
+      interestRatePct: 6.25,
+      monthsRemaining: 1,
+      collateralAsset: 'Letra de Regulación Monetaria BCH-LRM-2026',
+      status: 'activo'
+    }
+  ],
+  yieldCurve: [
+    { termLabel: '7 días', termDays: 7, bchYieldPct: 5.75, previousYieldPct: 5.75, trend: 'estable' },
+    { termLabel: '28 días', termDays: 28, bchYieldPct: 5.95, previousYieldPct: 5.90, trend: 'alza' },
+    { termLabel: '91 días', termDays: 91, bchYieldPct: 6.30, previousYieldPct: 6.25, trend: 'alza' },
+    { termLabel: '182 días', termDays: 182, bchYieldPct: 6.85, previousYieldPct: 6.80, trend: 'alza' },
+    { termLabel: '364 días', termDays: 364, bchYieldPct: 7.45, previousYieldPct: 7.40, trend: 'alza' }
+  ],
+  dailyInterbankCallOffers: [
+    { bankId: 'atlantida', bankName: 'Banco Atlántida', offeredRatePct: 6.10, availableAmountHNL: 80000000, direction: 'ofrece_liquidez' },
+    { bankId: 'ficohsa', bankName: 'Banco Ficohsa', offeredRatePct: 6.35, availableAmountHNL: 60000000, direction: 'demanda_liquidez' },
+    { bankId: 'bac', bankName: 'BAC Credomatic', offeredRatePct: 6.15, availableAmountHNL: 95000000, direction: 'ofrece_liquidez' },
+    { bankId: 'banpais', bankName: 'Banpaís', offeredRatePct: 6.40, availableAmountHNL: 40000000, direction: 'demanda_liquidez' },
+    { bankId: 'occidente', bankName: 'Banco de Occidente', offeredRatePct: 6.05, availableAmountHNL: 120000000, direction: 'ofrece_liquidez' }
+  ]
+};
+
+export const INITIAL_FX_FORWARDS: FxForwardContract[] = [
+  {
+    id: 'fwd-corp-01',
+    clientName: 'Roberto Facussé',
+    companyName: 'Textiles Villanueva S. de R.L.',
+    direction: 'venta_usd_a_cliente',
+    amountUSD: 500000,
+    agreedRateHNL: 25.10,
+    marketRateAtAgreementHNL: 24.88,
+    termDays: 60,
+    monthsRemaining: 2,
+    premiumFeeHNL: 75000,
+    status: 'activo'
+  },
+  {
+    id: 'fwd-corp-02',
+    clientName: 'Elena Kafati',
+    companyName: 'Cafés Finos de Marcala S.A.',
+    direction: 'compra_usd_a_cliente',
+    amountUSD: 850000,
+    agreedRateHNL: 24.95,
+    marketRateAtAgreementHNL: 24.88,
+    termDays: 90,
+    monthsRemaining: 3,
+    premiumFeeHNL: 110000,
+    status: 'activo'
+  }
+];
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -1991,5 +2057,8 @@ export const INITIAL_GAME_STATE: GameState = {
   interbankOffers: INITIAL_INTERBANK_OFFERS,
   dynamicAlerts: INITIAL_DYNAMIC_ALERTS,
   expertOpinions: INITIAL_EXPERT_OPINIONS,
-  innovations: INITIAL_INNOVATIONS
+  innovations: INITIAL_INNOVATIONS,
+  // Mesa de Dinero BCH, Forwards y Cierre Mensual Obligatorio
+  bchMoneyDesk: INITIAL_BCH_MONEY_DESK,
+  fxForwards: INITIAL_FX_FORWARDS
 };

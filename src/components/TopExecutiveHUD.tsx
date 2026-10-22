@@ -15,7 +15,10 @@ import {
   Bell,
   FileSpreadsheet,
   Building,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 
 interface TopExecutiveHUDProps {
@@ -26,6 +29,9 @@ interface TopExecutiveHUDProps {
   onSelectTab: (tab: string) => void;
   onOpenFinancialStatements: () => void;
   onOpenInterbankMarket: () => void;
+  onOpenMonthlySummary?: () => void;
+  onOpenFxForwards?: () => void;
+  onOpenStressTesting?: () => void;
 }
 
 export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
@@ -35,7 +41,10 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   activeTab,
   onSelectTab,
   onOpenFinancialStatements,
-  onOpenInterbankMarket
+  onOpenInterbankMarket,
+  onOpenMonthlySummary,
+  onOpenFxForwards,
+  onOpenStressTesting
 }) => {
   const [isMuted, setIsMuted] = React.useState(sound.getMuted());
   const [showAlertsDropdown, setShowAlertsDropdown] = React.useState(false);
@@ -57,6 +66,7 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const navItems = [
     { id: 'overview', label: 'Directorio' },
+    { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
     { id: 'divisions', label: '6 Bancas y Clientes' },
     { id: 'pos_acquiring', label: `Comercios POS (${state.posMerchants.length})` },
     { id: 'pension_funds', label: 'Fondos de Pensiones' },
@@ -145,8 +155,53 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
             title="Mercado Interbancario de Compra y Venta de Carteras"
           >
             <Building className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden md:inline">M&A Carteras</span>
+            <span className="hidden lg:inline">M&A Carteras</span>
           </button>
+
+          {/* Botón Forwards & Divisas */}
+          {onOpenFxForwards && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenFxForwards();
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
+              title="Subasta de Divisas BCH & Contratos Forwards"
+            >
+              <Coins className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden xl:inline">Forwards USD</span>
+            </button>
+          )}
+
+          {/* Botón Pruebas de Estrés CNBS */}
+          {onOpenStressTesting && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenStressTesting();
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
+              title="Pruebas de Estrés Macroeconómico CNBS"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden xl:inline">Estrés CNBS</span>
+            </button>
+          )}
+
+          {/* Botón Auditoría Cierre Mensual */}
+          {onOpenMonthlySummary && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenMonthlySummary();
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center gap-1.5 text-xs transition-colors font-medium"
+              title="Ver Auditoría y Liquidación Mensual Obligatoria"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Cierre Mensual</span>
+            </button>
+          )}
 
           {/* Botón Campana Alertas Dinámicas */}
           <div className="relative">

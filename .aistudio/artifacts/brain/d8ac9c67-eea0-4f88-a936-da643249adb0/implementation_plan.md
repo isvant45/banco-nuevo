@@ -1,137 +1,109 @@
-# Plan de Expansión Integral del Simulador Financiero Hondureño: Áureo Bank
+# Simulador Económico & Bancario Integral: Áureo Bank Honduras
 
-Plan arquitectónico y funcional para transformar **Áureo Bank** en un simulador bancario y macroeconómico de nivel institucional, incorporando dinámicas mensuales automáticas, negociación de moras (I a V), mercado interbancario de carteras con competidores, edición y creación de comercios POS y planillas corporativas, autonomía del oficial de crédito (hasta L. 20M) vs. comité directivo (L. 21M+), bolsa de bonos y acciones fluctuante, red SWIFT global enriquecida, estados financieros normados por la CNBS, alertas en tiempo real, 4 dashboards especializados y el paquete completo de 10 innovaciones bancarias.
+Ecosistema ampliado de simulación macroeconómica y bancaria institucional conforme a las regulaciones del Banco Central de Honduras (BCH) y la Comisión Nacional de Bancos y Seguros (CNBS), incorporando transmisión de política monetaria, curva de rendimientos, cámara de compensación ACH/LBTR, subastas de divisas con forwards cambiarios, liquidez Basilea III (LCR/NSFR), y ciclo mensual obligatorio de amortizaciones, límites crediticios e indexación de tasas.
 
----
-
-## Decisiones Críticas y Preferencias Confirmadas
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Se han incorporado las elecciones directas del usuario para gobernar las nuevas dinámicas del simulador:
-> - **Compra y Venta de Carteras Interbancarias**: Estructurado mediante un **Mercado Interbancario con Ofertas y Descuentos por Riesgo** (descuentos agresivos para mora V y primas sobre cartera sana).
-> - **Autonomía Crediticia del Oficial**: Regida por **Filtro de Scoring y Capacidad de Pago con Dictamen Automático** para solicitudes hasta L. 20,000,000.00; las solicitudes de L. 21,000,000.00 en adelante se reservan al Presidente/Comité con dictamen y nota del oficial.
-> - **Innovaciones Bancarias**: Se integran **todas las 10 innovaciones bancarias** sugeridas de manera armónica en los módulos del banco.
+> Nuevas innovaciones macroeconómicas y bancarias incorporadas a partir de la revisión:
+
+- **Mecanismo de Transmisión de Política Monetaria & Curva de Rendimientos BCH**: Modelado del impacto de la TPM sobre la curva de rendimientos soberana (letras a 7, 28, 91, 182 y 364 días), con rezago temporal (pass-through) en tasas activas y pasivas, alertando ante escenarios de curva invertida (recesión económica).
+- **Subasta Pública de Divisas BCH & Forwards Cambiarios USD/HNL**: Simulación del mecanismo de asignación de divisas del BCH con factor de prorrateo para importadores, y contratación interactiva de contratos forward no entregables (NDF) para mitigar el riesgo cambiario de empresas.
+- **Ratios Regulatorios Basilea III (LCR & NSFR)**: Cálculo en tiempo real del Coeficiente de Cobertura de Liquidez (LCR $\ge 100\%$) y Fondeo Estable Neto (NSFR $\ge 100\%$) frente a choques sistémicos de retiros.
+- **Cámara de Compensación ACH y Liquidación Bruta en Tiempo Real (LBTR / SIPSA)**: Posición neta multilateral ante el BCH con activación de facilidad de sobregiro diurno si hay desfase al corte de liquidación.
+- **Pruebas de Estrés Macroeconómico Multivariado**: Choques de caída en precios internacionales del café, reducción de remesas familiares desde EE.UU., y eventos climáticos en el agro.
+- **Actualización Mensual Obligatoria con Débito Flexible**: Amortización determinista de préstamos con cargo a cuentas, aviso previo de insuficiencia con botón de renegociación preventiva, y ajuste dinámico de límites de crédito según score Equifax.
 
 ---
 
-## 1. Visión General y Concepto Central
+## 1. Overview & Core Concept
 
-- **Propósito**: Proveer una experiencia ejecutiva de alta dirección bancaria hondureña, donde cada avance mensual refleja el impacto de la inflación, las resoluciones del BCH y las normas de la CNBS en balances, liquidez, carteras morosas, cotizaciones de títulos, convenios corporativos y transferencias internacionales.
-- **Audiencia / Rol**: Presidente Ejecutivo y Junta Directiva de Áureo Bank, interactuando con oficiales de crédito, mesas de dinero, auditores de la CNBS y bancos competidores (Ficohsa, Atlántida, BAC, Banpaís, Occidente).
-- **Valor Agregado**: Control granular y estratégico sobre activos, pasivos, riesgos y operaciones sin perder agilidad gracias a la automatización inteligente del oficial de crédito.
-
----
-
-## 2. Experiencia de Usuario y Arquitectura Visual
-
-### Flujos Principales
-1. **Avance Mensual Dinámico**:
-   - Al pulsar "Avanzar Mes", el motor actualiza la inflación, la TPM del BCH, las tasas pasivas y activas del sistema, la mora de clientes (Categorías I a V-Pérdida), las cotizaciones de bonos y acciones, los flujos de POS y planillas, las transferencias SWIFT y genera alertas dinámicas inmediatas.
-2. **Gestión y Venta de Cartera en Atraso (L. 55.29M)**:
-   - Panel interactivo para clasificar clientes en mora desde Cat I hasta Cat V-Pérdida.
-   - Opciones con un clic: *Negociar con el Cliente* (reestructuración, condonación parcial de recargos, ampliación de plazo) o *Vender a Banco Rival* (venta con descuento a Ficohsa, Atlántida o fondo de recuperación).
-3. **M&A y Mercado Interbancario de Carteras**:
-   - Pestaña para adquirir paquetes de préstamos vigentes o carteras de depósitos ofertadas por competidores con primas o descuentos, inyectando o consumiendo liquidez.
-4. **Comercios POS y Planillas Modificables**:
-   - Tablas interactivas con botones "Editar" y "Agregar Empresa / Comercio".
-   - Ajuste de saldos en cuenta, volumen de facturación, cantidad de terminales, empleados y nóminas.
-   - Apertura garantizada de cuentas bancarias en la división correspondiente (PYME, Corporativa) vinculadas a los depósitos del banco.
-5. **Autonomía de Aprobación Crediticia**:
-   - Solicitudes $\le$ L. 20,000,000: Botón de resolución automática del Oficial de Crédito según scoring y DTI.
-   - Solicitudes $\ge$ L. 21,000,000: Tarjetas destacadas de Comité Ejecutivo con la *Nota Oficial del Analista* (dictamen de garantías, patrimonio y recomendación) para decisión del jugador.
-6. **Bolsa de Bonos y Acciones Dinámica**:
-   - Cotizaciones mensuales fluctuantes basadas en la TPM y la inflación para Bonos BCH/SEFIN, Bonos Bancarios y Acciones de la BCV, con gráficos de tendencia y botones de Compra/Venta.
-7. **Red SWIFT Global Ampliada**:
-   - Cobertura de corresponsalías en EE.UU., Suiza, China, Reino Unido, España y Japón, con liquidación, filtros AML/OFAC y cobro de comisiones multidivisa (USD, EUR, GBP, CHF).
-8. **Cuatro Dashboards Especializados**:
-   - **Riesgos y Cartera CNBS**: Provisiones, coberturas, mora por tramo y categorías I a V.
-   - **Créditos y Colocación**: Concentración, DTI promedio, cosechas y ticket promedio.
-   - **Operaciones y Eficiencia**: Cost-to-Income, rendimiento de sucursales y ventanillas.
-   - **Opiniones de Expertos**: Boletines con dictámenes del FMI, economistas locales y directores de la CNBS.
-9. **Estados Financieros Normados**:
-   - Balance General, Estado de Resultados y Estado de Flujo/Encaje detallados y certificados.
-
-### Estilo Visual y Principios de Diseño
-- **Paleta y Acabado**: Fondo oscuro neutro institucional (`#080d1a`, `#0b1329`, `#111c38`) con acentos en oro financiero y esmeralda de liquidez.
-- **Tipografía**: Títulos limpios en `Outfit`, cuerpo legible en `Plus Jakarta Sans`, y métricas monetarias estrictamente tabulares en `JetBrains Mono` (`font-mono tabular-nums`).
-- **Disciplina Anti-Slop**: Cero cápsulas flotantes decorativas, cero puntos verdes parpadeantes sin telemetría real, sin bordes asimétricos gruesos `border-l-4`. Jerarquía pura con divisores hairline y espaciado proporcional.
+- **Qué hace**: Convierte a Áureo Bank en un simulador bancario y macroeconómico de alta fidelidad técnica. Permite gestionar tanto el balance individual de cada cliente (cuentas, préstamos, tarjetas, garantías) como la tesorería de nivel central: encaje legal ante el BCH, compras en el mercado primario de letras soberanas, contratos de cobertura cambiaria y posicionamiento interbancario frente a competidores (Ficohsa, Atlántida, BAC, Banpaís, Banco de Occidente).
+- **Público objetivo**: Gerencia de Tesorería, Comité de Activos y Pasivos (ALCO), Dirección de Riesgos y Oficiales de Cumplimiento Regulatorio.
+- **Valor principal**: Reproducción fiel de la macroeconomía hondureña (inflación, tipo de cambio Lempira/Dólar, subasta de divisas BCH, remesas familiares y estacionalidades de Catorceavo y Aguinaldo).
 
 ---
 
-## 3. Decisiones de Producto y Arquitectura de Datos
+## 2. User Experience & Visual Design
+
+### Módulos e Innovaciones Interactivas
+1. **Mesa de Dinero & Ventanilla de Liquidez BCH**:
+   - Monitoreo en vivo de la posición de Encaje Legal (12% en moneda nacional, 9% en moneda extranjera).
+   - Acceso directo a Ventanilla de Liquidez del BCH para reportos automáticos de 7 a 28 días con tasa de penalización si existe déficit de encaje.
+   - Pizarra de Cotización Interbancaria (Call Money): Colocación o captación de fondos overnight con bancos del sistema hondureño.
+2. **Mercado Cambiario & Coberturas Forwards (USD/HNL)**:
+   - Panel de postura en la Subasta de Divisas del BCH con porcentaje de adjudicación y tipo de cambio oficial.
+   - Emisión de contratos Forward para clientes corporativos (asegurando el tipo de cambio a 30, 60 y 90 días con cobro de comisión estructurada).
+3. **Curva de Rendimientos y Transmisión de Tasas (ALCO)**:
+   - Visualización de la curva de tipos de interés soberana del BCH por plazo.
+   - Control del spread bancario y análisis del Margen Financiero Neto (NIM).
+4. **Pruebas de Estrés Macroeconómico (Stress Testing)**:
+   - Ejecución interactiva de escenarios: "Caída del Café -25%", "Freno en Remesas -15%", "Devaluación del Lempira +8%".
+   - Verificación del impacto inmediato en el Índice de Adecuación de Capital (CAR) y provisiones CNBS.
+5. **Cierre Mensual Obligatorio & Débito Flexible**:
+   - Reporte con desglose de cuotas debitadas, créditos en aviso previo de mora, intereses de DPF capitalizados y recálculo de límites de tarjeta.
+   - Opciones inmediatas de acción: "Renegociar Préstamo", "Condonar Recargos", o "Abonar Extraordinario a Capital".
+
+### Jerarquía Tipográfica y Estilo Visual
+- **Paleta 60-30-10**: Fondo pizarra profunda (`slate-950`/`slate-900`), paneles con micro-bordes en `slate-800` y acentos contrastantes en oro institucional Áureo (`amber-400`/`amber-500`) y verde fiscal (`emerald-400`).
+- **Figuras Tabulares**: Todas las tasas, montos en Lempiras y Dólares, plazos y scores formateados estrictamente con `tabular-nums font-mono`.
+- **Top Bar Contract**: Barra superior con Marca Áureo Bank a la izquierda, enlaces a módulos sin saltos de línea al centro, y botón de acción principal ("Avanzar Mes Obligatorio") a la derecha.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Transmisión Macro con Rezagos Realistas**:
+  - *Decisión*: Las variaciones de la TPM del BCH no alteran el 100% de la cartera de inmediato; los préstamos a tasa fija conservan su tasa pactada, mientras que las líneas rotativas y préstamos comerciales variables se indexan de manera gradual.
+  - *Por qué*: Refleja la elasticidad real de la cartera bancaria y evita distorsiones artificiales en los ingresos del banco.
+- **Débito Flexible vs. Castigo Inmediato**:
+  - *Decisión*: Si un cliente no tiene saldo suficiente al llegar el fin de mes, se le debita la porción disponible y se emite un "Aviso Previo de Insuficiencia", permitiendo renegociar el crédito antes de reclasificarlo en categorías severas (III a V de la CNBS).
+  - *Por qué*: Satisface la directiva del usuario, otorgando una experiencia interactiva rica sin penalizaciones punitivas irreversibles.
+- **Integración de Basilea III (LCR/NSFR) sin Fricción**:
+  - *Decisión*: Modelar LCR y NSFR como indicadores regulatorios visibles en el HUD y en la Mesa de Dinero, con alertas preventivas antes de que caigan por debajo del 100%.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        ÁUREO BANK CORE PLATFORM                        │
-├────────────────────────────────┬───────────────────────────────────────┤
-│    MOTOR MACROECONÓMICO BCH    │        ESTADOS FINANCIEROS CNBS       │
-│  - TPM, Inflación, Encaje Legal│  - Balance General Detallado          │
-│  - Tipo de Cambio HNL/USD      │  - Estado de Resultados Clasificado   │
-│  - Subastas de Divisas         │  - Posición de Liquidez y Encaje      │
-├────────────────────────────────┴───────────────────────────────────────┤
-│                   SISTEMAS OPERATIVOS Y DE NEGOCIO                     │
-│ ┌──────────────────────────┐ ┌──────────────────────────┐ ┌──────────┐ │
-│ │  MERCADO INTERBANCARIO   │ │   ORIGINACIÓN CRÉDITO    │ │ ADQUIR.  │ │
-│ │  - Compra/Venta Carteras │ │  - Oficial (<= L. 20M)   │ │   POS    │ │
-│ │  - Tasas y Primas M&A    │ │  - Comité (>= L. 21M)    │ │ & EDIC.  │ │
-│ └──────────────────────────┘ └──────────────────────────┘ └──────────┘ │
-│ ┌──────────────────────────┐ ┌──────────────────────────┐ ┌──────────┐ │
-│ │   CARTERA MORA (I a V)   │ │   MERCADO DE VALORES     │ │ PLANILLA │ │
-│ │  - L. 55.29M Gestionable │ │  - Bonos BCH, Corp, BCV  │ │ CORP.    │ │
-│ │  - Negociación y Venta   │ │  - Precios y Yields Vivos│ │ & EDIC.  │ │
-│ └──────────────────────────┘ └──────────────────────────┘ └──────────┘ │
-│ ┌──────────────────────────┐ ┌──────────────────────────┐ ┌──────────┐ │
-│ │    RED SWIFT GLOBAL      │ │  ALERTAS EN TIEMPO REAL  │ │ 10 INNO- │ │
-│ │  - 6 Plazas Corresponsal │ │  - Encaje, Mora, Riesgo  │ │ VACIONES │ │
-│ └──────────────────────────┘ └──────────────────────────┘ └──────────┘ │
+│                        Áureo Bank Core Platform                        │
+├────────────────────────────────────────────────────────────────────────┤
+│ Top Bar: Áureo Bank · Módulos Financieros · Botón Avanzar Mes          │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌───────────────────────┐  ┌───────────────────────┐  ┌─────────────┐ │
+│  │ Mesa de Dinero BCH    │  │ Mercado Cambiario     │  │ Créditos &   │ │
+│  │ - Encaje Legal (12%)  │  │ - Subasta Divisas BCH │  │   Cuentas    │ │
+│  │ - Repos BCH 7/14/28d  │  │ - Forwards NDF USD/HNL│  │ - Cuotas     │ │
+│  │ - Call Interbancario  │  │ - Posición Neta Moneda│  │ - Límites    │ │
+│  │ - Curva Rendimientos  │  │   Extranjera (PNME)   │  │ - Mora/CNBS  │ │
+│  └───────────────────────┘  └───────────────────────┘  └─────────────┘ │
+│                                                                        │
+│  ┌───────────────────────┐  ┌───────────────────────┐  ┌─────────────┐ │
+│  │ Riesgo y Regulaciones │  │ Cámara ACH / LBTR     │  │ Banca Corp & │ │
+│  │ - Basilea III (LCR)   │  │ - Liquidación Bruta   │  │   Comercial  │ │
+│  │ - Stress Testing CNBS │  │ - Saldo Compensatorio │  │ - Planillas  │ │
+│  │ - Matriz Provisiones  │  │ - Riesgo Sistémico    │  │ - POS Comer. │ │
+│  └───────────────────────┘  └───────────────────────┘  └─────────────┘ │
+│                                                                        │
+├────────────────────────────────────────────────────────────────────────┤
+│           advanceGameMonth() Engine (Actualización Obligatoria)        │
+│  1. Recalibración de TPM BCH e indexación de tasas variables           │
+│  2. Ejecución de amortizaciones con débito flexible y avisos de mora   │
+│  3. Capitalización de intereses en cuentas y DPF                       │
+│  4. Ajuste automático de límites crediticios según rotación y score    │
+│  5. Verificación de Encaje Legal y balance de compensación ACH/LBTR    │
+│  6. Despliegue de Modal de Cierre Contable con acciones de resolución  │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Paquete de las 10 Innovaciones Bancarias Integradas
-1. **Mesa de Divisas (FX Trading & Subastas BCH)**: Compra/venta de divisas directas con spread cambiario y adjudicación de dólares del BCH.
-2. **Auditorías Sorpresa de la CNBS**: Inspecciones reglamentarias con requerimientos de capital o certificaciones de cumplimiento.
-3. **Mesa de Dinero Interbancario (Call / Overnight)**: Colocar o captar liquidez interbancaria a 24-48 horas con otros bancos para equilibrar encaje.
-4. **Calificación de Riesgo Internacional (Fitch / Moody's)**: Calificación pública de solvencia (AAA a B-) que influye en costos de fondeo y captaciones.
-5. **Centro de Negociación y Condonación de Deudas**: Modal especializado de dación en pago, refinanciamiento o quitas controladas para recuperar capital.
-6. **Banca Digital & App Móvil Áureo**: Inversión en canales digitales con reducción progresiva de costos operativos y migración de clientes.
-7. **Red Nacional de Remesas Familiares**: Alianzas con Western Union y MoneyGram para captar remesas directamente en depósitos bancarios.
-8. **Simulador de Pruebas de Estrés (Stress Testing CNBS)**: Módulo de escenarios de crisis (devaluación, shock de tasas o sequía agroindustrial).
-9. **Sindicación de Mega-Créditos de Infraestructura**: Participación en préstamos sindicados para proyectos de energía y carreteras con banca multilateral.
-10. **Adquisición de Activos de Bancos en Liquidación**: Subastas especiales de sucursales y carteras con descuento de liquidación forzosa.
+### Componentes y Vistas a Implementar
+1. `BchMoneyDeskView.tsx`: Módulo integral de Mesa de Dinero (Encaje Legal BCH, Ventanilla de Liquidez, Reportos, Call Interbancario y Curva de Rendimientos).
+2. `FxAndForwardsModal.tsx`: Gestión de posturas en la subasta de dólares del BCH y contratación de coberturas cambiarias Forward.
+3. `MonthlyClosingSummaryModal.tsx`: Auditoría obligatoria mensual con detalle de cuotas procesadas, alertas preventivas, variación de tasas y ajustes de límites.
+4. `ClientActionsModal.tsx`: Acciones directas sobre expedientes de clientes (abono a capital extraordinario, recalibración de límite y renegociación preventiva).
+5. `StressTestingModal.tsx`: Simulador de choques macroeconómicos de café, remesas y tipos de cambio con impacto en CAR y liquidez.
 
 ---
-
-## 4. Estrategia de Implementación por Fases
-
-### Fase 1: Expansión de Modelos y Tipos (`src/game/types.ts`)
-- Añadir interfaces para:
-  - Ofertas de Compra/Venta Interbancaria de Carteras.
-  - Alertas Dinámicas del Banco con niveles de severidad (`critica`, `advertencia`, `informativa`).
-  - Opiniones de Expertos Financieros.
-  - Dictamen y Nota del Oficial para créditos de L. 21M+.
-  - Módulos de las 10 innovaciones bancarias (Mesa de divisas, Stress Testing, Rating internacional, etc.).
-
-### Fase 2: Motor Macroeconómico y de Actualización Mensual (`src/game/economyEngine.ts` y `initialState.ts`)
-- Configurar la cartera inicial en mora por L. 55,294,191.00 en categorías I a V con nombres de clientes, montos y días de atraso reales.
-- Dinámica mensual de actualización de inflación, TPM, tasas del sistema, precios de bonos/acciones y volumen de transacciones de POS/planillas.
-- Lógica de evaluación automática del oficial de crédito ($\le$ 20M) y retención para comité ejecutivo ($\ge$ 21M).
-- Lógica de negociación de mora (reestructuración con reducción de categoría y reactivación de pagos) y venta de cartera a bancos competidores.
-
-### Fase 3: Modales de Creación y Edición (POS, Planillas y Negociación de Deudas)
-- Modal para editar y agregar comercios POS (saldo en cuenta, ventas mensuales, cantidad de terminales POS).
-- Modal para editar y agregar convenios de planillas corporativas (monto de nómina, empleados, banco correspondiente con cuenta garantizada).
-- Modal interactivo de negociación de deudas y venta de cartera a competidores.
-
-### Fase 4: Dashboards Especializados y Vistas Interactivas
-- Componente de **Dashboard de Riesgos y Cartera CNBS** con desglose de provisiones de I a V y cartera de L. 55.29M.
-- Componente de **Mercado Interbancario de Carteras (M&A)** con ofertas de compra y venta a competidores.
-- Componente de **Mercado Bursátil Dinámico** para bonos y acciones fluctuantes.
-- Componente de **Red SWIFT Global** con bancos de Europa, Asia y América.
-- Componente de **Opiniones de Expertos y Boletines Regulatorios**.
-- Componente de **Alertas Dinámicas en el HUD Principal**.
-- Vista de **Innovaciones Bancarias y Mesa de Dinero / Divisas**.
-
-### Fase 5: Verificación y Pruebas
-- Verificar persistencia en `localStorage` con migración de estado sin roturas.
-- Compilar la aplicación y validar con `lint_applet` y `compile_applet`.
-- Asegurar cero advertencias TypeScript y rendimiento fluido.

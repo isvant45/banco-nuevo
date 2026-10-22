@@ -28,6 +28,7 @@ interface BankingDivisionsTabProps {
   onOpenClient360: (client: IndividualClient) => void;
   onToggleClientGuaranteed: (clientId: string) => void;
   onAddClient: (divisionId: BankingDivisionId) => void;
+  onOpenClientActions?: (client: IndividualClient) => void;
 }
 
 export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
@@ -36,7 +37,8 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
   onSelectClientToEdit,
   onOpenClient360,
   onToggleClientGuaranteed,
-  onAddClient
+  onAddClient,
+  onOpenClientActions
 }) => {
   const [selectedDivId, setSelectedDivId] = useState<BankingDivisionId>('personas');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -403,6 +405,21 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
 
                       <td className="py-3 px-3 text-right font-sans">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Botón Acciones Financieras (Abono a capital / Límites) */}
+                          {onOpenClientActions && (
+                            <button
+                              onClick={() => {
+                                sound.playClick();
+                                onOpenClientActions(client);
+                              }}
+                              className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                              title="Abono a capital, ajuste de límite y estado mensual"
+                            >
+                              <CreditCard className="w-3 h-3" />
+                              <span>Finanzas</span>
+                            </button>
+                          )}
+
                           {/* Botón Expediente 360 */}
                           <button
                             onClick={() => {
