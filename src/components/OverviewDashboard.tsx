@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Building2,
   Coins,
-  Sliders
+  Sliders,
+  Sparkles
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -146,6 +147,32 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors whitespace-nowrap shrink-0 flex items-center justify-center gap-2 shadow-sm"
         >
           <span>Abrir Centro de Operaciones (24)</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Spotlight: Hub Estratégico de 24 Mejoras Bancarias */}
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950/30 to-slate-900 border border-emerald-500/30 hover:border-emerald-400/50 rounded-xl p-5 shadow-sm transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">NUEVO · 24 MEJORAS INSTITUCIONALES</span>
+            <span aria-hidden="true">·</span>
+            <span>3 Pilares Estratégicos · Retorno ROI · Sandbox & Hitos</span>
+          </div>
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            Hub Estratégico de 24 Mejoras Institucionales
+          </h3>
+          <p className="text-xs text-slate-300 max-w-2xl">
+            Ciberseguridad bancaria, interoperabilidad CEPROBAN, bio-validación RNP, scoring alternativo, régimen de retención SAR, bonos verdes ESG y tesorería avanzada.
+          </p>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('strategic_improvements')}
+          className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors whitespace-nowrap shrink-0 flex items-center justify-center gap-2 shadow-sm"
+        >
+          <span>Abrir Hub de 24 Mejoras</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

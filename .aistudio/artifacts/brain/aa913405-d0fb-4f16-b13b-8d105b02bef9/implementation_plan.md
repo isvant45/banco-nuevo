@@ -1,6 +1,6 @@
-# Panel Ejecutivo de Ranking Histórico de Dividendos y Sandbox Macrofinanciero & Scoring CNBS en Tiempo Real
+# Hub Ejecutivo de 24 Mejoras Estratégicas y Recomendaciones Bancarias
 
-Sistema ejecutivo para la Junta Directiva de Áureo Bank que incorpora un **Ranking Histórico de Dividendos a 10 Años Fiscales** (2017–2026) con gráficos de barras analíticos y un **Sandbox Central de Configuración Financiera, Fiscal y de Scoring Crediticio** con reactividad instantánea en tiempo real según la normativa del BCH, CNBS y el SAR de Honduras.
+Plan de arquitectura e implementación para incorporar una suite integral de **24 mejoras estratégicas de alto impacto** para el simulador bancario de Áureo Bank, organizadas en 3 ejes temáticos y con triple mecanismo de interacción (Aprobación Formal Directorio con CAPEX/OPEX, Conmutadores Sandbox Inmediatos y Desbloqueo Progresivo por Metas y Turnos).
 
 ---
 
@@ -9,121 +9,135 @@ Sistema ejecutivo para la Junta Directiva de Áureo Bank que incorpora un **Rank
 > [!IMPORTANT]
 > Decisiones confirmadas durante la fase interactiva de alineación:
 > 
-> - **Marco Regulatorio y Jurisdicción**: Normativa estricta de la República de Honduras (Banco Central de Honduras - BCH, Comisión Nacional de Bancos y Seguros - CNBS, Servicio de Administración de Rentas - SAR, expresado en Lempiras HNL y divisa USD).
-> - **Arquitectura de Interacción**: Sandbox interactivo central con deslizadores (sliders) numéricos y campos en tiempo real donde cualquier ajuste recalculó inmediatamente el balance general, estado de resultados, solvencia de capital (CAR/IAC), encaje legal y scoring de clientes en toda la aplicación.
-> - **Profundidad del Historial de Dividendos**: Desglose analítico completo de Payout Ratio (%), Retención para Capital Primario Tier 1 (%), Dividendo por Acción (DPS en L.), Dividend Yield y comparativa de los últimos 10 años fiscales (2017 a 2026).
+> - **Visualización e Interacción**: Se implementarán las tres modalidades combinadas:
+>   1. *Hub Interactivo de 24 Mejoras Estratégicas* con cálculo de ROI financiero y proyección de utilidades.
+>   2. *Integración Directa en el Motor Económico* con impacto real en balance, solvencia CAR, mora y comisiones.
+>   3. *Panel de Auditoría y Recomendaciones Técnicas* para la Junta Directiva y Comités de Auditoría CNBS.
+> - **Ejes Temáticos**: Cobertura balanceada de los 3 ejes:
+>   - Eje A: *Transformación Digital, Ciberseguridad e Inclusión Financiera* (Mejoras 1 a 8).
+>   - Eje B: *Cumplimiento Prudencial CNBS, Régimen SAR y Basilea III* (Mejoras 9 a 16).
+>   - Eje C: *Tesorería Avanzada, Finanzas Verdes (ESG) y Retención de Clientes* (Mejoras 17 a 24).
+> - **Mecanismo de Activación**: Soporte triple:
+>   - *Aprobación Formal*: Desembolso de inversión (CAPEX/OPEX) con retorno mensual en comisiones o eficiencia.
+>   - *Conmutadores Sandbox Inmediatos*: Toggle switches para activar/desactivar en tiempo real sin restricciones presupuestarias para experimentación rápida.
+>   - *Desbloqueo Progresivo por Metas*: Seguimiento de hitos institucionales (activos, clientes, CAR, turnos).
 
 ---
 
-## 1. Visión General y Capacidades Centrales
+## 1. Catálogo Completo de las 24 Mejoras Estratégicas
 
-### 1.1 Ranking Histórico de Dividendos (Últimos 10 Años Fiscales: 2017–2026)
-- **Visualización en Gráficos de Barras**: Componente SVG de alta precisión que ilustra la evolución anual de Utilidad Neta Contable vs. Dividendos Pagados en Efectivo vs. Utilidades Capitalizadas en Reserva Legal y Tier 1.
-- **Métricas Clave por Ejercicio Fiscal**:
-  - Utilidad Neta Auditada por la CNBS.
-  - Tasa de Distribución (*Payout Ratio* %): Política histórica del 40% al 65%.
-  - Retención Estratégica Tier 1: Monto acreditado a capital complementario y reservas patrimoniales.
-  - Dividendo por Acción (DPS) y Rendimiento por Dividendo (*Dividend Yield* %).
-  - Ranking de Rendimiento Anual: Ordenamiento interactivo por año más rentable, mayor dividendo desembolsado y mayor fortalecimiento de solvencia.
-- **Simulador Predictivo para el Año en Curso (2026)**: El usuario puede modificar la política de dividendos del ejercicio activo y ver en tiempo real cómo impacta la proyección del ratio CAR de cierre.
+### Eje A: Transformación Digital, Ciberseguridad e Inclusión (1 a 8)
+1. **Billetera Digital Interoperable & Red QR BCH**: Pagos P2P/P2M inmediatos escaneando códigos QR estandarizados del BCH, captando depósitos jóvenes e incrementando comisiones transaccionales.
+2. **Onboarding Digital Biométrico con Validación RNP**: Apertura de cuentas de ahorro en 90 segundos con biometría facial y cotejo en vivo con el Registro Nacional de las Personas (RNP), reduciendo el costo de adquisición de clientes en un 70%.
+3. **Escudo de Ciberseguridad SOC 24/7 & Zero Trust**: Centro de operaciones de seguridad bancaria con monitoreo en tiempo real, mitigación de ataques DDoS/ransomware y certificación ISO/IEC 27001.
+4. **Agencia Bancaria Virtual & Asesoría Patrimonial Remota**: Canales de atención digital personalizada para créditos de gran escala y clientes patrimoniales de alto valor.
+5. **Open Banking API Hub para Fintechs**: Ecosistema de APIs bancarias seguras bajo estándar Open Finance para conectar pasarelas de comercio electrónico y software contable de PyMEs.
+6. **IA Predictiva Antifraude en Tarjetas**: Red neuronal en tiempo real que previene transacciones fraudulentas y clonación de tarjetas con reducción masiva de contracargos.
+7. **Banca Móvil Offline & Lenguas Nativas (Garífuna y Miskito)**: Aplicación ultraligera con operación sin internet continuo e inclusión financiera en zonas rurales de Gracias a Dios y la costa atlántica.
+8. **Tokenización de Tarjetas (Apple Pay & Google Wallet)**: Integración tecnológica con pasarelas de pago sin contacto móvil bajo protocolo de seguridad EMVCo.
 
-### 1.2 Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
-Un centro de comando paramétrico donde cualquier ajuste de variables impacta simultáneamente a todos los submódulos bancarios:
+### Eje B: Cumplimiento Prudencial CNBS, Régimen SAR y Basilea III (9 a 16)
+9. **Simulador de Cobertura de Liquidez LCR & NSFR (Basilea III)**: Medición continua del Ratio de Cobertura de Liquidez a 30 días y Ratio de Fondeo Estable Neto a 1 año bajo estrés severo.
+10. **Matriz IFRS 9 Automatizada de Pérdida Crediticia Esperada (ECL)**: Modelo dinámico de cálculo de provisiones probabilísticas ($PD \times LGD \times EAD$) por tramos Stage 1, 2 y 3.
+11. **Oficialía de Cumplimiento AML/CFT con Inteligencia de Grafo**: Monitoreo de transferencias atípicas mayores a USD 10,000, detección de PEPs y generación automatizada del Reporte de Transacciones Múltiples (RTM) para la UIF.
+12. **Módulo de Planificación Fiscal SAR & Conciliación Tributaria**: Optimización legal de gastos deducibles, retención en la fuente de dividendos y cálculo de Aportación Solidaria bancaria.
+13. **Pista Inmutable de Auditoría Criptográfica (Audit Trail)**: Registro transparente y no alterable de cada decisión crediticia, cambio de política de tasas y movimiento contable.
+14. **Comité de Gobernanza de Datos y Normativa CNBS**: Repositorio normativo para la presentación digital de estados financieros en formato XBRL y circulares regulatorias.
+15. **Marco de Gestión de Riesgo Operacional (COSO ERM / BIA)**: Cuantificación de pérdidas operacionales, interrupciones de TI y planes de contingencia ante desastres naturales.
+16. **Fideicomisos de Garantía Recíproca (FOHDE / FOGAMA)**: Cobertura de garantías para créditos agropecuarios y de vivienda social con respaldo de fondos estatales.
 
-1. **Parámetros Macroeconómicos & BCH**:
-   - Tasa de Política Monetaria (TPM BCH, 3.00% – 12.00%).
-   - Tasa de Inflación Interanual del IPC (2.0% – 14.0%).
-   - Tipo de Cambio de Referencia USD/HNL (L. 20.00 – L. 32.00).
-   - Tasa de Encaje Legal Requerido (8.0% – 18.0%, estándar actual 12.0%).
-2. **Parámetros Fiscales & SAR (Régimen Bancario Hondureño)**:
-   - Impuesto Sobre la Renta Bancario (ISR general 25.0%).
-   - Aportación Solidaria Temporal (5.0% aplicable al exceso de renta gravable).
-   - Retención en la fuente por dividendos (10.0% según Código Tributario).
-   - Deducción máxima de reservas de saneamiento IFRS 9 / CNBS.
-3. **Parámetros de Intermediación y Eficiencia Financiera**:
-   - Spread objetivo de intermediación (Margen Activo - Pasivo).
-   - Índice de Costo de Fondeo mayorista y minorista.
-   - Meta de Coeficiente de Eficiencia Operativa (CIR %).
-4. **Modelo Paramétrico de Score Crediticio CNBS (Resolución CNBS No. 284/2003)**:
-   - Ponderación de Historial de Pago y Comportamiento Crediticio (35% – 50%).
-   - Límite de Relación Deuda a Ingreso (DTI máximo permitido, 30% – 55%).
-   - Cobertura de Garantías Reales e Hipotecarias (LTV máximo, 50% – 90%).
-   - Umbral de Score Buró (Equifax / TransUnion, 300 a 850 puntos).
-   - Reclasificación automática e inmediata de la cartera y recálculo de provisiones crediticias.
+### Eje C: Tesorería, Finanzas Verdes (ESG) y Retención (17 a 24)
+17. **Línea de Crédito Verde & Bonos Sostenibles (Taxonomía Verde)**: Fondeo blando multilateral (BCIE, IFC, BID Invest) para financiamiento de plantas solares, biomasa y movilidad eléctrica.
+18. **Algoritmo de Arbitraje Cambiario en Subasta de Divisas BCH**: Predicción inteligente de la banda de adjudicación de USD en las subastas electrónicas del Banco Central.
+19. **Portal B2B de Factoring y Descuento de Facturas Electrónicas**: Plataforma digital para que proveedores de corporativos descuenten facturas fiscales SAR en menos de 2 horas.
+20. **Microseguros Paramétricos Agrícolas contra Sequía e Inundaciones**: Pólizas populares vinculadas a estaciones climáticas de COPECO que indemnizan automáticamente a productores de café y granos.
+21. **Motor de Retención & Next-Best-Action Predictivo (Scoring NPS)**: Algoritmo predictivo que detecta cuentahabientes con riesgo de migrar a bancos competidores y activa ofertas preferenciales.
+22. **Mercado Secundario de Pagarés Bancarios y Papel Comercial**: Desintermediación financiera permitiendo a corporativos emitir papel comercial a corto plazo custodiado por Áureo Bank.
+23. **Programa de Lealtad y Recompensas "Puntos Áureo"**: Gamificación del ahorro familiar, acumulación por facturación en comercios POS y bonificaciones por pagos puntuales.
+24. **Portal del Accionista con Votación Remota y Custodia Digital**: Infraestructura para asambleas de socios en línea, voto electrónico ponderado y certificados digitales de acciones.
 
 ---
 
 ## 2. Experiencia de Usuario y Diseño Visual
 
-### 2.1 Estética y Sistema de Diseño
-- **Dirección Visual**: Estética ejecutiva de banca corporativa premium basada en el tema oscuro de Áureo Bank (`#080d1a` / `#0b1329`), superficies con bordes sutiles en `slate-800`, acentos en dorado institucional (`amber-400`/`amber-500`), azul financiero (`blue-400`/`indigo-500`) y verde fiscal (`emerald-400`).
-- **Tipografía y Rigor Tabular**: Títulos ejecutivos en `Outfit`, interfaz de lectura en `Plus Jakarta Sans`, y todas las cifras monetarias, porcentajes, ratios y sliders en `JetBrains Mono` con soporte `tabular-nums` para evitar saltos de línea y desalineaciones.
-- **Disciplina Anti-Slop**: Cero píldoras decorativas estáticas; metadata limpia separada por interpunto (`·`); gráficos vectoriales SVG limpios con tooltips interactivos al posar el cursor; sliders de rango ergonómicos con badges numéricos editables.
-
-### 2.2 Flujo de Usuario y Vistas
-1. **Pestaña 'Gobierno Corporativo & Dividendos'**:
-   - Header con indicadores macro: Total Dividendos Distribuidos (10 años), Tasa Promedio de Payout, Capital Tier 1 Acumulado.
-   - Gráfico de Barras Histórico (2017–2026) con selector de métrica (Monto Lempiras vs. Payout Ratio % vs. Rendimiento por Acción).
-   - Tabla comparativa de los 10 ejercicios con opción de exportación / vista ejecutiva.
-   - Simulador de propuesta de dividendos para la Asamblea de Accionistas 2026.
-2. **Pestaña 'Sandbox Central de Políticas'**:
-   - Panel de control en 4 cuadrantes (BCH / SAR Fiscal / ALCO Tesorería / Scoring CNBS).
-   - Modificación con sliders interactivos: a medida que el usuario arrastra la perilla, una barra de impacto proyecta en vivo el `Δ Utilidad Neta`, `Δ Ratio CAR`, `Δ Encaje Requerido` y `Δ Provisiones Crediticias`.
-   - Botón de restablecimiento rápido a "Normativa Oficial Vigente".
+### 2.1 Pestaña "24 Sugerencias de Mejora Estratégica"
+- **Barra de Resumen de Transformación**:
+  - Mejoras Activas (ej. 8 / 24).
+  - Inversión Total Desembolsada (CAPEX Lempiras).
+  - Gasto Operativo Mensual (OPEX Lempiras).
+  - Retorno Mensual Proyectado (Δ Utilidad / Δ Eficiencia).
+- **Barra de Filtros y Búsqueda**:
+  - Filtro por Eje: *Todas (24)*, *Digital & Ciberseguridad (8)*, *Riesgos & CNBS (8)*, *Tesorería & ESG (8)*.
+  - Filtro por Estado: *Activas*, *Pendientes de Aprobación*, *Desbloqueadas por Metas*.
+  - Selector de Modo de Interacción: *Directorio Formal (Inversión)* vs. *Modo Sandbox (Toggles Inmediatos)*.
+- **Tarjetas de Sugerencias de Alto Detalle**:
+  - Título institucional claro, ícono distintivo y metadata sin píldoras (separada por `·`).
+  - Indicadores de Impacto: Costo de Implementación (CAPEX), Mantenimiento (OPEX), Retorno Estimado (ROI %) e impacto regulatorio (CAR / CNBS).
+  - Botón interactivo de aprobación / toggle switch inmediato.
+  - Requisitos de meta para desbloqueo progresivo.
 
 ---
 
-## 3. Decisiones Técnicas y de Arquitectura
+## 3. Arquitectura Técnica y Modelo de Datos
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        ESTADO CENTRAL REACTIVO                         │
-│                           (GameState en App)                           │
+│                    (strategicImprovements en GameState)                │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Propagación instantánea
+                                    │ Mutación reactiva
         ┌───────────────────────────┼───────────────────────────┐
         ▼                           ▼                           ▼
 ┌───────────────┐           ┌───────────────┐           ┌───────────────┐
-│ Sandbox State │           │ Dividend Data │           │ Credit Scoring│
-│  (BCH / SAR / │           │  (2017-2026   │           │    Engine     │
-│   Tasas / LCR)│           │  Histórico)   │           │  (CNBS 284)   │
+│ Modo Formal   │           │ Modo Sandbox  │           │ Modo Metas    │
+│ (CAPEX / OPEX │           │ (Toggles en   │           │ (Hitos de     │
+│  en Balance)  │           │  Vivo)        │           │  Desbloqueo)  │
 └───────┬───────┘           └───────┬───────┘           └───────┬───────┘
         │                           │                           │
         └───────────────────────────┼───────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│               MOTOR DE RECALCULO INSTANTÁNEO EN VIVO                   │
-│   - Balance General, Depósitos, Cartera y Provisiones IFRS 9           │
-│   - Coeficiente de Adecuación de Capital (CAR) & Encaje Legal BCH      │
-│   - Impuesto ISR (25%) + Aportación Solidaria (5%)                     │
-│   - Reclasificación y Tasas de Aprobación Crediticia                   │
+│                   MOTOR ECONÓMICO (economyEngine.ts)                   │
+│   - toggleStrategicImprovement / approveStrategicImprovement           │
+│   - Recálculo de Utilidad Neta, Activos Fijos, Depósitos y CAR        │
+│   - Liquidación mensual de retornos y OPEX en advanceGameMonth         │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                 INTERFACES Y COMPONENTES VISUALES                      │
-│   - DividendHistoryDashboard (Gráficos de Barras SVG 10 años)          │
-│   - PolicySandboxPanel (Sliders interactivos en tiempo real)           │
-│   - TopExecutiveHUD & Financials (Actualización inmediata en vivo)     │
+│                 VISTAS Y COMPONENTES VISUALES                          │
+│   - StrategicImprovementsHub.tsx (Catálogo interactivo de 24 mejoras)  │
+│   - TopExecutiveHUD (Acceso y badge de mejoras activas)                │
+│   - OverviewDashboard (Widget de Transformación Estratégica)           │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Almacenamiento y Persistencia**: Integrado directamente en `GameState` mediante `savedState.ts`, garantizando compatibilidad con partidas anteriores y preservación de balances.
-- **Gráficos SVG Nativos**: Sin dependencias pesadas de terceros para evitar incompatibilidades de versión con React 19, con renderizado nítido a 60fps, tooltips dinámicos y transiciones fluidas.
-- **Cálculo Determinista de Impuestos**: Se modela el esquema fiscal bancario hondureño exacto:
-  $$\text{Renta Neta Gravable} = \text{Utilidad Operativa} - \text{Gastos Deducibles} - \text{Gasto Provisiones CNBS}$$
-  $$\text{ISR} = \text{Renta Neta Gravable} \times 25\%$$
-  $$\text{Aportación Solidaria} = \max(0, \text{Renta Neta Gravable} - 1,000,000) \times 5\%$$
-  $$\text{Utilidad Neta Disponible} = \text{Renta Neta Gravable} - \text{ISR} - \text{Aportación Solidaria}$$
+### 3.1 Modelo de Datos (`types.ts`)
+- `StrategicImprovementItem`:
+  - `id`: string
+  - `number`: number (1 a 24)
+  - `title`: string
+  - `pillar`: 'digital_inclusion' | 'prudential_cnbs' | 'treasury_esg'
+  - `description`: string
+  - `capexCostHNL`: number (Inversión inicial)
+  - `monthlyOpexHNL`: number (Costo mensual recurrente)
+  - `monthlyProfitBoostHNL`: number (Aumento mensual de ingresos / ahorro)
+  - `carImpactBps`: number (Impacto en puntos básicos de solvencia CAR)
+  - `depositGrowthBoostPct`: number (Impulso a captación)
+  - `loanQualityImprovementPct`: number (Reducción de mora)
+  - `status`: 'active' | 'inactive' | 'locked'
+  - `activationMode`: 'formal_board' | 'sandbox_instant' | 'milestone_unlocked'
+  - `unlockMilestone`: { description: string; currentProgress: number; targetProgress: number; isAchieved: boolean }
 
 ---
 
 ## 4. Plan de Pruebas y Validación
 
-1. **Pruebas Unitarias Automatizadas (`/tests/dividendsAndSandbox.test.ts`)**:
-   - Carga e integridad del registro histórico de 10 años fiscales (2017 a 2026).
-   - Consistencia matemática entre Utilidad Neta, Dividendos Pagados y Capitalización Tier 1.
-   - Reacción en tiempo real del motor ante variaciones de TPM BCH, Encaje Legal, ISR y umbrales de Scoring.
-   - Preservación de tipos finitos y no mutabilidad indebida tras avances de turno.
-2. **Verificación Estática y Compilación**:
+1. **Pruebas Unitarias (`tests/strategicImprovements.test.ts`)**:
+   - Inicialización limpia de las 24 mejoras con integridad numérica finita.
+   - Activación formal con desembolso de CAPEX y deducción exacta en reservas de caja.
+   - Activación en modo Sandbox inmediato sin afectación patrimonial indebida.
+   - Evaluación y desbloqueo de metas institucionales.
+   - Liquidación mensual automática de ingresos y costos en `advanceGameMonth`.
+2. **Validación Estática y Compilación**:
    - `lint_applet` ejecutando `tsc --noEmit` con 0 errores.
-   - `compile_applet` validando build de producción con Vite.
+   - `compile_applet` verificando build de producción con Vite.

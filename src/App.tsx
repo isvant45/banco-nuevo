@@ -53,6 +53,7 @@ import { ProgramsSuite20View } from './components/ProgramsSuite20View';
 import { AdvancedOperationsHub } from './components/AdvancedOperationsHub';
 import { DividendRankingDashboard } from './components/DividendRankingDashboard';
 import { PolicySandboxPanel } from './components/PolicySandboxPanel';
+import { StrategicImprovementsHub } from './components/StrategicImprovementsHub';
 import { restoreGameState } from './game/savedState';
 
 const STORAGE_KEY = 'aureo-bank-sim-state-v5';
@@ -1091,6 +1092,14 @@ export default function App() {
 
         {activeTab === 'sandbox' && (
           <PolicySandboxPanel
+            state={gameState}
+            onUpdateState={setGameState}
+            onNavigateTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'strategic_improvements' && (
+          <StrategicImprovementsHub
             state={gameState}
             onUpdateState={setGameState}
             onNavigateTab={setActiveTab}

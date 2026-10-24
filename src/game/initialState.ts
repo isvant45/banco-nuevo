@@ -26,7 +26,9 @@ import {
   AureoProgramsState,
   AdvancedOperationsState,
   DividendGovernanceState,
-  FinancialSandboxConfig
+  FinancialSandboxConfig,
+  StrategicImprovementsState,
+  StrategicImprovementItem
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -3236,6 +3238,611 @@ export const INITIAL_FINANCIAL_SANDBOX: FinancialSandboxConfig = {
   realtimeReactivityActive: true
 };
 
+// ------------------------------------------------------------------------------------
+// SUITE DE 24 MEJORAS ESTRATÉGICAS Y RECOMENDACIONES INSTITUCIONALES
+// ------------------------------------------------------------------------------------
+
+export const INITIAL_STRATEGIC_IMPROVEMENTS: StrategicImprovementsState = {
+  items: [
+    // EJE A: TRANSFORMACIÓN DIGITAL, CIBERSEGURIDAD E INCLUSIÓN (1 a 8)
+    {
+      id: 'imp-01',
+      number: 1,
+      title: 'Billetera Digital Interoperable & Red QR BCH',
+      pillar: 'digital_inclusion',
+      description: 'Plataforma de pagos móviles P2P y P2M escaneando códigos QR interoperables estandarizados del Banco Central de Honduras.',
+      technicalDetails: 'Conexión vía API con el conmutador ACH de CEPROBAN, tokenización instantánea y captura de depósitos a la vista sin costo de sucursal.',
+      regulatoryReference: 'BCH Circular No. 04/2026 sobre Sistemas de Pago Digital Interoperable',
+      capexCostHNL: 3500000,
+      monthlyOpexHNL: 120000,
+      monthlyProfitBoostHNL: 280000,
+      carImpactBps: 10,
+      depositGrowthBoostPct: 1.2,
+      loanQualityImprovementPct: 0.2,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Superar L. 3,000M en Activos Totales',
+        metricType: 'totalAssets',
+        targetValue: 3000000000,
+        currentValue: 3019074191,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-02',
+      number: 2,
+      title: 'Onboarding Digital Biométrico con Validación RNP',
+      pillar: 'digital_inclusion',
+      description: 'Apertura remota de cuentas de ahorro en menos de 90 segundos con biometría facial y cotejo en tiempo real con el Registro Nacional de las Personas.',
+      technicalDetails: 'Validación liveness 3D biométrica, OCR de DNI hondureño y firma digital certificada conforme a la Ley de Comercio Electrónico.',
+      regulatoryReference: 'CNBS Circular Conjunta RNP-CNBS No. 012/2025 de Identidad Digital',
+      capexCostHNL: 4200000,
+      monthlyOpexHNL: 95000,
+      monthlyProfitBoostHNL: 340000,
+      carImpactBps: 12,
+      depositGrowthBoostPct: 1.8,
+      loanQualityImprovementPct: 0.3,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Alcanzar Solvencia CAR superior a 14.0%',
+        metricType: 'car',
+        targetValue: 14.0,
+        currentValue: 14.8,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-03',
+      number: 3,
+      title: 'Escudo de Ciberseguridad SOC 24/7 & Arquitectura Zero Trust',
+      pillar: 'digital_inclusion',
+      description: 'Centro de Operaciones de Seguridad bancaria con inteligencia de amenazas en tiempo real, mitigación anti-ransomware y auditoría PCI-DSS.',
+      technicalDetails: 'Inspección de tráfico TLS 1.3, autenticación multifactor obligatoria (MFA) para transferencias mayores a L. 20,000 y respaldo inmutable.',
+      regulatoryReference: 'CNBS Resolución No. 119/2021 Normas de Gestión de Seguridad de la Información',
+      capexCostHNL: 6800000,
+      monthlyOpexHNL: 180000,
+      monthlyProfitBoostHNL: 150000,
+      carImpactBps: 25,
+      depositGrowthBoostPct: 0.8,
+      loanQualityImprovementPct: 0.5,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Mantener menos de 2 incidentes de riesgo por 6 meses',
+        metricType: 'gameMonth',
+        targetValue: 1,
+        currentValue: 1,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-04',
+      number: 4,
+      title: 'Agencia Bancaria Virtual & Asesoría Patrimonial Remota',
+      pillar: 'digital_inclusion',
+      description: 'Canal de videobanca segura y salas virtuales para asesoría a clientes corporativos de alto patrimonio y estructuración de créditos sindicados.',
+      technicalDetails: 'Firma de contratos por clave pública/privada, grabación de sesiones auditadas y cifrado end-to-end.',
+      regulatoryReference: 'CNBS Guía de Canales Complementarios Digitales',
+      capexCostHNL: 2400000,
+      monthlyOpexHNL: 80000,
+      monthlyProfitBoostHNL: 210000,
+      carImpactBps: 8,
+      depositGrowthBoostPct: 1.0,
+      loanQualityImprovementPct: 0.1,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Completar 3 meses de operación continua',
+        metricType: 'gameMonth',
+        targetValue: 3,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-05',
+      number: 5,
+      title: 'Open Banking API Hub para Ecosistema Fintech',
+      pillar: 'digital_inclusion',
+      description: 'Plataforma de APIs abiertas bajo estándar Open Finance para integrar pasarelas de pago locales, billeteras y ERPs empresariales.',
+      technicalDetails: 'Gateway de APIs con OAuth 2.0 mutual-TLS, rate-limiting, sandboxes para desarrolladores y cobro de comisión por llamada API.',
+      regulatoryReference: 'BCH Marco Estratégico de Innovación Financiera y Fintech',
+      capexCostHNL: 3800000,
+      monthlyOpexHNL: 110000,
+      monthlyProfitBoostHNL: 390000,
+      carImpactBps: 15,
+      depositGrowthBoostPct: 2.1,
+      loanQualityImprovementPct: 0.4,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Alcanzar 40 clientes corporativos en planilla',
+        metricType: 'corporateClients',
+        targetValue: 40,
+        currentValue: 42,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-06',
+      number: 6,
+      title: 'IA Predictiva Antifraude en Transacciones de Tarjetas',
+      pillar: 'digital_inclusion',
+      description: 'Red neuronal en tiempo real que evalúa patrones de geolocalización, velocidad y comportamiento para bloquear clonaciones de tarjetas con <0.05% falsos positivos.',
+      technicalDetails: 'Inferencia sub-50ms por transacción con scoring instantáneo de riesgo y notificación push interactiva al tarjetahabiente.',
+      regulatoryReference: 'CNBS Circular sobre Medidas Preventivas en Canales de Tarjetas de Crédito',
+      capexCostHNL: 2900000,
+      monthlyOpexHNL: 75000,
+      monthlyProfitBoostHNL: 240000,
+      carImpactBps: 10,
+      depositGrowthBoostPct: 0.5,
+      loanQualityImprovementPct: 0.6,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Superar L. 2,000M en cartera crediticia total',
+        metricType: 'totalAssets',
+        targetValue: 2000000000,
+        currentValue: 3019074191,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-07',
+      number: 7,
+      title: 'Banca Móvil Offline & Lenguas Nativas (Garífuna y Miskito)',
+      pillar: 'digital_inclusion',
+      description: 'Aplicación bancaria inclusiva con capacidad offline mediante SMS seguro y menús localizados en Garífuna y Miskito para zonas rurales de La Mosquitia y Atlántida.',
+      technicalDetails: 'Cifrado asimétrico vía canal USSD/SMS, sincronización diferida de saldos y soporte de voz para cuentahabientes analfabetos.',
+      regulatoryReference: 'Estrategia Nacional de Inclusión Financiera de Honduras (ENIF)',
+      capexCostHNL: 1800000,
+      monthlyOpexHNL: 50000,
+      monthlyProfitBoostHNL: 180000,
+      carImpactBps: 6,
+      depositGrowthBoostPct: 0.9,
+      loanQualityImprovementPct: 0.3,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Abrir al menos 1 sucursal en Colón o Gracias a Dios',
+        metricType: 'gameMonth',
+        targetValue: 2,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-08',
+      number: 8,
+      title: 'Tokenización de Tarjetas (Apple Pay & Google Wallet)',
+      pillar: 'digital_inclusion',
+      description: 'Habilitación de pagos contactless mediante billeteras móviles internacionales para tarjetas de débito y crédito Áureo.',
+      technicalDetails: 'Conexión con Visa VTS y Mastercard MDES, generación de Dynamic CVV y reducción de uso de plástico físico.',
+      regulatoryReference: 'Estándar EMVCo y Normativa de Medios de Pago Electrónicos BCH',
+      capexCostHNL: 3200000,
+      monthlyOpexHNL: 85000,
+      monthlyProfitBoostHNL: 290000,
+      carImpactBps: 11,
+      depositGrowthBoostPct: 1.4,
+      loanQualityImprovementPct: 0.2,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Alcanzar el Mes 3 del simulador',
+        metricType: 'gameMonth',
+        targetValue: 3,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+
+    // EJE B: CUMPLIMIENTO PRUDENCIAL CNBS, RÉGIMEN SAR Y BASILEA III (9 a 16)
+    {
+      id: 'imp-09',
+      number: 9,
+      title: 'Simulador de Cobertura de Liquidez LCR & NSFR (Basilea III)',
+      pillar: 'prudential_cnbs',
+      description: 'Motor de cálculo diario del Ratio de Cobertura de Liquidez (LCR a 30 días) y Fondeo Estable Neto (NSFR a 1 año) con pruebas de corridas bancarias.',
+      technicalDetails: 'Ponderación de Activos Líquidos de Alta Calidad (HQLA Nivel 1 y 2) frente a salidas netas estresadas de depósitos mayoristas y minoristas.',
+      regulatoryReference: 'CNBS Marco de Gestión Integral de Riesgo de Liquidez y Basilea III',
+      capexCostHNL: 2600000,
+      monthlyOpexHNL: 65000,
+      monthlyProfitBoostHNL: 160000,
+      carImpactBps: 20,
+      depositGrowthBoostPct: 0.6,
+      loanQualityImprovementPct: 0.4,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Mantener superávit de encaje BCH por 2 meses',
+        metricType: 'car',
+        targetValue: 12.0,
+        currentValue: 14.8,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-10',
+      number: 10,
+      title: 'Matriz IFRS 9 Automatizada de Pérdida Crediticia Esperada (ECL)',
+      pillar: 'prudential_cnbs',
+      description: 'Cálculo algorítmico de provisiones dinámicas bajo fórmula PD x LGD x EAD por tramos regulatorios Stage 1, Stage 2 y Stage 3.',
+      technicalDetails: 'Modelos de regresión logística basados en el historial crediticio nacional, reduciendo la volatilidad del gasto mensual de reservas.',
+      regulatoryReference: 'CNBS Resolución No. 284/2003 y Normativa NIIF 9 / IFRS 9',
+      capexCostHNL: 4500000,
+      monthlyOpexHNL: 120000,
+      monthlyProfitBoostHNL: 310000,
+      carImpactBps: 30,
+      depositGrowthBoostPct: 0.5,
+      loanQualityImprovementPct: 1.5,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Superar L. 50M en provisiones acumuladas',
+        metricType: 'totalAssets',
+        targetValue: 2500000000,
+        currentValue: 3019074191,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-11',
+      number: 11,
+      title: 'Oficialía de Cumplimiento AML/CFT con Inteligencia de Grafo',
+      pillar: 'prudential_cnbs',
+      description: 'Mapeo de redes de transferencias atípicas, cruce automático con listas de PEPs de la ONU/OFAC y generación inmediata de reportes UIF.',
+      technicalDetails: 'Análisis de grafos para detectar estructuraciones ("pitufeo") y transacciones fraccionadas en sucursales fronterizas.',
+      regulatoryReference: 'Ley Contra el Lavado de Activos y Financiamiento del Terrorismo (Decreto 144-2014)',
+      capexCostHNL: 3600000,
+      monthlyOpexHNL: 90000,
+      monthlyProfitBoostHNL: 190000,
+      carImpactBps: 15,
+      depositGrowthBoostPct: 0.4,
+      loanQualityImprovementPct: 0.5,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Revisión trimestral de cumplimiento aprobada',
+        metricType: 'gameMonth',
+        targetValue: 1,
+        currentValue: 1,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-12',
+      number: 12,
+      title: 'Módulo de Planificación Fiscal SAR & Conciliación Tributaria',
+      pillar: 'prudential_cnbs',
+      description: 'Automatización de la declaración jurada del Impuesto Sobre la Renta (ISR), Aportación Solidaria y deducción óptima de castigos crediticios.',
+      technicalDetails: 'Conciliación entre utilidad contable y renta líquida gravable, evitando multas fiscales y asegurando el crédito tributario por retenciones.',
+      regulatoryReference: 'SAR Código Tributario y Ley de Aportación Solidaria',
+      capexCostHNL: 2100000,
+      monthlyOpexHNL: 55000,
+      monthlyProfitBoostHNL: 350000,
+      carImpactBps: 18,
+      depositGrowthBoostPct: 0.3,
+      loanQualityImprovementPct: 0.2,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Alcanzar el Mes 4 para el cierre fiscal anual',
+        metricType: 'gameMonth',
+        targetValue: 4,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-13',
+      number: 13,
+      title: 'Pista Inmutable de Auditoría Criptográfica (Audit Trail)',
+      pillar: 'prudential_cnbs',
+      description: 'Sellado de tiempo inalterable en blockchain privada para cada crédito aprobado, modificación de tasa ALCO y asiento contable del banco.',
+      technicalDetails: 'Árboles de Merkle y hashes SHA-256 que garantizan a auditores externos de la CNBS la trazabilidad total sin manipulación interna.',
+      regulatoryReference: 'CNBS Normas de Auditoría Externa e Interna de Instituciones Financieras',
+      capexCostHNL: 2800000,
+      monthlyOpexHNL: 70000,
+      monthlyProfitBoostHNL: 140000,
+      carImpactBps: 12,
+      depositGrowthBoostPct: 0.4,
+      loanQualityImprovementPct: 0.3,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Superar CAR de 15.0%',
+        metricType: 'car',
+        targetValue: 15.0,
+        currentValue: 14.8,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-14',
+      number: 14,
+      title: 'Comité de Gobernanza de Datos y Normativa XBRL CNBS',
+      pillar: 'prudential_cnbs',
+      description: 'Generador estandarizado de catálogos de cuentas y reportes prudenciales en taxonomía digital XBRL para la central de riesgos CNBS.',
+      technicalDetails: 'Validación previa de consistencia cruzada entre estados financieros, carteras por departamento y encaje legal BCH.',
+      regulatoryReference: 'CNBS Catálogo Uniforme de Cuentas del Sistema Financiero',
+      capexCostHNL: 1900000,
+      monthlyOpexHNL: 45000,
+      monthlyProfitBoostHNL: 120000,
+      carImpactBps: 8,
+      depositGrowthBoostPct: 0.2,
+      loanQualityImprovementPct: 0.2,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Alcanzar el Mes 2 del simulador',
+        metricType: 'gameMonth',
+        targetValue: 2,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-15',
+      number: 15,
+      title: 'Marco de Gestión de Riesgo Operacional (COSO ERM / BIA)',
+      pillar: 'prudential_cnbs',
+      description: 'Matriz cuantitativa de impacto en el negocio (BIA) para prevenir fallas en telecomunicaciones, logística de blindados y continuidad eléctrica.',
+      technicalDetails: 'Planes de contingencia con generadores diésel en las 18 cabeceras departamentales y conmutación de fibra óptica redundante.',
+      regulatoryReference: 'CNBS Resolución No. 102/2022 Gestión de Riesgo Operacional',
+      capexCostHNL: 2500000,
+      monthlyOpexHNL: 60000,
+      monthlyProfitBoostHNL: 175000,
+      carImpactBps: 14,
+      depositGrowthBoostPct: 0.3,
+      loanQualityImprovementPct: 0.4,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Alcanzar 10 sucursales activas',
+        metricType: 'gameMonth',
+        targetValue: 3,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-16',
+      number: 16,
+      title: 'Fideicomisos de Garantía Recíproca (FOHDE / FOGAMA)',
+      pillar: 'prudential_cnbs',
+      description: 'Alianzas con fondos de garantía del gobierno de Honduras para cubrir hasta el 80% de pérdidas en créditos a pequeños caficultores y PyMEs.',
+      technicalDetails: 'Reclasificación de ponderación de riesgo de crédito al 20% para activos con garantía soberana, liberando capital regulatorio.',
+      regulatoryReference: 'Decreto Legislativo de Creación del Fondo de Garantías Recíprocas',
+      capexCostHNL: 4800000,
+      monthlyOpexHNL: 130000,
+      monthlyProfitBoostHNL: 420000,
+      carImpactBps: 28,
+      depositGrowthBoostPct: 1.1,
+      loanQualityImprovementPct: 2.0,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Superar L. 3,200M en Activos Totales',
+        metricType: 'totalAssets',
+        targetValue: 3200000000,
+        currentValue: 3019074191,
+        isAchieved: false
+      }
+    },
+
+    // EJE C: TESORERÍA AVANZADA, FINANZAS VERDES (ESG) Y RETENCIÓN (17 a 24)
+    {
+      id: 'imp-17',
+      number: 17,
+      title: 'Línea de Crédito Verde Sostenible & Bonos Temáticos (Taxonomía Verde)',
+      pillar: 'treasury_esg',
+      description: 'Estructuración de cartera de crédito alineada a los Principios de Ecuador para financiar proyectos solares en Choluteca e hidroeléctricos en Comayagua.',
+      technicalDetails: 'Acceso a líneas blandas del BCIE y KfW a tasa SOFR + 1.25%, devengando comisiones por estructuración verde.',
+      regulatoryReference: 'Taxonomía de Finanzas Verdes de Honduras y Acuerdo de París',
+      capexCostHNL: 5500000,
+      monthlyOpexHNL: 140000,
+      monthlyProfitBoostHNL: 480000,
+      carImpactBps: 35,
+      depositGrowthBoostPct: 1.5,
+      loanQualityImprovementPct: 0.8,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Alcanzar Solvencia CAR superior a 14.5%',
+        metricType: 'car',
+        targetValue: 14.5,
+        currentValue: 14.8,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-18',
+      number: 18,
+      title: 'Algoritmo de Arbitraje Cambiario en Subasta de Divisas BCH',
+      pillar: 'treasury_esg',
+      description: 'Motor cuantitativo que analiza las bandas de adjudicación del Banco Central y optimiza el diferencial cambiario (bid-ask) de la mesa de dinero.',
+      technicalDetails: 'Proyecciones estocásticas del flujo de remesas de los viernes y liquidación T+0 de posiciones en dólares.',
+      regulatoryReference: 'Reglamento para la Negociación de Divisas en el Mercado Interbancario BCH',
+      capexCostHNL: 3400000,
+      monthlyOpexHNL: 85000,
+      monthlyProfitBoostHNL: 410000,
+      carImpactBps: 16,
+      depositGrowthBoostPct: 0.8,
+      loanQualityImprovementPct: 0.2,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Operar mesa FX con más de USD 5M mensuales',
+        metricType: 'totalAssets',
+        targetValue: 2800000000,
+        currentValue: 3019074191,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-19',
+      number: 19,
+      title: 'Portal B2B de Factoring y Descuento de Facturas Electrónicas SAR',
+      pillar: 'treasury_esg',
+      description: 'Plataforma para que contratistas y proveedores de maquilas y cadenas de supermercados anticipen el cobro de facturas fiscales en 2 horas.',
+      technicalDetails: 'Validación en tiempo real del CAI (Código de Autorización de Impresión) del SAR y cesión electrónica de créditos mercantiles.',
+      regulatoryReference: 'Ley de Facturación Electrónica y Régimen de Factoring CNBS',
+      capexCostHNL: 4600000,
+      monthlyOpexHNL: 115000,
+      monthlyProfitBoostHNL: 460000,
+      carImpactBps: 22,
+      depositGrowthBoostPct: 1.7,
+      loanQualityImprovementPct: 0.9,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Superar 45 convenios corporativos de planilla',
+        metricType: 'corporateClients',
+        targetValue: 45,
+        currentValue: 42,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-20',
+      number: 20,
+      title: 'Microseguros Paramétricos contra Sequía e Inundaciones (COPECO)',
+      pillar: 'treasury_esg',
+      description: 'Pólizas de seguro popular con liquidación automática cuando los sensores pluviométricos de COPECO registran déficit de lluvia severo en el Corredor Seco.',
+      technicalDetails: 'Pago directo a la cuenta de ahorro del agricultor sin necesidad de ajuste pericial en campo, devengando 18% de comisión por colocación.',
+      regulatoryReference: 'CNBS Reglamento de Microseguros Inclusivos',
+      capexCostHNL: 2200000,
+      monthlyOpexHNL: 60000,
+      monthlyProfitBoostHNL: 220000,
+      carImpactBps: 10,
+      depositGrowthBoostPct: 0.7,
+      loanQualityImprovementPct: 0.7,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Completar 2 turnos del simulador',
+        metricType: 'gameMonth',
+        targetValue: 2,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-21',
+      number: 21,
+      title: 'Motor de Retención & Next-Best-Action Predictivo (Scoring NPS)',
+      pillar: 'treasury_esg',
+      description: 'Algoritmo de machine learning que detecta clientes con alta propensión de cancelar depósitos o trasladar nómina a BAC o Atlántida.',
+      technicalDetails: 'Disparador automático de llamadas del oficial de cuenta con tasa promocional y renegociación de comisiones antes del día de corte.',
+      regulatoryReference: 'CNBS Normas de Protección al Usuario Financiero',
+      capexCostHNL: 2700000,
+      monthlyOpexHNL: 70000,
+      monthlyProfitBoostHNL: 310000,
+      carImpactBps: 14,
+      depositGrowthBoostPct: 1.2,
+      loanQualityImprovementPct: 0.5,
+      status: 'active',
+      activationMode: 'formal_board',
+      activatedAtMonth: 1,
+      unlockMilestone: {
+        description: 'Alcanzar 100 clientes activos en base',
+        metricType: 'gameMonth',
+        targetValue: 1,
+        currentValue: 1,
+        isAchieved: true
+      }
+    },
+    {
+      id: 'imp-22',
+      number: 22,
+      title: 'Mercado Secundario de Pagarés Bancarios y Papel Comercial',
+      pillar: 'treasury_esg',
+      description: 'Desintermediación financiera que permite a empresas hondureñas emitir pagarés a corto plazo custodiados y liquidados por Áureo Bank.',
+      technicalDetails: 'Plataforma de colocación privada entre inversionistas institucionales y fondos de pensiones con cobro de comisión de estructuración del 0.75%.',
+      regulatoryReference: 'Ley de Mercado de Valores de Honduras y CNBS',
+      capexCostHNL: 3900000,
+      monthlyOpexHNL: 95000,
+      monthlyProfitBoostHNL: 380000,
+      carImpactBps: 19,
+      depositGrowthBoostPct: 1.3,
+      loanQualityImprovementPct: 0.4,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Superar L. 3,300M en Activos Totales',
+        metricType: 'totalAssets',
+        targetValue: 3300000000,
+        currentValue: 3019074191,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-23',
+      number: 23,
+      title: 'Programa de Lealtad y Recompensas "Puntos Áureo"',
+      pillar: 'treasury_esg',
+      description: 'Ecosistema de beneficios que premia el pago puntual de cuotas de crédito, la domiciliación de servicios públicos y el uso de tarjetas de débito.',
+      technicalDetails: 'Catálogo de canje en comercios afiliados POS con incentivo cruzado de retención de saldos en cuentas de ahorro.',
+      regulatoryReference: 'Código de Comercio y CNBS Transparencia en Programas de Lealtad',
+      capexCostHNL: 2300000,
+      monthlyOpexHNL: 80000,
+      monthlyProfitBoostHNL: 260000,
+      carImpactBps: 9,
+      depositGrowthBoostPct: 1.1,
+      loanQualityImprovementPct: 0.6,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Superar 15 comercios POS afiliados',
+        metricType: 'gameMonth',
+        targetValue: 2,
+        currentValue: 1,
+        isAchieved: false
+      }
+    },
+    {
+      id: 'imp-24',
+      number: 24,
+      title: 'Portal del Accionista con Votación Remota y Custodia Digital',
+      pillar: 'treasury_esg',
+      description: 'Sistema seguro para la celebración de asambleas ordinarias y extraordinarias en línea, quórum automático y certificados digitales de acciones.',
+      technicalDetails: 'Voto ponderado por paquete accionario, archivo notarial electrónico y cálculo automático de dividendos netos post-retención SAR.',
+      regulatoryReference: 'Código de Comercio de Honduras y CNBS Gobierno Corporativo',
+      capexCostHNL: 2000000,
+      monthlyOpexHNL: 50000,
+      monthlyProfitBoostHNL: 150000,
+      carImpactBps: 10,
+      depositGrowthBoostPct: 0.4,
+      loanQualityImprovementPct: 0.1,
+      status: 'inactive',
+      activationMode: 'formal_board',
+      unlockMilestone: {
+        description: 'Celebrar la Asamblea de Accionistas 2026',
+        metricType: 'gameMonth',
+        targetValue: 4,
+        currentValue: 1,
+        isAchieved: false
+      }
+    }
+  ],
+  activeFilter: 'all',
+  interactionMode: 'formal_board',
+  totalCapexInvestedHNL: 29900000,
+  totalMonthlyOpexHNL: 745000,
+  totalMonthlyProfitBoostHNL: 2390000
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -3300,6 +3907,9 @@ export const INITIAL_GAME_STATE: GameState = {
   // Gobierno Corporativo: Ranking Histórico de Dividendos (10 Años Fiscales 2017-2026)
   dividendGovernance: INITIAL_DIVIDEND_GOVERNANCE,
   // Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
-  financialSandbox: INITIAL_FINANCIAL_SANDBOX
+  financialSandbox: INITIAL_FINANCIAL_SANDBOX,
+  // Hub Estratégico de 24 Mejoras Institucionales (3 Pilares, ROI, Sandbox y Desbloqueos)
+  strategicImprovements: INITIAL_STRATEGIC_IMPROVEMENTS
 };
+
 

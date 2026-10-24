@@ -38,5 +38,8 @@ export function restoreGameState(saved: unknown): GameState {
   if (!state.financialSandbox) {
     state.financialSandbox = structuredClone(INITIAL_GAME_STATE.financialSandbox);
   }
+  if (!state.strategicImprovements) {
+    state.strategicImprovements = structuredClone(INITIAL_GAME_STATE.strategicImprovements);
+  }
   return state;
 }

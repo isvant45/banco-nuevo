@@ -757,6 +757,8 @@ export interface GameState {
   dividendGovernance: DividendGovernanceState;
   // Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
   financialSandbox: FinancialSandboxConfig;
+  // Suite de 24 Mejoras Estratégicas y Recomendaciones Institucionales
+  strategicImprovements: StrategicImprovementsState;
 }
 
 export interface BranchDepartment {
@@ -1023,5 +1025,54 @@ export interface FinancialSandboxConfig {
   lastAppliedTimestamp: number;
   realtimeReactivityActive: boolean;
 }
+
+// ------------------------------------------------------------------------------------
+// SUITE DE 24 MEJORAS ESTRATÉGICAS Y RECOMENDACIONES INSTITUCIONALES
+// ------------------------------------------------------------------------------------
+
+export type StrategicImprovementPillar = 
+  | 'digital_inclusion' // Eje A: Transformación Digital, Ciberseguridad e Inclusión
+  | 'prudential_cnbs'   // Eje B: Cumplimiento Prudencial CNBS, Régimen SAR y Basilea III
+  | 'treasury_esg';     // Eje C: Tesorería Avanzada, Finanzas Verdes (ESG) y Retención
+
+export type StrategicImprovementStatus = 'active' | 'inactive' | 'locked';
+
+export type StrategicActivationMode = 'formal_board' | 'sandbox_instant' | 'milestone_unlocked' | 'milestone_unlock';
+
+export interface StrategicImprovementItem {
+  id: string;
+  number: number; // 1 a 24
+  title: string;
+  pillar: StrategicImprovementPillar;
+  description: string;
+  technicalDetails: string;
+  regulatoryReference: string; // Ej. 'BCH Circular 04/2026', 'CNBS Res. 284/2003', 'SAR Ley Solidaria'
+  capexCostHNL: number; // Inversión inicial en Lempiras
+  monthlyOpexHNL: number; // Costo operativo mensual
+  monthlyProfitBoostHNL: number; // Retorno mensual estimado en ingresos/ahorro
+  carImpactBps: number; // Impacto en Solvencia CAR en puntos básicos (ej. 25 bps = +0.25%)
+  depositGrowthBoostPct: number; // Impulso a captación de depósitos
+  loanQualityImprovementPct: number; // Reducción de mora crediticia
+  status: StrategicImprovementStatus;
+  activationMode: StrategicActivationMode;
+  activatedAtMonth?: number;
+  unlockMilestone: {
+    description: string;
+    metricType: 'totalAssets' | 'car' | 'corporateClients' | 'gameMonth' | 'depositVolume' | 'clientsCount' | 'nplRatio';
+    targetValue: number;
+    currentValue: number;
+    isAchieved: boolean;
+  };
+}
+
+export interface StrategicImprovementsState {
+  items: StrategicImprovementItem[];
+  activeFilter: 'all' | StrategicImprovementPillar;
+  interactionMode: StrategicActivationMode;
+  totalCapexInvestedHNL: number;
+  totalMonthlyOpexHNL: number;
+  totalMonthlyProfitBoostHNL: number;
+}
+
 
 

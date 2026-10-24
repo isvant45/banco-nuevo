@@ -36,13 +36,19 @@ import {
   StressSimulationResult,
   FiscalYearDividendRecord,
   DividendGovernanceState,
-  FinancialSandboxConfig
+  FinancialSandboxConfig,
+  StrategicImprovementPillar,
+  StrategicImprovementStatus,
+  StrategicActivationMode,
+  StrategicImprovementItem,
+  StrategicImprovementsState
 } from './types';
 import { 
   INITIAL_BANKING_PROGRAMS_20, 
   INITIAL_ADVANCED_OPERATIONS,
   INITIAL_DIVIDEND_GOVERNANCE,
-  INITIAL_FINANCIAL_SANDBOX
+  INITIAL_FINANCIAL_SANDBOX,
+  INITIAL_STRATEGIC_IMPROVEMENTS
 } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -1073,6 +1079,9 @@ export function advanceGameMonth(state: GameState): GameState {
   // 15. Centro de Operaciones Avanzadas (24 Características en 4 Ejes Estratégicos)
   const { updatedOperations: newAdvancedOperations } = advanceAdvancedOperationsMonth(state, nextMonth, tpmDelta, newExchangeRate);
 
+  // 16. Hub Estratégico de 24 Mejoras Institucionales (3 Pilares, ROI y Desbloqueos)
+  const { updatedImprovements: newStrategicImprovements } = advanceStrategicImprovementsMonth(state, nextMonth, totalAssets, newCAR, newNPL);
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -1119,7 +1128,8 @@ export function advanceGameMonth(state: GameState): GameState {
     fxForwards: updatedFxForwards,
     lastMonthlyClosingSummary: monthlyClosingSummary,
     bankingPrograms20: newBankingPrograms20,
-    advancedOperations: newAdvancedOperations
+    advancedOperations: newAdvancedOperations,
+    strategicImprovements: newStrategicImprovements
   };
 }
 
@@ -4199,5 +4209,238 @@ export function updateCurrentYearDividendPolicy(
   };
 }
 
+/**
+ * Procesa la evolución mensual de las 24 Mejoras Estratégicas Institucionales:
+ * Actualiza el progreso de hitos de desbloqueo, acumula el beneficio neto mensual
+ * y actualiza los indicadores clave.
+ */
+export function advanceStrategicImprovementsMonth(
+  state: GameState,
+  nextMonth: number,
+  totalAssets: number,
+  car: number,
+  npl: number
+): {
+  updatedImprovements: StrategicImprovementsState;
+  totalProfitBoostHNL: number;
+  totalOpexHNL: number;
+} {
+  const current = state.strategicImprovements || INITIAL_STRATEGIC_IMPROVEMENTS;
+  const totalClients = Object.values(state.divisions).reduce((sum, d) => sum + (d.clientCount || 0), 0);
 
+  let totalProfitBoostHNL = 0;
+  let totalOpexHNL = 0;
 
+  const updatedItems = current.items.map(item => {
+    let milestone = item.unlockMilestone;
+    if (milestone) {
+      let currentVal = milestone.currentValue;
+      if (milestone.metricType === 'gameMonth') {
+        currentVal = nextMonth;
+      } else if (milestone.metricType === 'totalAssets') {
+        currentVal = totalAssets;
+      } else if (milestone.metricType === 'car') {
+        currentVal = car;
+      } else if (milestone.metricType === 'clientsCount') {
+        currentVal = totalClients;
+      } else if (milestone.metricType === 'nplRatio') {
+        currentVal = npl;
+      }
+
+      const isAchieved = milestone.metricType === 'nplRatio' 
+        ? currentVal <= milestone.targetValue 
+        : currentVal >= milestone.targetValue;
+
+      milestone = {
+        ...milestone,
+        currentValue: currentVal,
+        isAchieved: milestone.isAchieved || isAchieved
+      };
+    }
+
+    if (item.status === 'active') {
+      totalProfitBoostHNL += item.monthlyProfitBoostHNL;
+      totalOpexHNL += item.monthlyOpexHNL;
+    }
+
+    return {
+      ...item,
+      unlockMilestone: milestone
+    };
+  });
+
+  return {
+    updatedImprovements: {
+      ...current,
+      items: updatedItems,
+      totalMonthlyOpexHNL: totalOpexHNL,
+      totalMonthlyProfitBoostHNL: totalProfitBoostHNL
+    },
+    totalProfitBoostHNL,
+    totalOpexHNL
+  };
+}
+
+/**
+ * Activa o pausa una mejora estratégica del banco según el modo seleccionado:
+ * - formal_board: Deduce el CAPEX en efectivo, lo capitaliza en activos fijos y ajusta CAR.
+ * - sandbox_instant: Conmutación en tiempo real sin deducción de caja para simulaciones.
+ * - milestone_unlock: Activación tras haber alcanzado el hito institucional regulatorio.
+ */
+export function toggleStrategicImprovement(
+  state: GameState,
+  improvementId: string,
+  mode?: StrategicActivationMode
+): { updatedState: GameState; successMessage: string } {
+  const improvementsState = state.strategicImprovements || INITIAL_STRATEGIC_IMPROVEMENTS;
+  const item = improvementsState.items.find(i => i.id === improvementId);
+  if (!item) {
+    return { updatedState: state, successMessage: 'Mejora estratégica no encontrada' };
+  }
+
+  const effectiveMode = mode || improvementsState.interactionMode;
+  const isActivating = item.status !== 'active';
+
+  if ((effectiveMode === 'milestone_unlocked' || effectiveMode === 'milestone_unlock') && isActivating && item.unlockMilestone && !item.unlockMilestone.isAchieved) {
+    return {
+      updatedState: state,
+      successMessage: `Requisito no cumplido: ${item.unlockMilestone.description} (Objetivo: ${item.unlockMilestone.targetValue}, Actual: ${item.unlockMilestone.currentValue}).`
+    };
+  }
+
+  if (effectiveMode === 'formal_board' && isActivating) {
+    if (state.financials.cashAndBCHReserves < item.capexCostHNL) {
+      return {
+        updatedState: state,
+        successMessage: `Liquidez insuficiente: Se requiere ${formatHNL(item.capexCostHNL)} de CAPEX disponible, pero las reservas de caja son ${formatHNL(state.financials.cashAndBCHReserves)}.`
+      };
+    }
+  }
+
+  const updatedFinancials = { ...state.financials };
+
+  if (effectiveMode === 'formal_board') {
+    if (isActivating) {
+      updatedFinancials.cashAndBCHReserves -= item.capexCostHNL;
+      updatedFinancials.fixedAssetsBranches += item.capexCostHNL;
+      updatedFinancials.capitalAdequacyRatioCAR = +(updatedFinancials.capitalAdequacyRatioCAR + (item.carImpactBps / 100)).toFixed(2);
+    } else {
+      updatedFinancials.capitalAdequacyRatioCAR = Math.max(10.0, +(updatedFinancials.capitalAdequacyRatioCAR - (item.carImpactBps / 100)).toFixed(2));
+    }
+  } else if (effectiveMode === 'sandbox_instant') {
+    if (isActivating) {
+      updatedFinancials.capitalAdequacyRatioCAR = +(updatedFinancials.capitalAdequacyRatioCAR + (item.carImpactBps / 100)).toFixed(2);
+    } else {
+      updatedFinancials.capitalAdequacyRatioCAR = Math.max(10.0, +(updatedFinancials.capitalAdequacyRatioCAR - (item.carImpactBps / 100)).toFixed(2));
+    }
+  }
+
+  const updatedItems = improvementsState.items.map(it => {
+    if (it.id === improvementId) {
+      return {
+        ...it,
+        status: isActivating ? ('active' as const) : ('inactive' as const),
+        activationMode: effectiveMode
+      };
+    }
+    return it;
+  });
+
+  const activeItems = updatedItems.filter(it => it.status === 'active');
+  const totalCapex = activeItems.reduce((acc, it) => acc + it.capexCostHNL, 0);
+  const totalOpex = activeItems.reduce((acc, it) => acc + it.monthlyOpexHNL, 0);
+  const totalBoost = activeItems.reduce((acc, it) => acc + it.monthlyProfitBoostHNL, 0);
+
+  const updatedImprovements: StrategicImprovementsState = {
+    ...improvementsState,
+    items: updatedItems,
+    totalCapexInvestedHNL: totalCapex,
+    totalMonthlyOpexHNL: totalOpex,
+    totalMonthlyProfitBoostHNL: totalBoost
+  };
+
+  const actionVerb = isActivating ? 'activada con éxito' : 'pausada';
+  const modeLabel = effectiveMode === 'formal_board' 
+    ? 'Aprobación formal de Junta Directiva (CAPEX/OPEX)' 
+    : effectiveMode === 'sandbox_instant' 
+      ? 'Sandbox Interactivo en Tiempo Real' 
+      : 'Desbloqueo por Cumplimiento de Hito Institucional';
+
+  const successMessage = `Mejora #${item.number} "${item.title}" ${actionVerb} mediante ${modeLabel}. Retorno neto mensual estimado: ${formatHNL(item.monthlyProfitBoostHNL - item.monthlyOpexHNL)}.`;
+
+  return {
+    updatedState: {
+      ...state,
+      financials: updatedFinancials,
+      strategicImprovements: updatedImprovements
+    },
+    successMessage
+  };
+}
+
+export function setStrategicInteractionMode(
+  state: GameState,
+  mode: StrategicActivationMode
+): GameState {
+  const current = state.strategicImprovements || INITIAL_STRATEGIC_IMPROVEMENTS;
+  return {
+    ...state,
+    strategicImprovements: {
+      ...current,
+      interactionMode: mode
+    }
+  };
+}
+
+export function setStrategicFilter(
+  state: GameState,
+  filter: StrategicImprovementPillar | 'all'
+): GameState {
+  const current = state.strategicImprovements || INITIAL_STRATEGIC_IMPROVEMENTS;
+  return {
+    ...state,
+    strategicImprovements: {
+      ...current,
+      activeFilter: filter
+    }
+  };
+}
+
+export function checkAndUnlockMilestones(state: GameState): GameState {
+  const current = state.strategicImprovements || INITIAL_STRATEGIC_IMPROVEMENTS;
+  const totalAssets = state.financials.totalAssets;
+  const car = state.financials.capitalAdequacyRatioCAR;
+  const npl = state.financials.delinquencyRatioNPL;
+  const totalClients = Object.values(state.divisions).reduce((sum, d) => sum + (d.clientCount || 0), 0);
+
+  const updatedItems = current.items.map(item => {
+    if (!item.unlockMilestone) return item;
+    let currentVal = item.unlockMilestone.currentValue;
+    if (item.unlockMilestone.metricType === 'gameMonth') currentVal = state.gameMonth;
+    else if (item.unlockMilestone.metricType === 'totalAssets') currentVal = totalAssets;
+    else if (item.unlockMilestone.metricType === 'car') currentVal = car;
+    else if (item.unlockMilestone.metricType === 'clientsCount') currentVal = totalClients;
+    else if (item.unlockMilestone.metricType === 'nplRatio') currentVal = npl;
+
+    const isAchieved = item.unlockMilestone.metricType === 'nplRatio' 
+      ? currentVal <= item.unlockMilestone.targetValue 
+      : currentVal >= item.unlockMilestone.targetValue;
+
+    return {
+      ...item,
+      unlockMilestone: {
+        ...item.unlockMilestone,
+        currentValue: currentVal,
+        isAchieved: item.unlockMilestone.isAchieved || isAchieved
+      }
+    };
+  });
+
+  return {
+    ...state,
+    strategicImprovements: {
+      ...current,
+      items: updatedItems
+    }
+  };
+}
