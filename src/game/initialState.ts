@@ -24,7 +24,9 @@ import {
   BchMoneyDeskState,
   FxForwardContract,
   AureoProgramsState,
-  AdvancedOperationsState
+  AdvancedOperationsState,
+  DividendGovernanceState,
+  FinancialSandboxConfig
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -3041,6 +3043,199 @@ export const INITIAL_ADVANCED_OPERATIONS: AdvancedOperationsState = {
   }
 };
 
+// ------------------------------------------------------------------------------------
+// GOBIERNO CORPORATIVO: RANKING HISTÓRICO DE DIVIDENDOS (10 AÑOS FISCALES 2017-2026)
+// ------------------------------------------------------------------------------------
+
+export const INITIAL_DIVIDEND_GOVERNANCE: DividendGovernanceState = {
+  historical10Years: [
+    {
+      fiscalYear: 2017,
+      netIncomeAuditHNL: 145000000,
+      dividendCashDistributedHNL: 65250000,
+      retainedTier1HNL: 79750000,
+      payoutRatioPct: 45.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 6.53,
+      bookValuePerShareHNL: 68.40,
+      dividendYieldPct: 7.2,
+      carClosingPct: 12.8,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 10
+    },
+    {
+      fiscalYear: 2018,
+      netIncomeAuditHNL: 168000000,
+      dividendCashDistributedHNL: 78960000,
+      retainedTier1HNL: 89040000,
+      payoutRatioPct: 47.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 7.90,
+      bookValuePerShareHNL: 74.20,
+      dividendYieldPct: 7.6,
+      carClosingPct: 13.1,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 9
+    },
+    {
+      fiscalYear: 2019,
+      netIncomeAuditHNL: 195000000,
+      dividendCashDistributedHNL: 97500000,
+      retainedTier1HNL: 97500000,
+      payoutRatioPct: 50.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 9.75,
+      bookValuePerShareHNL: 81.50,
+      dividendYieldPct: 8.1,
+      carClosingPct: 13.4,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 8
+    },
+    {
+      fiscalYear: 2020,
+      netIncomeAuditHNL: 152000000,
+      dividendCashDistributedHNL: 60800000,
+      retainedTier1HNL: 91200000,
+      payoutRatioPct: 40.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 6.08,
+      bookValuePerShareHNL: 87.20,
+      dividendYieldPct: 5.8,
+      carClosingPct: 14.2,
+      governanceAuditorOpinion: 'Con Énfasis Normativo',
+      rankingPosition: 7
+    },
+    {
+      fiscalYear: 2021,
+      netIncomeAuditHNL: 220000000,
+      dividendCashDistributedHNL: 110000000,
+      retainedTier1HNL: 110000000,
+      payoutRatioPct: 50.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 11.00,
+      bookValuePerShareHNL: 95.80,
+      dividendYieldPct: 8.5,
+      carClosingPct: 13.7,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 6
+    },
+    {
+      fiscalYear: 2022,
+      netIncomeAuditHNL: 258000000,
+      dividendCashDistributedHNL: 134160000,
+      retainedTier1HNL: 123840000,
+      payoutRatioPct: 52.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 13.42,
+      bookValuePerShareHNL: 106.40,
+      dividendYieldPct: 9.1,
+      carClosingPct: 13.9,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 5
+    },
+    {
+      fiscalYear: 2023,
+      netIncomeAuditHNL: 295000000,
+      dividendCashDistributedHNL: 162250000,
+      retainedTier1HNL: 132750000,
+      payoutRatioPct: 55.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 16.23,
+      bookValuePerShareHNL: 118.90,
+      dividendYieldPct: 9.8,
+      carClosingPct: 14.3,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 4
+    },
+    {
+      fiscalYear: 2024,
+      netIncomeAuditHNL: 340000000,
+      dividendCashDistributedHNL: 187000000,
+      retainedTier1HNL: 153000000,
+      payoutRatioPct: 55.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 18.70,
+      bookValuePerShareHNL: 132.50,
+      dividendYieldPct: 10.2,
+      carClosingPct: 14.6,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 3
+    },
+    {
+      fiscalYear: 2025,
+      netIncomeAuditHNL: 388000000,
+      dividendCashDistributedHNL: 221160000,
+      retainedTier1HNL: 166840000,
+      payoutRatioPct: 57.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 22.12,
+      bookValuePerShareHNL: 148.20,
+      dividendYieldPct: 10.9,
+      carClosingPct: 14.8,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 2
+    },
+    {
+      fiscalYear: 2026,
+      netIncomeAuditHNL: 425000000,
+      dividendCashDistributedHNL: 233750000,
+      retainedTier1HNL: 191250000,
+      payoutRatioPct: 55.0,
+      sharesCount: 10000000,
+      dividendPerShareHNL: 23.38,
+      bookValuePerShareHNL: 165.40,
+      dividendYieldPct: 11.2,
+      carClosingPct: 15.1,
+      governanceAuditorOpinion: 'Favorable sin Salvedades',
+      rankingPosition: 1
+    }
+  ],
+  currentYearPolicy2026: {
+    targetPayoutPct: 55.0,
+    proposedCashDividendHNL: 233750000,
+    retainedCapitalTier1HNL: 191250000,
+    expectedCarImpactPct: 0.8,
+    asambleaScheduledMonth: 4,
+    asambleaStatus: 'Aprobada por Junta Directiva'
+  },
+  totalHistoricalDividendsHNL: 1351830000,
+  avgHistoricalPayoutPct: 50.1,
+  accumulatedTier1RetainedHNL: 1234970000
+};
+
+// ------------------------------------------------------------------------------------
+// SANDBOX CENTRAL DE CONFIGURACIÓN FINANCIERA, FISCAL Y SCORING EN TIEMPO REAL
+// ------------------------------------------------------------------------------------
+
+export const INITIAL_FINANCIAL_SANDBOX: FinancialSandboxConfig = {
+  macro: {
+    tpmRatePct: 5.75,
+    interannualInflationPct: 4.90,
+    exchangeRateUsdHnl: 24.85,
+    reserveReqPct: 12.0
+  },
+  fiscalSar: {
+    isrRatePct: 25.0,
+    aportacionSolidariaPct: 5.0,
+    dividendWithholdingTaxPct: 10.0,
+    maxDeductibleProvisionPct: 100.0
+  },
+  bankAlco: {
+    targetIntermediationSpreadPct: 8.5,
+    cirEfficiencyTargetPct: 52.0,
+    minTier1CarBufferPct: 3.5
+  },
+  creditScoringCnbs: {
+    paymentHistoryWeightPct: 40.0,
+    maxDtiAllowedPct: 45.0,
+    maxLtvCoveragePct: 80.0,
+    minBureauScoreThreshold: 640,
+    categoryVArrearsDaysTrigger: 180
+  },
+  lastAppliedTimestamp: Date.now(),
+  realtimeReactivityActive: true
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -3101,6 +3296,10 @@ export const INITIAL_GAME_STATE: GameState = {
   // Suite de 20 Características, Programas e Innovaciones Bancarias
   bankingPrograms20: INITIAL_BANKING_PROGRAMS_20,
   // Centro de Operaciones Avanzadas (24 Características)
-  advancedOperations: INITIAL_ADVANCED_OPERATIONS
+  advancedOperations: INITIAL_ADVANCED_OPERATIONS,
+  // Gobierno Corporativo: Ranking Histórico de Dividendos (10 Años Fiscales 2017-2026)
+  dividendGovernance: INITIAL_DIVIDEND_GOVERNANCE,
+  // Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
+  financialSandbox: INITIAL_FINANCIAL_SANDBOX
 };
 

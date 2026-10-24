@@ -32,5 +32,11 @@ export function restoreGameState(saved: unknown): GameState {
   state.dynamicAlerts = state.dynamicAlerts.map(a => ({
     ...a, targetTab: a.targetTab === 'risk' ? 'credit_risk' : a.targetTab === 'credit' ? 'origination' : a.targetTab,
   }));
+  if (!state.dividendGovernance) {
+    state.dividendGovernance = structuredClone(INITIAL_GAME_STATE.dividendGovernance);
+  }
+  if (!state.financialSandbox) {
+    state.financialSandbox = structuredClone(INITIAL_GAME_STATE.financialSandbox);
+  }
   return state;
 }

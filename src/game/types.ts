@@ -753,6 +753,10 @@ export interface GameState {
   bankingPrograms20: AureoProgramsState;
   // Centro de Operaciones Avanzadas: 24 Características en 4 Ejes Estratégicos
   advancedOperations: AdvancedOperationsState;
+  // Gobierno Corporativo: Ranking Histórico de Dividendos (10 Años Fiscales 2017-2026)
+  dividendGovernance: DividendGovernanceState;
+  // Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
+  financialSandbox: FinancialSandboxConfig;
 }
 
 export interface BranchDepartment {
@@ -952,4 +956,72 @@ export interface AdvancedOperationsState {
     retainedEarningsRatioPct: number;
   };
 }
+
+// ------------------------------------------------------------------------------------
+// GOBIERNO CORPORATIVO: RANKING HISTÓRICO DE DIVIDENDOS (10 AÑOS FISCALES 2017-2026)
+// ------------------------------------------------------------------------------------
+
+export interface FiscalYearDividendRecord {
+  fiscalYear: number; // 2017 to 2026
+  netIncomeAuditHNL: number; // Utilidad Neta Auditada CNBS
+  dividendCashDistributedHNL: number; // Dividendos en efectivo desembolsados
+  retainedTier1HNL: number; // Utilidades retenidas para Capital Primario Tier 1
+  payoutRatioPct: number; // % distribuido en dividendos
+  sharesCount: number; // Acciones en circulación (10,000,000)
+  dividendPerShareHNL: number; // Dividendo por Acción (DPS) en Lempiras
+  bookValuePerShareHNL: number; // Valor en Libros por Acción
+  dividendYieldPct: number; // Rendimiento por dividendo (%)
+  carClosingPct: number; // Índice de Adecuación de Capital (CAR) al cierre
+  governanceAuditorOpinion: 'Favorable sin Salvedades' | 'Con Énfasis Normativo';
+  rankingPosition: number; // 1 a 10 por monto distribuido
+}
+
+export interface DividendGovernanceState {
+  historical10Years: FiscalYearDividendRecord[];
+  currentYearPolicy2026: {
+    targetPayoutPct: number; // Ej. 50%
+    proposedCashDividendHNL: number;
+    retainedCapitalTier1HNL: number;
+    expectedCarImpactPct: number;
+    asambleaScheduledMonth: number; // Mes 4 (Abril)
+    asambleaStatus: 'Pendiente de Convocatoria' | 'Aprobada por Junta Directiva' | 'Ratificada por Asamblea';
+  };
+  totalHistoricalDividendsHNL: number;
+  avgHistoricalPayoutPct: number;
+  accumulatedTier1RetainedHNL: number;
+}
+
+// ------------------------------------------------------------------------------------
+// SANDBOX CENTRAL DE CONFIGURACIÓN FINANCIERA, FISCAL Y SCORING EN TIEMPO REAL
+// ------------------------------------------------------------------------------------
+
+export interface FinancialSandboxConfig {
+  macro: {
+    tpmRatePct: number; // 3.0% - 12.0% (TPM Banco Central de Honduras)
+    interannualInflationPct: number; // 2.0% - 14.0%
+    exchangeRateUsdHnl: number; // 20.00 - 32.00 Lempiras por Dólar
+    reserveReqPct: number; // 8.0% - 18.0% (Encaje legal requerido BCH)
+  };
+  fiscalSar: {
+    isrRatePct: number; // 25.0% Impuesto Sobre la Renta Bancario
+    aportacionSolidariaPct: number; // 5.0% Ley de Aportación Solidaria
+    dividendWithholdingTaxPct: number; // 10.0% Retención en la fuente por dividendos
+    maxDeductibleProvisionPct: number; // Deducción fiscal máxima de provisiones CNBS
+  };
+  bankAlco: {
+    targetIntermediationSpreadPct: number; // Spread objetivo Margen Activo - Pasivo
+    cirEfficiencyTargetPct: number; // Meta Coeficiente de Eficiencia Operativa CIR
+    minTier1CarBufferPct: number; // Margen de seguridad patrimonial voluntario
+  };
+  creditScoringCnbs: {
+    paymentHistoryWeightPct: number; // Ponderación de historial crediticio (30% - 50%)
+    maxDtiAllowedPct: number; // Relación Deuda a Ingreso máxima permitida (30% - 55%)
+    maxLtvCoveragePct: number; // LTV máximo en garantías reales (50% - 90%)
+    minBureauScoreThreshold: number; // Umbral de score buró Equifax/TransUnion (500 - 750)
+    categoryVArrearsDaysTrigger: number; // Días de mora para categoría V - Pérdida
+  };
+  lastAppliedTimestamp: number;
+  realtimeReactivityActive: boolean;
+}
+
 

@@ -66,6 +66,8 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const navItems = [
     { id: 'overview', label: 'Directorio' },
+    { id: 'dividends', label: 'Ranking Dividendos (10 Años)' },
+    { id: 'sandbox', label: 'Sandbox Políticas & Scoring' },
     { id: 'advanced_ops', label: 'Centro de Operaciones (24)' },
     { id: 'programs20', label: '20 Programas & Clientes' },
     { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },

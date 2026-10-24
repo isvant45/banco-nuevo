@@ -13,7 +13,9 @@ import {
   FileCheck2, 
   AlertCircle,
   ArrowRight,
-  Building2
+  Building2,
+  Coins,
+  Sliders
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -146,6 +148,69 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <span>Abrir Centro de Operaciones (24)</span>
           <ArrowRight className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Dual Highlights: Ranking Histórico de Dividendos & Sandbox Central de Políticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tarjeta Ranking de Dividendos */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20 border border-amber-500/30 hover:border-amber-400/50 rounded-xl p-4 shadow-sm transition-colors flex flex-col justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-amber-400 font-semibold">
+              <span>GOBIERNO CORPORATIVO</span>
+              <span aria-hidden="true">·</span>
+              <span>10 AÑOS FISCALES (2017–2026)</span>
+            </div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Coins className="w-4 h-4 text-amber-400" />
+              Ranking Histórico de Dividendos
+            </h3>
+            <p className="text-xs text-slate-300">
+              Gráficos de barras de distribución de utilidades, Payout Ratio %, retención para Capital Tier 1 y rendimiento por acción (DPS).
+            </p>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <span className="text-[11px] font-mono text-emerald-400 font-bold">
+              {formatHNL(state.dividendGovernance?.totalHistoricalDividendsHNL || 1351830000)} Distribuidos
+            </span>
+            <button
+              onClick={() => onNavigateTab('dividends')}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <span>Ver Ranking</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tarjeta Sandbox Central de Políticas */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/20 border border-blue-500/30 hover:border-blue-400/50 rounded-xl p-4 shadow-sm transition-colors flex flex-col justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-blue-400 font-semibold">
+              <span>SIMULADOR EN TIEMPO REAL</span>
+              <span aria-hidden="true">·</span>
+              <span>BCH · SAR · ALCO · CNBS</span>
+            </div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-blue-400" />
+              Sandbox Central de Parámetros y Scoring
+            </h3>
+            <p className="text-xs text-slate-300">
+              Ajuste deslizadores de TPM, Encaje, ISR bancario y scoring crediticio con propagación simultánea e inmediata en todo el balance.
+            </p>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <span className="text-[11px] font-mono text-blue-300 font-bold">
+              Normativa Oficial de Honduras Activa
+            </span>
+            <button
+              onClick={() => onNavigateTab('sandbox')}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <span>Abrir Sandbox</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 2. Sección Central: Boletín Oficial BCH y Guerra de Mercado */}

@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan de arquitectura e implementación del Panel Ejecutivo de Ranking Histórico de Dividendos (10 años fiscales) con gráficos de barras interactivos, y el Sandbox Central de Configuración Macroeconómica, Fiscal (SAR) y Scoring Crediticio (CNBS) con recalculo reactivo en tiempo real en toda la aplicación.",
+  "updatedAt":  "2026-10-23T23:48:59.100750260Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

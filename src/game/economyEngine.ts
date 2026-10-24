@@ -33,9 +33,17 @@ import {
   MutualFundTier,
   CorporateTrustContract,
   MicroInsuranceProduct,
-  StressSimulationResult
+  StressSimulationResult,
+  FiscalYearDividendRecord,
+  DividendGovernanceState,
+  FinancialSandboxConfig
 } from './types';
-import { INITIAL_BANKING_PROGRAMS_20, INITIAL_ADVANCED_OPERATIONS } from './initialState';
+import { 
+  INITIAL_BANKING_PROGRAMS_20, 
+  INITIAL_ADVANCED_OPERATIONS,
+  INITIAL_DIVIDEND_GOVERNANCE,
+  INITIAL_FINANCIAL_SANDBOX
+} from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
 const HN_FIRST_NAMES = ['Carlos', 'Ana', 'José', 'Suyapa', 'Roberto', 'María', 'Luis', 'Daniela', 'Rigoberto', 'Xiomara', 'Mario', 'Gissel', 'Edgar', 'Brenda', 'Héctor', 'Karla', 'Mauricio', 'Miriam'];
@@ -4017,5 +4025,179 @@ export function simulateDividendDistribution(
     successMessage: `Política de dividendos proyectada para Asamblea: Payout ${dividendPayoutRatioPct}% (${formatHNL(perShare)} por acción). Reinversión de utilidades retenidas: ${retainedPct}%.`
   };
 }
+
+// ------------------------------------------------------------------------------------
+// MOTOR REACTIVO EN TIEMPO REAL: SANDBOX MACROECONÓMICO, FISCAL Y SCORING CNBS
+// ------------------------------------------------------------------------------------
+
+/**
+ * Aplica en tiempo real cualquier modificación en los parámetros del Sandbox Financiero,
+ * recalculando simultáneamente el balance general, encaje BCH, impuestos SAR, provisiones
+ * y solvencia de capital en toda la aplicación.
+ */
+export function updateFinancialSandboxConfig(
+  state: GameState,
+  newConfig: Partial<FinancialSandboxConfig>
+): GameState {
+  const current = state.financialSandbox || INITIAL_FINANCIAL_SANDBOX;
+  const merged: FinancialSandboxConfig = {
+    macro: { ...current.macro, ...(newConfig.macro || {}) },
+    fiscalSar: { ...current.fiscalSar, ...(newConfig.fiscalSar || {}) },
+    bankAlco: { ...current.bankAlco, ...(newConfig.bankAlco || {}) },
+    creditScoringCnbs: { ...current.creditScoringCnbs, ...(newConfig.creditScoringCnbs || {}) },
+    lastAppliedTimestamp: Date.now(),
+    realtimeReactivityActive: newConfig.realtimeReactivityActive ?? current.realtimeReactivityActive
+  };
+
+  // 1. Cascada inmediata a Tickers e Indicadores del Banco Central de Honduras (BCH)
+  const updatedBch = {
+    ...state.bch,
+    tpmRate: merged.macro.tpmRatePct,
+    interannualInflation: merged.macro.interannualInflationPct,
+    exchangeRateHNLtoUSD: merged.macro.exchangeRateUsdHnl,
+    reserveRequirementPct: merged.macro.reserveReqPct
+  };
+
+  // 2. Cascada inmediata a Encaje Legal Requerido en BCH
+  const requiredReserves = Math.round(state.financials.depositsPublicTotal * (merged.macro.reserveReqPct / 100));
+
+  // 3. Recálculo impositivo según SAR (ISR 25% + Aportación Solidaria 5%)
+  const approxOperatingIncome = Math.round(Math.max(10000000, state.financials.currentMonthProfit / 0.70));
+  let recalculatedNetProfit = state.financials.currentMonthProfit;
+  if (approxOperatingIncome > 0) {
+    const isr = Math.round(approxOperatingIncome * (merged.fiscalSar.isrRatePct / 100));
+    const taxableOver1M = Math.max(0, approxOperatingIncome - Math.round(1000000 / 12));
+    const solidaria = Math.round(taxableOver1M * (merged.fiscalSar.aportacionSolidariaPct / 100));
+    recalculatedNetProfit = approxOperatingIncome - isr - solidaria;
+  }
+
+  // 4. Modelo de Scoring Crediticio CNBS (Resolución 284/2003): Reclasificación dinámica
+  const scoreThreshold = merged.creditScoringCnbs.minBureauScoreThreshold;
+  const dtiMax = merged.creditScoringCnbs.maxDtiAllowedPct;
+  const arrearsLossTrigger = merged.creditScoringCnbs.categoryVArrearsDaysTrigger;
+
+  const updatedClients = state.clients.map(client => {
+    let cnbsCat = client.cnbsCategory;
+    if (client.pastDueDays >= arrearsLossTrigger) {
+      cnbsCat = 'V - Pérdida';
+    } else if (client.pastDueDays >= 90) {
+      cnbsCat = 'IV - Dudoso Recaudo';
+    } else if (client.pastDueDays >= 60) {
+      cnbsCat = 'III - Subnormal';
+    } else if (client.pastDueDays > 0 || client.equifaxScore < scoreThreshold) {
+      cnbsCat = 'II - Especial';
+    } else {
+      cnbsCat = 'I - Normal';
+    }
+    return { ...client, cnbsCategory: cnbsCat };
+  });
+
+  // 5. Provisiones IFRS 9 dinámicas según tramos CNBS
+  let calculatedProvisions = 0;
+  updatedClients.forEach(c => {
+    if (c.hasLoan && c.loanBalanceHNL > 0) {
+      if (c.cnbsCategory === 'V - Pérdida') calculatedProvisions += c.loanBalanceHNL * 1.0;
+      else if (c.cnbsCategory === 'IV - Dudoso Recaudo') calculatedProvisions += c.loanBalanceHNL * 0.50;
+      else if (c.cnbsCategory === 'III - Subnormal') calculatedProvisions += c.loanBalanceHNL * 0.20;
+      else if (c.cnbsCategory === 'II - Especial') calculatedProvisions += c.loanBalanceHNL * 0.05;
+      else calculatedProvisions += c.loanBalanceHNL * 0.01;
+    }
+  });
+
+  // 6. Solvencia CAR con buffer ALCO
+  const totalAssets = state.financials.totalAssets;
+  const baseCAR = +((state.financials.totalEquity / (totalAssets * 0.72)) * 100).toFixed(2);
+  const adjustedCAR = +(baseCAR + (merged.bankAlco.minTier1CarBufferPct * 0.1)).toFixed(2);
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    requiredReserveAmount: requiredReserves,
+    currentMonthProfit: recalculatedNetProfit,
+    loanLossProvisions: Math.round(calculatedProvisions),
+    capitalAdequacyRatioCAR: adjustedCAR
+  };
+
+  return {
+    ...state,
+    bch: updatedBch,
+    financials: updatedFinancials,
+    clients: updatedClients,
+    financialSandbox: merged
+  };
+}
+
+/**
+ * Actualiza la política de dividendos para el año fiscal 2026,
+ * recalculando el payout, DPS, dividend yield y el impacto en Capital Tier 1.
+ */
+export function updateCurrentYearDividendPolicy(
+  state: GameState,
+  targetPayoutPct: number
+): GameState {
+  const currentGov = state.dividendGovernance || INITIAL_DIVIDEND_GOVERNANCE;
+  const clampedPayout = Math.max(10, Math.min(90, targetPayoutPct));
+
+  // Utilidad neta anualizada estimada para 2026
+  const annualizedProfit2026 = Math.max(
+    380000000, 
+    Math.round(state.financials.currentMonthProfit * 12)
+  );
+
+  const proposedCashDividend = Math.round(annualizedProfit2026 * (clampedPayout / 100));
+  const retainedTier1 = annualizedProfit2026 - proposedCashDividend;
+  const dps = +(proposedCashDividend / 10000000).toFixed(2);
+  const bookValue = +(state.financials.totalEquity / 10000000).toFixed(2);
+  const dividendYield = +( (dps / Math.max(1, bookValue)) * 100 ).toFixed(1);
+  const expectedCarImpact = +( (retainedTier1 / state.financials.totalAssets) * 10 ).toFixed(1);
+
+  const updatedRecord2026: FiscalYearDividendRecord = {
+    fiscalYear: 2026,
+    netIncomeAuditHNL: annualizedProfit2026,
+    dividendCashDistributedHNL: proposedCashDividend,
+    retainedTier1HNL: retainedTier1,
+    payoutRatioPct: clampedPayout,
+    sharesCount: 10000000,
+    dividendPerShareHNL: dps,
+    bookValuePerShareHNL: bookValue,
+    dividendYieldPct: dividendYield,
+    carClosingPct: +(state.financials.capitalAdequacyRatioCAR + (retainedTier1 > 150000000 ? 0.3 : 0.1)).toFixed(1),
+    governanceAuditorOpinion: 'Favorable sin Salvedades',
+    rankingPosition: 1
+  };
+
+  const updated10Years = currentGov.historical10Years.map(rec => 
+    rec.fiscalYear === 2026 ? updatedRecord2026 : rec
+  );
+
+  // Re-calcular ranking por monto de dividendo desembolsado
+  const sorted = [...updated10Years].sort((a, b) => b.dividendCashDistributedHNL - a.dividendCashDistributedHNL);
+  const ranked10Years = updated10Years.map(rec => {
+    const rank = sorted.findIndex(s => s.fiscalYear === rec.fiscalYear) + 1;
+    return { ...rec, rankingPosition: rank };
+  });
+
+  const totalDividends = ranked10Years.reduce((sum, r) => sum + r.dividendCashDistributedHNL, 0);
+  const avgPayout = +(ranked10Years.reduce((sum, r) => sum + r.payoutRatioPct, 0) / ranked10Years.length).toFixed(1);
+  const totalRetained = ranked10Years.reduce((sum, r) => sum + r.retainedTier1HNL, 0);
+
+  return {
+    ...state,
+    dividendGovernance: {
+      ...currentGov,
+      historical10Years: ranked10Years,
+      currentYearPolicy2026: {
+        ...currentGov.currentYearPolicy2026,
+        targetPayoutPct: clampedPayout,
+        proposedCashDividendHNL: proposedCashDividend,
+        retainedCapitalTier1HNL: retainedTier1,
+        expectedCarImpactPct: expectedCarImpact
+      },
+      totalHistoricalDividendsHNL: totalDividends,
+      avgHistoricalPayoutPct: avgPayout,
+      accumulatedTier1RetainedHNL: totalRetained
+    }
+  };
+}
+
 
 
