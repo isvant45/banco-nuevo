@@ -91,6 +91,12 @@ export interface IndividualClient {
   lastMonthlyAmortizationStatus?: 'al_dia' | 'aviso_previo_insuficiencia' | 'renegociado';
   lastAmortizationNotice?: string;
   lastQuotaDeductedHNL?: number;
+  // Identificación Fiscal SAR y Cumplimiento AML / Prevención de Fraudes
+  rtn?: string; // Registro Tributario Nacional (SAR)
+  amlRiskScore?: number; // 0 - 100
+  amlStatus?: 'normal' | 'bajo_monitoreo' | 'alerta_pitufeo' | 'congelado_judicial' | 'reportado_uif' | 'congelada_uif' | 'investigada_limpia';
+  isFrozen?: boolean;
+  frozenReason?: string;
   // Expediente 360°: Productos en la competencia para robo de cartera / atracción
   otherBankProducts: OtherBankProduct[];
 }
@@ -360,7 +366,7 @@ export interface GameEventNotification {
   id: string;
   month: number;
   year: number;
-  type: 'bch_policy' | 'market_war' | 'regulatory_cnbs' | 'swift_alert' | 'corporate_deal' | 'segment_upgrade' | 'npl_sale';
+  type: 'bch_policy' | 'market_war' | 'regulatory_cnbs' | 'swift_alert' | 'corporate_deal' | 'segment_upgrade' | 'npl_sale' | 'regulatory_alert' | 'board_decision';
   title: string;
   message: string;
   impactSummary: string;
@@ -759,6 +765,10 @@ export interface GameState {
   financialSandbox: FinancialSandboxConfig;
   // Suite de 24 Mejoras Estratégicas y Recomendaciones Institucionales
   strategicImprovements: StrategicImprovementsState;
+  // Centro Global de Prevención de Fraudes, Lavado de Dinero (AML/CFT) y Reportes UIF
+  amlCompliance: AmlComplianceState;
+  // Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
+  executiveDilemmas: ExecutiveDilemmasState;
 }
 
 export interface BranchDepartment {
@@ -1074,5 +1084,180 @@ export interface StrategicImprovementsState {
   totalMonthlyProfitBoostHNL: number;
 }
 
+// ------------------------------------------------------------------------------------
+// CENTRO GLOBAL DE PREVENCIÓN DE FRAUDES Y LAVADO DE DINERO (AML / CFT / PLD / UIF)
+// ------------------------------------------------------------------------------------
 
+export type AmlAlertSeverity = 'critica' | 'alta' | 'media' | 'informativa';
+export type AmlAlertType = 
+  | 'pitufeo_structuring'
+  | 'pitufeo_fraccionamiento'
+  | 'ofac_onu_match'
+  | 'lista_ofac_sancionados'
+  | 'pep_high_risk'
+  | 'politicamente_expuesto'
+  | 'rapid_movement'
+  | 'origen_injustificado'
+  | 'shell_company'
+  | 'empresa_fachada_shell'
+  | 'card_fraud_cloning'
+  | 'clonacion_tarjeta_pos';
 
+export type AmlInvestigationStatus = 
+  | 'abierta' 
+  | 'en_analisis' 
+  | 'congelada' 
+  | 'cuenta_congelada'
+  | 'archivada_justificada' 
+  | 'reportada_uif'
+  | 'remitida_uif'
+  | 'detectada'
+  | 'bajo_investigacion';
+
+export interface AmlTransactionAlert {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientRtn: string;
+  division: BankingDivisionId;
+  type: AmlAlertType;
+  severity: AmlAlertSeverity;
+  amountHNL: number;
+  amountUSD: number;
+  originCountry: string;
+  destinationCountry: string;
+  description: string;
+  detectedMonth: number;
+  riskScore: number; // 0 - 100
+  status: AmlInvestigationStatus;
+  evidenceNotes: string[];
+  isAccountFrozen: boolean;
+  uifReportId?: string;
+  clearedByOfficer?: string;
+
+  // Campos amigables y alias para consola ejecutiva
+  ticketCode?: string;
+  clientRtnOrId?: string;
+  alertType?: AmlAlertType;
+  involvedAmountHNL?: number;
+  detectedAtMonth?: number;
+  triggerHeuristic?: string;
+  recommendedAction?: string;
+  assignedInvestigator?: string;
+  uifReportFiled?: boolean;
+}
+
+export interface UifReportDossier {
+  reportId: string; // ROS-UIF-2026-XXXX
+  filingMonth: number;
+  alertId: string;
+  clientId: string;
+  clientName: string;
+  clientRtn: string;
+  suspicionSummary: string;
+  totalFlaggedAmountHNL: number;
+  legalBasis: string; // Ley Especial Contra el Lavado de Activos Decreto 144-2014
+  uifCaseStatus: 'Enviado a UIF/CNBS' | 'En Investigación Fiscal' | 'Bloqueo Judicial Ratificado';
+  submissionTimestamp: number;
+
+  // Campos adicionales y alias de expediente
+  id?: string;
+  expedienteNumber?: string;
+  clientRtnOrId?: string;
+  typology?: AmlAlertType;
+  filingDate?: string;
+  gameMonth?: number;
+  involvedAmountHNL?: number;
+  legalBasisArticles?: string[];
+  complianceOfficerSignature?: string;
+  status?: string;
+  uifAcknowledgmentReceipt?: string;
+}
+
+export interface AmlComplianceState {
+  alerts: AmlTransactionAlert[];
+  uifReports: UifReportDossier[];
+  totalScreenedTransactionsMonth: number;
+  totalSuspiciousVolumeHNL: number;
+  frozenAccountsCount: number;
+  totalFrozenFundsHNL: number;
+  ofacMatchesBlockedCount: number;
+  autoStructuringRulesActive: boolean;
+  pepStrictMonitoringActive: boolean;
+  riskThresholdScore: number; // e.g. 70
+
+  // Alias y métricas ejecutivas complementarias
+  complianceAuditRatingScore?: number;
+  transactionAlerts?: AmlTransactionAlert[];
+  historicalUifReports?: UifReportDossier[];
+  monthlyScreenedTransactionsCount?: number;
+  suspiciousActivityVolumeHNL?: number;
+  frozenFundsTotalHNL?: number;
+  uifReportsFiledCount?: number;
+}
+
+// ------------------------------------------------------------------------------------
+// MOTOR DE DILEMAS EJECUTIVOS, ÉTICOS Y CRISIS DE JUNTA DIRECTIVA
+// ------------------------------------------------------------------------------------
+
+export type DilemmaCategory = 
+  | 'lavado_de_dinero' 
+  | 'presion_politica' 
+  | 'crisis_reputacional' 
+  | 'fraude_interno' 
+  | 'esg_medioambiente' 
+  | 'auditoria_cnbs';
+
+export type DilemmaStatus = 'pendiente' | 'resuelto' | 'expirado';
+
+export interface DilemmaOption {
+  id: string;
+  title: string;
+  description: string;
+  consequencesSummary: string;
+  impactFinancials: {
+    cashDeltaHNL: number;
+    profitDeltaHNL: number;
+    equityDeltaHNL: number;
+    carDeltaBps: number;
+    cnbsFineHNL?: number;
+  };
+  impactCompliance: {
+    complianceScoreDelta: number; // -30 a +30
+    reputationScoreDelta: number; // -30 a +30
+    cnbsAuditRiskLevel: 'Bajo' | 'Moderado' | 'Alto' | 'Sanción Inminente';
+    cnbsFineHNL?: number;
+  };
+  directorsVotesApprovalPct: number; // Ej. 80% del Directorio a favor
+}
+
+export interface ExecutiveDilemma {
+  id: string;
+  number: number;
+  month: number;
+  category: DilemmaCategory;
+  title: string;
+  dilemmaSummary: string;
+  detailedContext: string;
+  stakeholders: string[]; // e.g. ['Comisión Nacional de Bancos y Seguros', 'Clientes Ahorrantes', 'Junta Directiva']
+  regulatoryArticle: string;
+  urgency: 'Urgente' | 'Alta' | 'Ordinaria';
+  options: DilemmaOption[];
+  status: DilemmaStatus;
+  selectedOptionId?: string;
+  chosenOptionId?: string;
+  resolutionNote?: string;
+  resolvedAtMonth?: number;
+}
+
+export interface ExecutiveDilemmasState {
+  dilemmas: ExecutiveDilemma[];
+  activeDilemmaId: string | null;
+  resolvedDilemmasCount: number;
+  accumulatedFinesHNL: number;
+  publicReputationScore: number; // 0 a 100
+  complianceTrustScore: number; // 0 a 100
+  crisisActive: boolean;
+  crisisScenarioTitle?: string;
+  crisisDetails?: string;
+}

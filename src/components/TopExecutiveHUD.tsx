@@ -18,7 +18,9 @@ import {
   Sparkles,
   RefreshCw,
   AlertTriangle,
-  FileText
+  FileText,
+  ShieldAlert,
+  Vote
 } from 'lucide-react';
 
 interface TopExecutiveHUDProps {
@@ -32,6 +34,7 @@ interface TopExecutiveHUDProps {
   onOpenMonthlySummary?: () => void;
   onOpenFxForwards?: () => void;
   onOpenStressTesting?: () => void;
+  onOpenExecutiveDilemmas?: () => void;
 }
 
 export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
@@ -44,7 +47,8 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   onOpenInterbankMarket,
   onOpenMonthlySummary,
   onOpenFxForwards,
-  onOpenStressTesting
+  onOpenStressTesting,
+  onOpenExecutiveDilemmas
 }) => {
   const [isMuted, setIsMuted] = React.useState(sound.getMuted());
   const [showAlertsDropdown, setShowAlertsDropdown] = React.useState(false);
@@ -63,9 +67,12 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const alerts = state.dynamicAlerts || [];
   const unreadAlertsCount = alerts.filter(a => !a.isRead).length;
+  const amlPendingCount = state.amlCompliance?.transactionAlerts?.filter(a => a.status === 'bajo_investigacion' || a.status === 'detectada').length || 0;
+  const pendingDilemmasCount = state.executiveDilemmas?.dilemmas?.filter(d => d.status === 'pendiente').length || 0;
 
   const navItems = [
     { id: 'overview', label: 'Directorio' },
+    { id: 'aml_compliance', label: `Prevención Fraudes & AML (${amlPendingCount})` },
     { id: 'dividends', label: 'Ranking Dividendos (10 Años)' },
     { id: 'sandbox', label: 'Sandbox Políticas & Scoring' },
     { id: 'strategic_improvements', label: '24 Mejoras Estratégicas' },
@@ -205,6 +212,26 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
             >
               <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline">Cierre Mensual</span>
+            </button>
+          )}
+
+          {/* Botón Dilemas de Directorio */}
+          {onOpenExecutiveDilemmas && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenExecutiveDilemmas();
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-amber-500/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 flex items-center gap-1.5 text-xs transition-colors font-medium relative"
+              title="Dilemas Estratégicos, Éticos y Simulador de Crisis de Directorio"
+            >
+              <Vote className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Dilemas Directorio</span>
+              {pendingDilemmasCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center">
+                  {pendingDilemmasCount}
+                </span>
+              )}
             </button>
           )}
 

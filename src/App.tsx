@@ -54,11 +54,14 @@ import { AdvancedOperationsHub } from './components/AdvancedOperationsHub';
 import { DividendRankingDashboard } from './components/DividendRankingDashboard';
 import { PolicySandboxPanel } from './components/PolicySandboxPanel';
 import { StrategicImprovementsHub } from './components/StrategicImprovementsHub';
+import { AmlFraudComplianceHub } from './components/AmlFraudComplianceHub';
+import { ExecutiveDilemmasModal } from './components/ExecutiveDilemmasModal';
 import { restoreGameState } from './game/savedState';
 
 const STORAGE_KEY = 'aureo-bank-sim-state-v5';
 
 export default function App() {
+  const [isExecutiveDilemmasModalOpen, setIsExecutiveDilemmasModalOpen] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1070,6 +1073,7 @@ export default function App() {
         onOpenMonthlySummary={() => setIsMonthlyClosingModalOpen(true)}
         onOpenFxForwards={() => setIsFxForwardsModalOpen(true)}
         onOpenStressTesting={() => setIsStressTestingModalOpen(true)}
+        onOpenExecutiveDilemmas={() => setIsExecutiveDilemmasModalOpen(true)}
       />
 
       {/* Contenido Principal según la Pestaña Activa */}
@@ -1079,6 +1083,13 @@ export default function App() {
             state={gameState}
             onSetMarketing={handleSetMarketing}
             onNavigateTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'aml_compliance' && (
+          <AmlFraudComplianceHub
+            state={gameState}
+            onUpdateState={setGameState}
           />
         )}
 
@@ -1339,6 +1350,16 @@ export default function App() {
           onExtraordinaryPrepayment={handleExtraordinaryPrepayment}
           onRecalibrateLimit={handleRecalibrateLimit}
           onRenegotiateDebt={handleNegotiateDebtWorkout}
+        />
+      )}
+
+      {/* Modal de Dilemas Ejecutivos, Éticos y Simulador de Crisis de Directorio */}
+      {isExecutiveDilemmasModalOpen && (
+        <ExecutiveDilemmasModal
+          state={gameState}
+          isOpen={true}
+          onClose={() => setIsExecutiveDilemmasModalOpen(false)}
+          onUpdateState={setGameState}
         />
       )}
 

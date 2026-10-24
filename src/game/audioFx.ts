@@ -186,6 +186,16 @@ class SoundEngine {
     this.playRejectBuzzer();
   }
 
+  // Alias para inversión estratégica o resolución directiva
+  public playInvest() {
+    this.playCashChime();
+  }
+
+  // Alias para alerta de riesgo o crisis
+  public playAlert() {
+    this.playRejectBuzzer();
+  }
+
   // Alias para jingle de mejora técnica
   public playUpgradeJingle() {
     this.playApprovalStamp();

@@ -41,14 +41,27 @@ import {
   StrategicImprovementStatus,
   StrategicActivationMode,
   StrategicImprovementItem,
-  StrategicImprovementsState
+  StrategicImprovementsState,
+  AmlComplianceState,
+  AmlTransactionAlert,
+  AmlAlertSeverity,
+  AmlAlertType,
+  AmlInvestigationStatus,
+  UifReportDossier,
+  ExecutiveDilemmasState,
+  ExecutiveDilemma,
+  DilemmaCategory,
+  DilemmaStatus,
+  DilemmaOption
 } from './types';
 import { 
   INITIAL_BANKING_PROGRAMS_20, 
   INITIAL_ADVANCED_OPERATIONS,
   INITIAL_DIVIDEND_GOVERNANCE,
   INITIAL_FINANCIAL_SANDBOX,
-  INITIAL_STRATEGIC_IMPROVEMENTS
+  INITIAL_STRATEGIC_IMPROVEMENTS,
+  INITIAL_AML_COMPLIANCE,
+  INITIAL_EXECUTIVE_DILEMMAS
 } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -1082,6 +1095,12 @@ export function advanceGameMonth(state: GameState): GameState {
   // 16. Hub Estratégico de 24 Mejoras Institucionales (3 Pilares, ROI y Desbloqueos)
   const { updatedImprovements: newStrategicImprovements } = advanceStrategicImprovementsMonth(state, nextMonth, totalAssets, newCAR, newNPL);
 
+  // 17. Centro Global de Prevención de Fraudes, Lavado de Dinero (AML/CFT) y Alertas Heurísticas
+  const newAmlCompliance = advanceAmlComplianceMonth(state, nextMonth);
+
+  // 18. Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
+  const newExecutiveDilemmas = advanceExecutiveDilemmasMonth(state, nextMonth);
+
   return {
     ...state,
     gameMonth: nextMonth,
@@ -1129,7 +1148,9 @@ export function advanceGameMonth(state: GameState): GameState {
     lastMonthlyClosingSummary: monthlyClosingSummary,
     bankingPrograms20: newBankingPrograms20,
     advancedOperations: newAdvancedOperations,
-    strategicImprovements: newStrategicImprovements
+    strategicImprovements: newStrategicImprovements,
+    amlCompliance: newAmlCompliance,
+    executiveDilemmas: newExecutiveDilemmas
   };
 }
 
@@ -4444,3 +4465,570 @@ export function checkAndUnlockMilestones(state: GameState): GameState {
     }
   };
 }
+
+// ============================================================================
+// CENTRO GLOBAL DE PREVENCIÓN DE FRAUDES, LAVADO DE ACTIVOS (AML/CFT) Y REPORTES UIF
+// ============================================================================
+
+export function advanceAmlComplianceMonth(state: GameState, nextMonth: number): AmlComplianceState {
+  const current = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const newTransactionsScreened = Math.floor(32000 + Math.random() * 8000);
+  const additionalSuspiciousVol = Math.floor(1200000 + Math.random() * 1800000);
+
+  // Generación condicional de nuevas alertas heurísticas conforme avanzan los meses
+  const rawAlerts = Array.isArray(current.alerts) ? current.alerts : (Array.isArray(current.transactionAlerts) ? current.transactionAlerts : (INITIAL_AML_COMPLIANCE.alerts || []));
+  let alerts = [...rawAlerts];
+
+  if (nextMonth === 2 && !alerts.some(a => a.id === 'aml-alt-07')) {
+    alerts.unshift({
+      id: 'aml-alt-07',
+      clientId: 'CLI-PYM-03',
+      ticketCode: 'AML-2026-CHOL-09',
+      clientName: 'Agroinsumos del Aguan S. de R.L.',
+      clientRtn: '0501-9018-882190',
+      clientRtnOrId: '0501-9018-882190',
+      division: 'pyme',
+      type: 'rapid_movement',
+      alertType: 'rapid_movement',
+      severity: 'alta',
+      amountHNL: 3850000,
+      involvedAmountHNL: 3850000,
+      amountUSD: 155000,
+      originCountry: 'Honduras (Tocoa)',
+      destinationCountry: 'Extranjero (Exchange Cripto P2P)',
+      status: 'en_analisis',
+      detectedMonth: nextMonth,
+      detectedAtMonth: nextMonth,
+      description: 'Transferencias rápidas recibidas de múltiples cuentas personales en Tocoa y desvío inmediato hacia cuenta de criptoactivos no registrada.',
+      triggerHeuristic: 'Incompatibilidad de flujo comercial agrícola con destino en exchange P2P extranjero.',
+      recommendedAction: 'Solicitar facturas de venta gravadas por SAR e inmovilizar saldo de salida.',
+      riskScore: 68,
+      evidenceNotes: ['Flujo rápido sin justificación comercial.', 'Desvío hacia plataforma no regulada.'],
+      isAccountFrozen: false
+    });
+  } else if (nextMonth === 3 && !alerts.some(a => a.id === 'aml-alt-08')) {
+    alerts.unshift({
+      id: 'aml-alt-08',
+      clientId: 'CLI-CORP-04',
+      ticketCode: 'AML-2026-TGU-12',
+      clientName: 'Consorcio Vial Maya Honduras',
+      clientRtn: '0801-9003-124991',
+      clientRtnOrId: '0801-9003-124991',
+      division: 'corporativa',
+      type: 'pep_high_risk',
+      alertType: 'pep_high_risk',
+      severity: 'critica',
+      amountHNL: 14200000,
+      involvedAmountHNL: 14200000,
+      amountUSD: 572000,
+      originCountry: 'Honduras (Fideicomiso Público)',
+      destinationCountry: 'Honduras (Cuentas Personales Familiares PEP)',
+      status: 'en_analisis',
+      detectedMonth: nextMonth,
+      detectedAtMonth: nextMonth,
+      description: 'Anticipo de contrato de obra pública transferido a cuentas personales de familiares de ex-funcionario de infraestructura.',
+      triggerHeuristic: 'Cruce con base de datos de Personas Expuestas Políticamente (PEP) y beneficiarios finales opacos.',
+      recommendedAction: 'Elevar a Oficial de Cumplimiento Titular para emisión inmediata de ROS ante la UIF.',
+      riskScore: 84,
+      evidenceNotes: ['Familiar de primer grado de consanguinidad de PEP.', 'Contrato público objetado por el Tribunal Superior de Cuentas.'],
+      isAccountFrozen: false
+    });
+  }
+
+  // Recalcular montos congelados basados en clientes reales
+  const frozenClients = (state.clients || []).filter(c => c.isFrozen);
+  const calculatedFrozenFunds = frozenClients.reduce((sum, c) => sum + (c.accountBalanceHNL || 0), 0);
+  const calculatedFrozenAccounts = Math.max(current.frozenAccountsCount || 0, frozenClients.length);
+
+  const prevScreened = current.totalScreenedTransactionsMonth || current.monthlyScreenedTransactionsCount || 124500;
+  const prevSuspicious = current.totalSuspiciousVolumeHNL || current.suspiciousActivityVolumeHNL || 48555500;
+  const prevFrozenFunds = calculatedFrozenFunds > 0 ? calculatedFrozenFunds : (current.totalFrozenFundsHNL || current.frozenFundsTotalHNL || 11928000);
+  const uifList = current.uifReports || current.historicalUifReports || INITIAL_AML_COMPLIANCE.uifReports || [];
+
+  return {
+    ...current,
+    alerts,
+    transactionAlerts: alerts,
+    uifReports: uifList,
+    historicalUifReports: uifList,
+    totalScreenedTransactionsMonth: prevScreened + newTransactionsScreened,
+    monthlyScreenedTransactionsCount: prevScreened + newTransactionsScreened,
+    totalSuspiciousVolumeHNL: prevSuspicious + additionalSuspiciousVol,
+    suspiciousActivityVolumeHNL: prevSuspicious + additionalSuspiciousVol,
+    frozenAccountsCount: calculatedFrozenAccounts,
+    totalFrozenFundsHNL: prevFrozenFunds,
+    frozenFundsTotalHNL: prevFrozenFunds,
+    ofacMatchesBlockedCount: current.ofacMatchesBlockedCount || 3,
+    autoStructuringRulesActive: true,
+    pepStrictMonitoringActive: true,
+    riskThresholdScore: current.riskThresholdScore || 75,
+    complianceAuditRatingScore: current.complianceAuditRatingScore || 94.5,
+    uifReportsFiledCount: current.uifReportsFiledCount || uifList.length
+  };
+}
+
+/** Congelar cuenta de un cliente bajo orden UIF / Decreto 144-2014 */
+export function freezeClientAccount(
+  state: GameState,
+  clientIdOrAlertId: string,
+  reason: string = 'Inmovilización preventiva por indicios de lavado de activos (Decreto 144-2014)'
+): { updatedState: GameState; successMessage: string } {
+  const currentAml = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const baseAlerts = currentAml.alerts || currentAml.transactionAlerts || INITIAL_AML_COMPLIANCE.alerts || [];
+
+  let targetClient = state.clients.find(c => c.id === clientIdOrAlertId || c.rtn === clientIdOrAlertId || c.cif === clientIdOrAlertId);
+
+  // Si no se encuentra directo por clientId, buscar si coincide con alguna alerta AML
+  const linkedAlert = baseAlerts.find(a => a.id === clientIdOrAlertId || a.clientRtn === clientIdOrAlertId || a.clientRtnOrId === clientIdOrAlertId || a.clientName === clientIdOrAlertId || a.clientId === clientIdOrAlertId);
+  if (!targetClient && linkedAlert) {
+    targetClient = state.clients.find(c => c.id === linkedAlert.clientId || c.rtn === linkedAlert.clientRtn || c.rtn === linkedAlert.clientRtnOrId || c.name.toLowerCase() === linkedAlert.clientName.toLowerCase());
+  }
+
+  const clientName = targetClient ? targetClient.name : (linkedAlert ? linkedAlert.clientName : 'Titular de Cuenta');
+  const frozenAmount = targetClient ? targetClient.accountBalanceHNL : (linkedAlert ? (linkedAlert.amountHNL || linkedAlert.involvedAmountHNL || 0) : 0);
+
+  // Actualizar clientes
+  const updatedClients = state.clients.map(c => {
+    if (targetClient && c.id === targetClient.id) {
+      return {
+        ...c,
+        isFrozen: true,
+        frozenReason: reason,
+        amlStatus: 'congelada_uif' as const,
+        notes: `${c.notes || ''} [CUENTA CONGELADA POR ORDEN UIF/CNBS en Mes ${state.gameMonth}]`
+      };
+    }
+    return c;
+  });
+
+  // Actualizar alertas asociadas
+  const updatedAlerts = baseAlerts.map(a => {
+    if (a.id === clientIdOrAlertId || (targetClient && (a.clientId === targetClient.id || a.clientRtn === targetClient.rtn || a.clientRtnOrId === targetClient.rtn || a.clientName.toLowerCase() === targetClient.name.toLowerCase()))) {
+      return {
+        ...a,
+        status: 'congelada' as const,
+        isAccountFrozen: true,
+        assignedInvestigator: 'Oficial de Cumplimiento Titular'
+      };
+    }
+    return a;
+  });
+
+  const updatedFrozenCount = (currentAml.frozenAccountsCount || 0) + 1;
+  const updatedFrozenFunds = (currentAml.totalFrozenFundsHNL || currentAml.frozenFundsTotalHNL || 0) + frozenAmount;
+
+  const updatedAml: AmlComplianceState = {
+    ...currentAml,
+    alerts: updatedAlerts,
+    transactionAlerts: updatedAlerts,
+    frozenAccountsCount: updatedFrozenCount,
+    totalFrozenFundsHNL: updatedFrozenFunds,
+    frozenFundsTotalHNL: updatedFrozenFunds,
+    complianceAuditRatingScore: +Math.min(99.8, (currentAml.complianceAuditRatingScore || 94.5) + 0.4).toFixed(1)
+  };
+
+  const newNotification: GameEventNotification = {
+    id: `notif-freeze-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'regulatory_alert',
+    title: `Inmovilización Judicial de Fondos: ${clientName}`,
+    message: `Se aplicó congelamiento preventivo sobre la cuenta de ${clientName} por ${formatHNL(frozenAmount)}. Motivo: ${reason}.`,
+    impactSummary: `Fondos en custodia judicial: ${formatHNL(frozenAmount)} · Cumplimiento UIF al 100%`
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      amlCompliance: updatedAml,
+      notifications: [newNotification, ...state.notifications]
+    },
+    successMessage: `Cuenta de ${clientName} inmovilizada exitosamente conforme al Decreto 144-2014. Fondos retenidos: ${formatHNL(frozenAmount)}.`
+  };
+}
+
+/** Descongelar cuenta tras descargo legal y resolución favorable */
+export function unfreezeClientAccount(
+  state: GameState,
+  clientIdOrAlertId: string
+): { updatedState: GameState; successMessage: string } {
+  const currentAml = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const baseAlerts = currentAml.alerts || currentAml.transactionAlerts || INITIAL_AML_COMPLIANCE.alerts || [];
+
+  let targetClient = state.clients.find(c => c.id === clientIdOrAlertId || c.rtn === clientIdOrAlertId);
+  const linkedAlert = baseAlerts.find(a => a.id === clientIdOrAlertId || a.clientRtn === clientIdOrAlertId || a.clientRtnOrId === clientIdOrAlertId || a.clientId === clientIdOrAlertId);
+  if (!targetClient && linkedAlert) {
+    targetClient = state.clients.find(c => c.id === linkedAlert.clientId || c.rtn === linkedAlert.clientRtn || c.rtn === linkedAlert.clientRtnOrId || c.name.toLowerCase() === linkedAlert.clientName.toLowerCase());
+  }
+
+  const clientName = targetClient ? targetClient.name : (linkedAlert ? linkedAlert.clientName : 'Cliente');
+  const unfrozenAmount = targetClient ? targetClient.accountBalanceHNL : 0;
+
+  const updatedClients = state.clients.map(c => {
+    if (targetClient && c.id === targetClient.id) {
+      return {
+        ...c,
+        isFrozen: false,
+        frozenReason: undefined,
+        amlStatus: 'investigada_limpia' as const,
+        notes: `${c.notes || ''} [Descongelada por sobreseimiento en Mes ${state.gameMonth}]`
+      };
+    }
+    return c;
+  });
+
+  const updatedAlerts = baseAlerts.map(a => {
+    if (a.id === clientIdOrAlertId || (targetClient && (a.clientId === targetClient.id || a.clientRtn === targetClient.rtn || a.clientRtnOrId === targetClient.rtn || a.clientName.toLowerCase() === targetClient.name.toLowerCase()))) {
+      return {
+        ...a,
+        status: 'archivada_justificada' as const,
+        isAccountFrozen: false
+      };
+    }
+    return a;
+  });
+
+  const updatedFrozenCount = Math.max(0, (currentAml.frozenAccountsCount || 0) - 1);
+  const updatedFrozenFunds = Math.max(0, (currentAml.totalFrozenFundsHNL || currentAml.frozenFundsTotalHNL || 0) - unfrozenAmount);
+
+  const updatedAml: AmlComplianceState = {
+    ...currentAml,
+    alerts: updatedAlerts,
+    transactionAlerts: updatedAlerts,
+    frozenAccountsCount: updatedFrozenCount,
+    totalFrozenFundsHNL: updatedFrozenFunds,
+    frozenFundsTotalHNL: updatedFrozenFunds
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      amlCompliance: updatedAml
+    },
+    successMessage: `Cuenta de ${clientName} reactivada y desbloqueada tras dictamen legal favorable.`
+  };
+}
+
+/** Emitir y Radicar Reporte de Operación Sospechosa (ROS) formal ante la UIF y CNBS */
+export function fileUifSuspiciousReport(
+  state: GameState,
+  alertId: string,
+  suspicionSummary?: string
+): { updatedState: GameState; successMessage: string; reportId: string } {
+  const currentAml = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const baseAlerts = currentAml.alerts || currentAml.transactionAlerts || INITIAL_AML_COMPLIANCE.alerts || [];
+  const baseReports = currentAml.uifReports || currentAml.historicalUifReports || INITIAL_AML_COMPLIANCE.uifReports || [];
+
+  const alert = baseAlerts.find(a => a.id === alertId);
+  const reportNumber = baseReports.length + 1;
+  const reportId = `ROS-UIF-2026-${String(reportNumber).padStart(3, '0')}`;
+  const receiptCode = `BCH-UIF-REC-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const newDossier: UifReportDossier = {
+    reportId,
+    id: reportId,
+    filingMonth: state.gameMonth,
+    gameMonth: state.gameMonth,
+    filingDate: `Mes ${state.gameMonth} - 2026`,
+    alertId,
+    clientId: alert?.clientId || `CLI-AML-${alertId}`,
+    clientName: alert?.clientName || 'Titular no identificado',
+    clientRtn: alert?.clientRtn || alert?.clientRtnOrId || '0801-1990-00000',
+    clientRtnOrId: alert?.clientRtn || alert?.clientRtnOrId || '0801-1990-00000',
+    expedienteNumber: `EXP-UIF-HN-${alert?.ticketCode || alertId.toUpperCase()}`,
+    typology: (alert?.alertType || alert?.type || 'pitufeo_structuring') as any,
+    totalFlaggedAmountHNL: alert?.amountHNL || alert?.involvedAmountHNL || 1500000,
+    involvedAmountHNL: alert?.amountHNL || alert?.involvedAmountHNL || 1500000,
+    suspicionSummary: suspicionSummary || alert?.description || 'Operaciones no congruentes con el perfil económico del cliente.',
+    legalBasis: 'Ley Especial Contra el Lavado de Activos Decreto No. 144-2014, Artículo 34 y Circular CNBS No. 018/2022',
+    legalBasisArticles: [
+      'Decreto 144-2014 Art. 34 (Ley Especial contra el Lavado de Activos de Honduras)',
+      'Resolución CNBS No. 082/2021 Art. 19 (Obligación de Remisión de ROS dentro de las 24 Horas)',
+      'Recomendación 20 de los Estándares Internacionales GAFI / GAFILAT'
+    ],
+    uifCaseStatus: 'Enviado a UIF/CNBS',
+    status: 'remitido_uif',
+    submissionTimestamp: Date.now(),
+    complianceOfficerSignature: 'Lic. Fernando Zelaya (Oficial de Cumplimiento Titular CNBS #OF-094)',
+    uifAcknowledgmentReceipt: receiptCode
+  };
+
+  const updatedAlerts = baseAlerts.map(a => {
+    if (a.id === alertId) {
+      return {
+        ...a,
+        status: 'reportada_uif' as const,
+        uifReportId: reportId,
+        uifReportFiled: true,
+        assignedInvestigator: 'Oficial de Cumplimiento Titular'
+      };
+    }
+    return a;
+  });
+
+  const updatedReports = [newDossier, ...baseReports];
+  const updatedAml: AmlComplianceState = {
+    ...currentAml,
+    alerts: updatedAlerts,
+    transactionAlerts: updatedAlerts,
+    uifReports: updatedReports,
+    historicalUifReports: updatedReports,
+    uifReportsFiledCount: updatedReports.length,
+    complianceAuditRatingScore: +Math.min(99.8, (currentAml.complianceAuditRatingScore || 94.5) + 0.3).toFixed(1)
+  };
+
+  const notif: GameEventNotification = {
+    id: `notif-uif-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'regulatory_alert',
+    title: `Reporte ROS Radicado ante la UIF: ${reportId}`,
+    message: `Se transmitió exitosamente el expediente ${newDossier.expedienteNumber} a la Unidad de Información Financiera (UIF/CNBS) por ${formatHNL(newDossier.totalFlaggedAmountHNL)}. Recibo: ${receiptCode}.`,
+    impactSummary: 'Cumplimiento normativo penal blindado ante la CNBS.'
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      amlCompliance: updatedAml,
+      notifications: [notif, ...state.notifications]
+    },
+    successMessage: `Expediente ROS ${reportId} transmitido con acuse de recibo oficial de la UIF (${receiptCode}).`,
+    reportId
+  };
+}
+
+/** Resolver una alerta de AML mediante archivo justificado, congelamiento o remisión UIF */
+export function resolveAmlAlert(
+  state: GameState,
+  alertId: string,
+  action: 'archivar_justificada' | 'congelar_y_reportar' | 'remitir_uif',
+  notes?: string
+): { updatedState: GameState; successMessage: string } {
+  const currentAml = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const baseAlerts = currentAml.alerts || currentAml.transactionAlerts || INITIAL_AML_COMPLIANCE.alerts || [];
+  const alert = baseAlerts.find(a => a.id === alertId);
+  if (!alert) {
+    return { updatedState: state, successMessage: 'Alerta no encontrada' };
+  }
+
+  if (action === 'congelar_y_reportar') {
+    const freezeRes = freezeClientAccount(state, alertId, notes || `Inmovilización preventiva por alerta ${alert.ticketCode || alert.id}`);
+    const uifRes = fileUifSuspiciousReport(freezeRes.updatedState, alertId, notes);
+    return {
+      updatedState: uifRes.updatedState,
+      successMessage: `Acción ejecutada: Cuenta inmovilizada y expediente ${uifRes.reportId} radicado ante la UIF/CNBS.`
+    };
+  } else if (action === 'remitir_uif') {
+    const uifRes = fileUifSuspiciousReport(state, alertId, notes);
+    return {
+      updatedState: uifRes.updatedState,
+      successMessage: `Expediente transmitido a la UIF bajo recibo oficial.`
+    };
+  } else {
+    // Archivar con justificación documentada
+    const updatedAlerts = baseAlerts.map(a => {
+      if (a.id === alertId) {
+        return {
+          ...a,
+          status: 'archivada_justificada' as const,
+          clearedByOfficer: 'Auditoría Forense Interna',
+          assignedInvestigator: 'Auditoría Forense Interna'
+        };
+      }
+      return a;
+    });
+
+    const updatedAml: AmlComplianceState = {
+      ...currentAml,
+      alerts: updatedAlerts,
+      transactionAlerts: updatedAlerts,
+      complianceAuditRatingScore: +Math.min(99.8, (currentAml.complianceAuditRatingScore || 94.5) + 0.1).toFixed(1)
+    };
+
+    return {
+      updatedState: {
+        ...state,
+        amlCompliance: updatedAml
+      },
+      successMessage: `Alerta ${alert.ticketCode || alert.id} archivada con dictamen técnico de auditoría y soporte documental.`
+    };
+  }
+}
+
+// ============================================================================
+// MOTOR DE DILEMAS EJECUTIVOS, ÉTICOS Y CRISIS DE JUNTA DIRECTIVA
+// ============================================================================
+
+export function advanceExecutiveDilemmasMonth(state: GameState, nextMonth: number): ExecutiveDilemmasState {
+  const current = state.executiveDilemmas || INITIAL_EXECUTIVE_DILEMMAS;
+  
+  // Buscar el primer dilema pendiente para ponerlo como activo
+  const pendingDilemma = current.dilemmas.find(d => d.status === 'pendiente');
+  const activeId = pendingDilemma ? pendingDilemma.id : current.activeDilemmaId;
+
+  return {
+    ...current,
+    activeDilemmaId: activeId
+  };
+}
+
+/** Resolver un dilema ético/financiero por votación de la Junta Directiva */
+export function resolveExecutiveDilemma(
+  state: GameState,
+  dilemmaId: string,
+  optionId: string
+): { updatedState: GameState; successMessage: string } {
+  const current = state.executiveDilemmas || INITIAL_EXECUTIVE_DILEMMAS;
+  const dilemma = current.dilemmas.find(d => d.id === dilemmaId);
+  if (!dilemma) {
+    return { updatedState: state, successMessage: 'Dilema de Directorio no encontrado.' };
+  }
+
+  const option = dilemma.options.find(o => o.id === optionId);
+  if (!option) {
+    return { updatedState: state, successMessage: 'Opción resolutiva no encontrada.' };
+  }
+
+  const { impactFinancials, impactCompliance } = option;
+  const cashDelta = impactFinancials.cashDeltaHNL - (impactFinancials.cnbsFineHNL || 0);
+  const profitDelta = impactFinancials.profitDeltaHNL;
+  const carDeltaPct = +(impactFinancials.carDeltaBps / 100).toFixed(2);
+  const cnbsFine = impactFinancials.cnbsFineHNL || 0;
+
+  // Actualizar dilema
+  const updatedDilemmas = current.dilemmas.map(d => {
+    if (d.id === dilemmaId) {
+      return {
+        ...d,
+        status: 'resuelto' as const,
+        chosenOptionId: optionId,
+        resolvedAtMonth: state.gameMonth
+      };
+    }
+    return d;
+  });
+
+  // Próximo dilema activo si queda alguno
+  const nextPending = updatedDilemmas.find(d => d.status === 'pendiente');
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves + cashDelta),
+    currentMonthProfit: state.financials.currentMonthProfit + profitDelta,
+    retainedEarnings: state.financials.retainedEarnings + profitDelta,
+    totalEquity: state.financials.totalEquity + profitDelta,
+    capitalAdequacyRatioCAR: +(Math.max(8.0, state.financials.capitalAdequacyRatioCAR + carDeltaPct)).toFixed(2)
+  };
+
+  const updatedDilemmasState: ExecutiveDilemmasState = {
+    ...current,
+    dilemmas: updatedDilemmas,
+    activeDilemmaId: nextPending ? nextPending.id : dilemmaId,
+    resolvedDilemmasCount: current.resolvedDilemmasCount + 1,
+    accumulatedFinesHNL: current.accumulatedFinesHNL + cnbsFine,
+    publicReputationScore: Math.max(10, Math.min(100, current.publicReputationScore + impactCompliance.reputationScoreDelta)),
+    complianceTrustScore: Math.max(10, Math.min(100, current.complianceTrustScore + impactCompliance.complianceScoreDelta))
+  };
+
+  const notif: GameEventNotification = {
+    id: `notif-dil-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'board_decision',
+    title: `Resolución de Directorio: ${dilemma.title}`,
+    message: `La Junta Directiva aprobó la opción "${option.title}" con un ${option.directorsVotesApprovalPct}% de votos favorables. ${option.consequencesSummary}`,
+    impactSummary: `Impacto en Utilidad: ${profitDelta >= 0 ? '+' : ''}${formatHNL(profitDelta)} · CAR: ${carDeltaPct >= 0 ? '+' : ''}${carDeltaPct}% · Multa CNBS: ${formatHNL(cnbsFine)}`
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      financials: updatedFinancials,
+      executiveDilemmas: updatedDilemmasState,
+      notifications: [notif, ...state.notifications]
+    },
+    successMessage: `Resolución de Directorio adoptada: "${option.title}". Dictamen asentado en acta formal.`
+  };
+}
+
+/** Activar simulacro de crisis de reputación y corrida de liquidez */
+export function triggerReputationalCrisisSimulation(state: GameState): { updatedState: GameState; successMessage: string } {
+  const current = state.executiveDilemmas || INITIAL_EXECUTIVE_DILEMMAS;
+  const depositOutflowSimulated = Math.round(state.financials.depositsPublicTotal * 0.04);
+
+  const updatedDilemmas: ExecutiveDilemmasState = {
+    ...current,
+    crisisActive: true,
+    publicReputationScore: Math.max(20, current.publicReputationScore - 12)
+  };
+
+  const notif: GameEventNotification = {
+    id: `notif-crisis-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'regulatory_alert',
+    title: '¡Simulacro de Crisis Reputacional y Tensión de Depósitos!',
+    message: `Se activó el protocolo de defensa ante rumores en redes sociales. Demanda de retiros estimada en ${formatHNL(depositOutflowSimulated)}. El Comité de Crisis debe emitir postura.`,
+    impactSummary: 'Protocolo de liquidez contingente activado ante BCH.'
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      executiveDilemmas: updatedDilemmas,
+      notifications: [notif, ...state.notifications]
+    },
+    successMessage: 'Simulacro de crisis reputacional activado. Mide la resiliencia institucional de tu gobernanza.'
+  };
+}
+
+/** Responder y desactivar la crisis reputacional */
+export function resolveReputationalCrisis(
+  state: GameState,
+  strategy: 'transparencia_inmediata' | 'comunicado_juridico' | 'auditoria_externa'
+): { updatedState: GameState; successMessage: string } {
+  const current = state.executiveDilemmas || INITIAL_EXECUTIVE_DILEMMAS;
+  let reputationRecovery = 10;
+  let costHNL = 0;
+  let summary = '';
+
+  if (strategy === 'transparencia_inmediata') {
+    reputationRecovery = 15;
+    costHNL = 450000;
+    summary = 'Rueda de prensa televisada en Tegucigalpa y San Pedro Sula desmintiendo rumores con auditores presentes.';
+  } else if (strategy === 'auditoria_externa') {
+    reputationRecovery = 18;
+    costHNL = 1200000;
+    summary = 'Certificación especial de solvencia emitida por Deloitte & Touche y respaldo público del BCH.';
+  } else {
+    reputationRecovery = 8;
+    costHNL = 150000;
+    summary = 'Comunicado oficial por prensa escrita y redes sociales advirtiendo acciones legales por difamación.';
+  }
+
+  const updatedDilemmas: ExecutiveDilemmasState = {
+    ...current,
+    crisisActive: false,
+    publicReputationScore: Math.min(100, current.publicReputationScore + reputationRecovery),
+    complianceTrustScore: Math.min(100, current.complianceTrustScore + 5)
+  };
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: Math.max(0, state.financials.cashAndBCHReserves - costHNL),
+    totalOperatingExpense: state.financials.totalOperatingExpense + costHNL
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      financials: updatedFinancials,
+      executiveDilemmas: updatedDilemmas
+    },
+    successMessage: `Crisis resuelta con éxito mediante ${strategy.replace(/_/g, ' ')}. ${summary}`
+  };
+}
+

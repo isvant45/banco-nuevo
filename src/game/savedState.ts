@@ -41,5 +41,11 @@ export function restoreGameState(saved: unknown): GameState {
   if (!state.strategicImprovements) {
     state.strategicImprovements = structuredClone(INITIAL_GAME_STATE.strategicImprovements);
   }
+  if (!state.amlCompliance) {
+    state.amlCompliance = structuredClone(INITIAL_GAME_STATE.amlCompliance);
+  }
+  if (!state.executiveDilemmas) {
+    state.executiveDilemmas = structuredClone(INITIAL_GAME_STATE.executiveDilemmas);
+  }
   return state;
 }

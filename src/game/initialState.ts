@@ -28,7 +28,13 @@ import {
   DividendGovernanceState,
   FinancialSandboxConfig,
   StrategicImprovementsState,
-  StrategicImprovementItem
+  StrategicImprovementItem,
+  AmlComplianceState,
+  AmlTransactionAlert,
+  UifReportDossier,
+  ExecutiveDilemmasState,
+  ExecutiveDilemma,
+  DilemmaOption
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -1089,9 +1095,9 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
 export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   personas: {
     id: 'personas',
-    name: 'Banca Personas (Retail)',
-    categoryTag: 'Cuentas, Préstamos y Tarjetas',
-    description: 'Atención a personas naturales, asalariados y familias en Honduras con cuentas de ahorro, tarjetas y remesas.',
+    name: 'Banca Minorista & Patrimonial Familiar (Consumer & Wealth)',
+    categoryTag: 'Personas Naturales, Nómina & Remesas',
+    description: 'Servicios financieros universales para asalariados, profesionales independientes y familias en Honduras; administración de nómina ACH Pronto y recepción de remesas familiares.',
     clientCount: 18450,
     totalDeposits: 680000000,
     totalLoans: 520000000,
@@ -1111,9 +1117,9 @@ export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   },
   premier: {
     id: 'premier',
-    name: 'Banca Premier / Banca+',
-    categoryTag: 'Segmento Preferencial ($10k-$100k)',
-    description: 'Clientes de ingresos medios-altos y profesionales con pasivos entre US$ 10,000 y US$ 100,000 con atención dedicada.',
+    name: 'Banca Premier & Affluent Wealth (Segmento Preferencial)',
+    categoryTag: 'Patrimonios Medios-Altos ($10k-$100k USD)',
+    description: 'Segmento afluente de altos ingresos con asesoría patrimonial personalizada, condiciones preferenciales en tasas pasivas y cupos de tarjetas internacionales.',
     clientCount: 1420,
     totalDeposits: 410000000,
     totalLoans: 310000000,
@@ -1133,9 +1139,9 @@ export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   },
   privada: {
     id: 'privada',
-    name: 'Banca Privada y Fiduciaria',
-    categoryTag: 'Wealth Management (> $100,000)',
-    description: 'Grandes patrimonios familiares, fondos de inversión y fideicomisos estructurados testamentarios y mercantiles.',
+    name: 'Banca Privada, Fiduciaria & Family Offices (Wealth Management)',
+    categoryTag: 'Grandes Patrimonios (> $100k USD) & Trusts',
+    description: 'Gestión discrecional de patrimonios de familias empresarias hondureñas, fideicomisos testamentarios y mercantiles, y cuentas de custodia internacional.',
     clientCount: 195,
     totalDeposits: 580000000,
     totalLoans: 290000000,
@@ -1155,9 +1161,9 @@ export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   },
   pyme: {
     id: 'pyme',
-    name: 'Banca Comercial PYME',
-    categoryTag: 'Negocios, POS y Agroindustria',
-    description: 'Comercios, distribuidoras, talleres y empresas medianas con líneas de capital de trabajo y terminales de cobro POS.',
+    name: 'Banca Comercial, Pymes & Factoring (Commercial Banking)',
+    categoryTag: 'Empresas Medianas, Comercios & Red POS',
+    description: 'Soluciones integrales para distribuidores, agroindustrias y comercios; financiamiento de capital de trabajo, adquirencia POS y factoring electrónico.',
     clientCount: 2850,
     totalDeposits: 320000000,
     totalLoans: 490000000,
@@ -1177,9 +1183,9 @@ export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   },
   corporativa: {
     id: 'corporativa',
-    name: 'Banca Corporativa',
-    categoryTag: 'Grandes Empresas y Maquilas',
-    description: 'Servicio a corporaciones multinacionales, consorcios azucareros, textileras de maquila y cadenas de supermercados.',
+    name: 'Banca Corporativa, Sindicada & Finanzas Estructuradas (CIB)',
+    categoryTag: 'Consorcios Multinacionales, Maquilas & Infraestructura',
+    description: 'Banca de inversión y corporativa para los mayores conglomerados económicos de Honduras; liderazgo en créditos sindicados, project finance y emisión de bonos.',
     clientCount: 85,
     totalDeposits: 280000000,
     totalLoans: 340000000,
@@ -1199,9 +1205,9 @@ export const INITIAL_DIVISIONS: Record<string, BankDivisionConfig> = {
   },
   internacional: {
     id: 'internacional',
-    name: 'Banca Internacional & SWIFT',
-    categoryTag: 'Comercio Exterior y Corresponsalía',
-    description: 'Gestión de transferencias internacionales SWIFT, cartas de crédito comerciales y mesas de cambio de divisas.',
+    name: 'Banca Global, Tesorería & Corresponsalía SWIFT (Global Markets)',
+    categoryTag: 'Mesas de Divisas, Corresponsalía & Comercio Exterior',
+    description: 'Acceso directo a mercados financieros internacionales, corresponsalía con bancos de primer orden en Nueva York y Zúrich, cartas de crédito y coberturas cambiarias NDF.',
     clientCount: 120,
     totalDeposits: 70000000,
     totalLoans: 45000000,
@@ -3843,6 +3849,527 @@ export const INITIAL_STRATEGIC_IMPROVEMENTS: StrategicImprovementsState = {
   totalMonthlyProfitBoostHNL: 2390000
 };
 
+export const INITIAL_AML_COMPLIANCE: AmlComplianceState = {
+  alerts: [
+    {
+      id: 'aml-alt-01',
+      clientId: 'CLI-MORA-05',
+      clientName: 'Consorcio Maderero Olancho S.A.',
+      clientRtn: '1501-1971-001099',
+      division: 'corporativa',
+      type: 'pitufeo_structuring',
+      severity: 'critica',
+      amountHNL: 3290000,
+      amountUSD: 132394,
+      originCountry: 'Honduras (Juticalpa/Catacamas)',
+      destinationCountry: 'Honduras (Cuenta Corriente)',
+      description: 'Detección de "Pitufeo": 14 depósitos fraccionados en ventanilla de L. 235,000 en menos de 48 horas en 3 sucursales distintas para eludir el umbral de L. 250,000.',
+      detectedMonth: 1,
+      riskScore: 92,
+      status: 'en_analisis',
+      evidenceNotes: [
+        'Depósitos en efectivo consecutivos sin justificación de flujo comercial maderero.',
+        'La empresa mantiene litigio judicial y planta de aserrío clausurada por ICF.',
+        'Cajero de sucursal Juticalpa emitió reporte interno por fraccionamiento premeditado.'
+      ],
+      isAccountFrozen: false
+    },
+    {
+      id: 'aml-alt-02',
+      clientId: 'CLI-CORP-01',
+      clientName: 'Grupo Agroindustrial del Valle S.A.',
+      clientRtn: '0501-1982-004412',
+      division: 'corporativa',
+      type: 'ofac_onu_match',
+      severity: 'critica',
+      amountHNL: 11928000,
+      amountUSD: 480000,
+      originCountry: 'Panamá (Banco Privado Offshore)',
+      destinationCountry: 'Honduras (Áureo Bank SPS)',
+      description: 'Coincidencia con listas restrictivas internacionales: Socio minoritario del 18% incluido en lista de la OFAC (SDNT). Giro entrante en USD bloqueado preventivamente.',
+      detectedMonth: 1,
+      riskScore: 98,
+      status: 'congelada',
+      evidenceNotes: [
+        'Cruce automático de grafo societario ante base de datos World-Check y OFAC.',
+        'Fondo congelado en cuenta transitoria bajo Resolución CNBS No. 144-2014.',
+        'Se notificó de oficio a la Oficialía de Cumplimiento Institucional.'
+      ],
+      isAccountFrozen: true,
+      uifReportId: 'ROS-UIF-2026-001'
+    },
+    {
+      id: 'aml-alt-03',
+      clientId: 'CLI-PRE-02',
+      clientName: 'Ing. Roberto Facussé Handal (PEP)',
+      clientRtn: '0801-1965-008234',
+      division: 'premier',
+      type: 'pep_high_risk',
+      severity: 'alta',
+      amountHNL: 4500000,
+      amountUSD: 181086,
+      originCountry: 'Honduras (Depósito en Ventanilla Tegucigalpa)',
+      destinationCountry: 'Honduras (Cuenta Premier)',
+      description: 'Persona Expuesta Políticamente (PEP): Depósito extraordinario en efectivo de L. 4,500,000 que excede en un 400% su perfil transaccional promedio y su declaración jurada.',
+      detectedMonth: 1,
+      riskScore: 85,
+      status: 'abierta',
+      evidenceNotes: [
+        'Cliente catalogado como PEP bajo el Reglamento de Prevención CNBS.',
+        'Declaró "venta de inmueble rural", pero no presentó escritura notarial registrada en el IP.',
+        'Requiere Debida Diligencia Ampliada (EDD) y ratificación de origen lícito.'
+      ],
+      isAccountFrozen: false
+    },
+    {
+      id: 'aml-alt-04',
+      clientId: 'CLI-PYM-01',
+      clientName: 'Inversiones y Logística Maya Roatán S. de R.L.',
+      clientRtn: '1101-2015-003412',
+      division: 'pyme',
+      type: 'shell_company',
+      severity: 'alta',
+      amountHNL: 18637500,
+      amountUSD: 750000,
+      originCountry: 'Islas Caimán (George Town)',
+      destinationCountry: 'Honduras (Roatán West Bay)',
+      description: 'Presunta Empresa Fachada (Shell Company): Sociedad con capital social mínimo de L. 25,000 que recibe transferencia internacional SWIFT millonaria por "asesoría técnica intangible".',
+      detectedMonth: 1,
+      riskScore: 89,
+      status: 'en_analisis',
+      evidenceNotes: [
+        'Sin planilla reportada en el IHSS ni declaración de volumen de ventas en el SAR.',
+        'Domicilio fiscal coincide con oficina virtual sin personal operativo.',
+        'Transferencia SWIFT retenida en mesa internacional para justificación documental.'
+      ],
+      isAccountFrozen: false
+    },
+    {
+      id: 'aml-alt-05',
+      clientId: 'CLI-RET-01',
+      clientName: 'Carlos Roberto Pineda',
+      clientRtn: '0502-1994-012894',
+      division: 'personas',
+      type: 'card_fraud_cloning',
+      severity: 'media',
+      amountHNL: 64000,
+      amountUSD: 2575,
+      originCountry: 'Estados Unidos (Miami Beach POS)',
+      destinationCountry: 'Honduras (Choloma ATM)',
+      description: 'Fraude por clonación o transacciones geográficamente imposibles: Retiro en cajero automático en Choloma y compra presencial en boutique en Miami con 9 minutos de diferencia.',
+      detectedMonth: 1,
+      riskScore: 78,
+      status: 'abierta',
+      evidenceNotes: [
+        'Algoritmo de telemetría de red Visa detectó velocidad de desplazamiento de 12,000 km/h.',
+        'Tarjeta bloqueada preventivamente en switch transaccional.',
+        'Se contactó al tarjetahabiente para confirmación de fraude y trámite de contracargo.'
+      ],
+      isAccountFrozen: false
+    },
+    {
+      id: 'aml-alt-06',
+      clientId: 'CLI-PYM-02',
+      clientName: 'Agropecuaria El Zamorano / Valle Verde',
+      clientRtn: '0301-1976-009211',
+      division: 'pyme',
+      type: 'rapid_movement',
+      severity: 'alta',
+      amountHNL: 8200000,
+      amountUSD: 330000,
+      originCountry: 'Honduras (Cooperativa Rural Comayagua)',
+      destinationCountry: 'Honduras (Dispersión ACH masiva)',
+      description: 'Movimiento Rápido de Fondos (Pass-Through): Acreditación de L. 8.2M dispersada en 120 transferencias ACH Pronto a terceros particulares en menos de 3 horas.',
+      detectedMonth: 1,
+      riskScore: 81,
+      status: 'abierta',
+      evidenceNotes: [
+        'La cuenta se utilizó como canal puente sin saldo remanente al final del día.',
+        'Más del 60% de los destinatarios tienen cuentas recién creadas en otros bancos.',
+        'Oficialía de Cumplimiento solicitó congelamiento cautelar a Tesorería.'
+      ],
+      isAccountFrozen: false
+    }
+  ],
+  uifReports: [
+    {
+      reportId: 'ROS-UIF-2026-001',
+      filingMonth: 1,
+      alertId: 'aml-alt-02',
+      clientId: 'CLI-CORP-01',
+      clientName: 'Grupo Agroindustrial del Valle S.A.',
+      clientRtn: '0501-1982-004412',
+      suspicionSummary: 'Coincidencia positiva con lista OFAC (Specially Designated Narcotics Traffickers). Fondos por US$ 480,000 inmovilizados preventivamente en cuenta de custodia.',
+      totalFlaggedAmountHNL: 11928000,
+      legalBasis: 'Ley Especial Contra el Lavado de Activos Decreto No. 144-2014, Artículo 34 y Circular CNBS No. 018/2022',
+      uifCaseStatus: 'Enviado a UIF/CNBS',
+      submissionTimestamp: 1737504000000
+    }
+  ],
+  totalScreenedTransactionsMonth: 124500,
+  totalSuspiciousVolumeHNL: 48555500,
+  frozenAccountsCount: 1,
+  totalFrozenFundsHNL: 11928000,
+  ofacMatchesBlockedCount: 3,
+  autoStructuringRulesActive: true,
+  pepStrictMonitoringActive: true,
+  riskThresholdScore: 75
+};
+
+export const INITIAL_EXECUTIVE_DILEMMAS: ExecutiveDilemmasState = {
+  dilemmas: [
+    {
+      id: 'dil-01',
+      number: 1,
+      month: 1,
+      category: 'lavado_de_dinero',
+      title: 'El Mega-Depósito de Procedencia Opaca de Grupo Minero Aguán',
+      dilemmaSummary: 'Grupo Minero Aguán solicita abrir un Certificado de Depósito a Plazo Fijo por L. 350,000,000 al 6.0%. Sin embargo, la Oficialía de Cumplimiento detectó litigios y transacciones con firmas offshore.',
+      detailedContext: 'Un consorcio minero privado del departamento de Colón se presenta en la sede principal con L. 350 Millones listos para ser colocados a 36 meses. Esta inyección de liquidez resolvería de golpe cualquier déficit de encaje legal ante el BCH y permitiría expandir la cartera comercial. No obstante, la investigación de debida diligencia revela que sus accionistas mayoritarios enfrentan denuncias de lavado de activos y cuentas bloqueadas en el extranjero.',
+      stakeholders: ['Comisión Nacional de Bancos y Seguros (CNBS)', 'Unidad de Información Financiera (UIF)', 'Accionistas de Áureo Bank', 'Comité de Tesorería'],
+      regulatoryArticle: 'Decreto 144-2014 Ley Contra el Lavado de Activos y Financiamiento del Terrorismo',
+      urgency: 'Urgente',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-01-opt-a',
+          title: 'Rechazar Depósito y Remitir Reporte ROS a la UIF',
+          description: 'Cerrar la puerta al consorcio, emitir un Reporte de Operación Sospechosa ante la UIF/CNBS y blindar la reputación legal del banco.',
+          consequencesSummary: 'Reputación pública +15%, cero riesgo regulatorio, pero se descarta la captación de L. 350M de liquidez.',
+          impactFinancials: {
+            cashDeltaHNL: 0,
+            profitDeltaHNL: 0,
+            equityDeltaHNL: 0,
+            carDeltaBps: 0
+          },
+          impactCompliance: {
+            complianceScoreDelta: 20,
+            reputationScoreDelta: 15,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 85
+        },
+        {
+          id: 'dil-01-opt-b',
+          title: 'Aceptar bajo Custodia Condicionada a 90 días',
+          description: 'Retener los fondos en cuenta de depósito fiduciario con investigación forense exhaustiva y auditoría externa independiente.',
+          consequencesSummary: 'Captación temporal de L. 350M, margen financiero bruto +L. 1.75M/mes, con costo de auditoría de L. 800,000.',
+          impactFinancials: {
+            cashDeltaHNL: 350000000,
+            profitDeltaHNL: 1750000,
+            equityDeltaHNL: 0,
+            carDeltaBps: 20
+          },
+          impactCompliance: {
+            complianceScoreDelta: -5,
+            reputationScoreDelta: 5,
+            cnbsAuditRiskLevel: 'Moderado'
+          },
+          directorsVotesApprovalPct: 60
+        },
+        {
+          id: 'dil-01-opt-c',
+          title: 'Aceptar Incondicionalmente para Ganar Cuota de Mercado',
+          description: 'Aperturar el DPF de inmediato compitiendo agresivamente contra Banco Atlántida y Ficohsa para subir en el ranking bancario.',
+          consequencesSummary: 'Aumento masivo de activos, pero riesgo severo de sanción CNBS por L. 25M y pérdida de corresponsalía con EE.UU.',
+          impactFinancials: {
+            cashDeltaHNL: 350000000,
+            profitDeltaHNL: 3200000,
+            equityDeltaHNL: 0,
+            carDeltaBps: 35
+          },
+          impactCompliance: {
+            complianceScoreDelta: -30,
+            reputationScoreDelta: -25,
+            cnbsAuditRiskLevel: 'Sanción Inminente',
+            cnbsFineHNL: 25000000
+          },
+          directorsVotesApprovalPct: 35
+        }
+      ]
+    },
+    {
+      id: 'dil-02',
+      number: 2,
+      month: 1,
+      category: 'presion_politica',
+      title: 'Presión Gubernamental: Condonación de Mora a Cooperativas del Corredor Seco',
+      dilemmaSummary: 'La Secretaría de Agricultura y el Congreso Nacional solicitan a los bancos condonar el 50% de intereses moratorios a pequeños productores afectados por sequía severa.',
+      detailedContext: 'El fenómeno de El Niño ha devastado las cosechas de granos básicos en Choluteca, El Paraíso y Valle. El Gobierno convoca a la banca a un acuerdo de solidaridad agraria. Negarse colocaría a Áureo Bank bajo el escrutinio de los medios y posibles represalias tributarias del SAR, pero aceptar reducirá directamente los ingresos financieros de la cartera PYME.',
+      stakeholders: ['Secretaría de Finanzas (SEFIN)', 'Productores Agrícolas', 'Asociación de Bancos de Honduras (AHIBA)'],
+      regulatoryArticle: 'Decreto Legislativo de Solidaridad Agropecuaria y Resiliencia Climática',
+      urgency: 'Alta',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-02-opt-a',
+          title: 'Condonar el 50% de Mora con Deducción Fiscal SAR',
+          description: 'Aceptar el pacto gubernamental aplicando condonación de recargos moratorios y pactar con el SAR su deducción al 100% del ISR.',
+          consequencesSummary: 'Gasto no recurrente de L. 8.5M en provisiones, ahorro fiscal de L. 2.1M, reputación pública salta a 95%.',
+          impactFinancials: {
+            cashDeltaHNL: -6400000,
+            profitDeltaHNL: -6400000,
+            equityDeltaHNL: -6400000,
+            carDeltaBps: -10
+          },
+          impactCompliance: {
+            complianceScoreDelta: 15,
+            reputationScoreDelta: 25,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 75
+        },
+        {
+          id: 'dil-02-opt-b',
+          title: 'Exigir Aval Soberano del BCH antes de Condonar',
+          description: 'Firmar el convenio únicamente si el Banco Central de Honduras respalda las carteras con garantías FOHDE o líneas de redescuento blandas.',
+          consequencesSummary: 'Protege la solvencia patrimonial sin pérdidas contables inmediatas; demora la solución 60 días.',
+          impactFinancials: {
+            cashDeltaHNL: 0,
+            profitDeltaHNL: 0,
+            equityDeltaHNL: 0,
+            carDeltaBps: 5
+          },
+          impactCompliance: {
+            complianceScoreDelta: 5,
+            reputationScoreDelta: 0,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 90
+        },
+        {
+          id: 'dil-02-opt-c',
+          title: 'Rechazar y Ejecutar Garantías Prendarias e Hipotecarias',
+          description: 'Preservar estrictamente el retorno financiero y ordenar al departamento de cobranzas proceder con ejecuciones forzosas.',
+          consequencesSummary: 'Recupera L. 11M de capital a corto plazo, pero detona protestas frente a sucursales y retiro masivo de depósitos rurales.',
+          impactFinancials: {
+            cashDeltaHNL: 11000000,
+            profitDeltaHNL: 4200000,
+            equityDeltaHNL: 4200000,
+            carDeltaBps: 12
+          },
+          impactCompliance: {
+            complianceScoreDelta: -15,
+            reputationScoreDelta: -30,
+            cnbsAuditRiskLevel: 'Alto'
+          },
+          directorsVotesApprovalPct: 40
+        }
+      ]
+    },
+    {
+      id: 'dil-03',
+      number: 3,
+      month: 1,
+      category: 'crisis_reputacional',
+      title: 'Filtración en la Dark Web: Presunta Brecha en Lote de Tarjetas de Crédito',
+      dilemmaSummary: 'Alerta cibernética internacional indica que 8,500 tarjetas Visa y Mastercard de Áureo Bank circulan a la venta en foros clandestinos por una vulnerabilidad en un comercio adquirente.',
+      detailedContext: 'Un equipo de seguridad cibernética externa detectó que credenciales completas de plásticos emitidos por el banco están expuestas. Si se hace público, el pánico de los tarjetahabientes colapsará el call center y provocará cancelaciones masivas. La gerencia de TI propone un bloqueo silencioso, mientras que Riesgos exige sustitución universal.',
+      stakeholders: ['Red de Tarjetas Visa / Mastercard', 'Comisión Nacional de Bancos y Seguros (CNBS)', 'Tarjetahabientes'],
+      regulatoryArticle: 'CNBS Resolución 119/2021 Normas de Gestión de Seguridad de la Información',
+      urgency: 'Urgente',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-03-opt-a',
+          title: 'Bloqueo Inmediato y Reemisión Masiva Gratuita',
+          description: 'Inmovilizar las 8,500 tarjetas de inmediato, enviar plásticos nuevos con chip tokenizado y emitir comunicado de transparencia.',
+          consequencesSummary: 'Costo operativo de L. 3.8M por plásticos y logística express. Cero fraudes posteriores y felicitación de CNBS.',
+          impactFinancials: {
+            cashDeltaHNL: -3800000,
+            profitDeltaHNL: -3800000,
+            equityDeltaHNL: -3800000,
+            carDeltaBps: -5
+          },
+          impactCompliance: {
+            complianceScoreDelta: 25,
+            reputationScoreDelta: 10,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 80
+        },
+        {
+          id: 'dil-03-opt-b',
+          title: 'Monitoreo Sigiloso mediante Algoritmo Antifraude',
+          description: 'Mantener las tarjetas activas pero ajustar los parámetros de la red neuronal para bloquear transacciones sospechosas individualmente.',
+          consequencesSummary: 'Ahorro de los costos de reemisión, pero si se escapan fraudes el banco asumirá contracargos de hasta L. 8,000,000.',
+          impactFinancials: {
+            cashDeltaHNL: -1200000,
+            profitDeltaHNL: -1200000,
+            equityDeltaHNL: -1200000,
+            carDeltaBps: 0
+          },
+          impactCompliance: {
+            complianceScoreDelta: -10,
+            reputationScoreDelta: -10,
+            cnbsAuditRiskLevel: 'Moderado'
+          },
+          directorsVotesApprovalPct: 55
+        }
+      ]
+    },
+    {
+      id: 'dil-04',
+      number: 4,
+      month: 1,
+      category: 'esg_medioambiente',
+      title: 'Financiamiento de Planta Térmica a Carbón vs Sello Verde ESG BCIE',
+      dilemmaSummary: 'Consorcio textil solicita L. 180,000,000 para una planta térmica de carbón con margen récord del 16.5%. Aprobarlo pondría en riesgo la línea multilateral verde del BCIE.',
+      detailedContext: 'El cliente ofrece garantías hipotecarias de primer orden y una comisión de estructuración inmediata de L. 5.4 Millones. No obstante, el Banco Centroamericano de Integración Económica (BCIE) condiciona el fondeo de L. 500 Millones a tasas subsidiadas a que Áureo Bank no financie proyectos contaminantes con alta huella de carbono.',
+      stakeholders: ['Banco Centroamericano de Integración Económica (BCIE)', 'Sector Maquilador de Choloma', 'Comité de Sostenibilidad'],
+      regulatoryArticle: 'Taxonomía de Finanzas Verdes y Sostenibles de Centroamérica',
+      urgency: 'Ordinaria',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-04-opt-a',
+          title: 'Rechazar Carbón y Exigir Reconversión a Solar / Biomasa',
+          description: 'Rechazar la planta contaminante y ofrecer estructurar un bono verde con subsidio del BCIE al 8.5% anual.',
+          consequencesSummary: 'Garantiza la línea de fondeo blando de L. 500M del BCIE y consolida el liderazgo ESG de Áureo Bank.',
+          impactFinancials: {
+            cashDeltaHNL: 0,
+            profitDeltaHNL: 1500000,
+            equityDeltaHNL: 0,
+            carDeltaBps: 15
+          },
+          impactCompliance: {
+            complianceScoreDelta: 20,
+            reputationScoreDelta: 20,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 88
+        },
+        {
+          id: 'dil-04-opt-b',
+          title: 'Aprobar el Crédito Térmico con Sobretasa Ecológica',
+          description: 'Financiar la planta de carbón cobrando un margen financiero agresivo del 16.5% y destinar el 1% a proyectos de reforestación en El Merendón.',
+          consequencesSummary: 'Ingreso inmediato de L. 5.4M en comisiones y flujo activo alto, pero se cancela el fondeo blando del BCIE.',
+          impactFinancials: {
+            cashDeltaHNL: 5400000,
+            profitDeltaHNL: 5400000,
+            equityDeltaHNL: 5400000,
+            carDeltaBps: 20
+          },
+          impactCompliance: {
+            complianceScoreDelta: -15,
+            reputationScoreDelta: -10,
+            cnbsAuditRiskLevel: 'Moderado'
+          },
+          directorsVotesApprovalPct: 62
+        }
+      ]
+    },
+    {
+      id: 'dil-05',
+      number: 5,
+      month: 1,
+      category: 'auditoria_cnbs',
+      title: 'Dictamen de Auditoría CNBS: Reclasificación Forzosa y Provisiones en Cartera Café',
+      dilemmaSummary: 'Supervisión bancaria exige registrar L. 22,000,000 en provisiones adicionales de inmediato por riesgo de precio internacional en productores de Marcala y Santa Bárbara.',
+      detailedContext: 'El informe preliminar de la CNBS objeta que Áureo Bank mantenga en Categoría I a exportadores con caídas de ventas del 30%. Si se registra el 100% de la provisión este mes, la utilidad neta caerá abruptamente, afectando el dividendo a los accionistas.',
+      stakeholders: ['Comisión Nacional de Bancos y Seguros (CNBS)', 'Productores Cafetaleros', 'Junta Directiva'],
+      regulatoryArticle: 'CNBS Resolución No. 284/2003 Reglamento para la Evaluación y Calificación de la Cartera de Créditos',
+      urgency: 'Alta',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-05-opt-a',
+          title: 'Constituir de Inmediato los L. 22M de Provisiones',
+          description: 'Aceptar el dictamen del regulador sin objeción contable, limpiando el balance y cerrando el acta de auditoría con nota excelente.',
+          consequencesSummary: 'Gasto de L. 22M directo a resultados, pero blinda el banco contra sanciones y sube la calificación de riesgo a AAA.',
+          impactFinancials: {
+            cashDeltaHNL: 0,
+            profitDeltaHNL: -22000000,
+            equityDeltaHNL: -22000000,
+            carDeltaBps: -25
+          },
+          impactCompliance: {
+            complianceScoreDelta: 25,
+            reputationScoreDelta: 10,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 70
+        },
+        {
+          id: 'dil-05-opt-b',
+          title: 'Solicitar Plan de Gradualidad a 12 Meses ante la CNBS',
+          description: 'Presentar un recurso de reconsideración formal aportando garantías prendarias de café en bodegas AGD para prorratear el impacto.',
+          consequencesSummary: 'Provisión mensual suave de L. 1.83M sin desplomar la utilidad del mes; la CNBS condiciona la aprobación.',
+          impactFinancials: {
+            cashDeltaHNL: 0,
+            profitDeltaHNL: -1833333,
+            equityDeltaHNL: -1833333,
+            carDeltaBps: -5
+          },
+          impactCompliance: {
+            complianceScoreDelta: 5,
+            reputationScoreDelta: 0,
+            cnbsAuditRiskLevel: 'Moderado'
+          },
+          directorsVotesApprovalPct: 85
+        }
+      ]
+    },
+    {
+      id: 'dil-06',
+      number: 6,
+      month: 1,
+      category: 'fraude_interno',
+      title: 'Fraude Interno Detectado: Desvío en Agencia Regional de Choluteca',
+      dilemmaSummary: 'Auditoría interna destapa que dos funcionarios de confianza desviaron L. 5,800,000 mediante créditos ficticios a adultos mayores vulnerables.',
+      detailedContext: 'El Gerente de Agencia y la Oficial de Operaciones crearon expedientes simulados de préstamos con deducción de nómina. Los fondos ya fueron transferidos fuera de las cuentas. El caso debe resolverse antes de que trascienda a los canales de televisión locales.',
+      stakeholders: ['Ministerio Público de Honduras', 'Comisión Nacional de Bancos y Seguros (CNBS)', 'Clientes Afectados'],
+      regulatoryArticle: 'Código Penal de Honduras y Normas de Control Interno CNBS',
+      urgency: 'Urgente',
+      status: 'pendiente',
+      options: [
+        {
+          id: 'dil-06-opt-a',
+          title: 'Denuncia Penal Inmediata y Restitución Íntegra a las Víctimas',
+          description: 'Entregar pruebas al Ministerio Público, ordenar la captura de los implicados y restituir el 100% de fondos con cargo a reservas del banco.',
+          consequencesSummary: 'Costo financiero de L. 5.8M, pero respaldo ético unánime, premio a la transparencia y cero multas regulatorias.',
+          impactFinancials: {
+            cashDeltaHNL: -5800000,
+            profitDeltaHNL: -5800000,
+            equityDeltaHNL: -5800000,
+            carDeltaBps: -8
+          },
+          impactCompliance: {
+            complianceScoreDelta: 30,
+            reputationScoreDelta: 15,
+            cnbsAuditRiskLevel: 'Bajo'
+          },
+          directorsVotesApprovalPct: 92
+        },
+        {
+          id: 'dil-06-opt-b',
+          title: 'Negociación Confidencial y Reclamo a la Aseguradora',
+          description: 'Despedir discretamente a los involucrados, exigir devolución de bienes bajo acuerdo notarial y cobrar la póliza de deslealtad bancaria.',
+          consequencesSummary: 'Evita la cobertura mediática negativa, pero arriesga sanción penal por encubrimiento de delito financiero ante la CNBS.',
+          impactFinancials: {
+            cashDeltaHNL: -1500000,
+            profitDeltaHNL: -1500000,
+            equityDeltaHNL: -1500000,
+            carDeltaBps: -2
+          },
+          impactCompliance: {
+            complianceScoreDelta: -25,
+            reputationScoreDelta: -15,
+            cnbsAuditRiskLevel: 'Alto'
+          },
+          directorsVotesApprovalPct: 45
+        }
+      ]
+    }
+  ],
+  activeDilemmaId: 'dil-01',
+  resolvedDilemmasCount: 0,
+  accumulatedFinesHNL: 0,
+  publicReputationScore: 90,
+  complianceTrustScore: 92,
+  crisisActive: false
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -3909,7 +4436,12 @@ export const INITIAL_GAME_STATE: GameState = {
   // Sandbox Central de Configuración Financiera, Fiscal y Scoring en Tiempo Real
   financialSandbox: INITIAL_FINANCIAL_SANDBOX,
   // Hub Estratégico de 24 Mejoras Institucionales (3 Pilares, ROI, Sandbox y Desbloqueos)
-  strategicImprovements: INITIAL_STRATEGIC_IMPROVEMENTS
+  strategicImprovements: INITIAL_STRATEGIC_IMPROVEMENTS,
+  // Centro Global de Prevención de Fraudes, Lavado de Dinero (AML/CFT) y Reportes UIF
+  amlCompliance: INITIAL_AML_COMPLIANCE,
+  // Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
+  executiveDilemmas: INITIAL_EXECUTIVE_DILEMMAS
 };
+
 
 
