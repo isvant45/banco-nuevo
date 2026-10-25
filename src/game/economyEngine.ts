@@ -1640,8 +1640,9 @@ export function approveCreditByOfficer(
   const error = creditApprovalError(state, app);
   if (error) return { updatedState: state, successMessage: error };
 
-  if (app.requestedAmount > 20000000) {
-    return { updatedState: state, successMessage: 'Esta solicitud excede la autonomía del Oficial de Crédito (L. 20M). Requiere aprobación del Comité Ejecutivo y Presidencia.' };
+  const advisorLimit = state.advisorAutoApprovalThresholdHNL ?? 20000000;
+  if (app.requestedAmount > advisorLimit) {
+    return { updatedState: state, successMessage: `Esta solicitud excede la autonomía del Oficial de Crédito (${formatHNL(advisorLimit)}). Requiere aprobación del Comité Ejecutivo y Junta Directiva.` };
   }
 
   const newLoans = state.financials.loanPortfolioCurrent + app.requestedAmount;
@@ -1795,10 +1796,11 @@ export function rejectCreditApplication(
 }
 
 /**
- * Aprueba automáticamente en bloque todas las solicitudes elegibles según la política del Oficial (<= L. 20M)
+ * Aprueba automáticamente en bloque todas las solicitudes elegibles según la política del Oficial
  */
 export function autoApproveAllOfficerEligibleCredits(state: GameState): { updatedState: GameState; count: number; totalApproved: number } {
-  const eligible = state.pendingApplications.filter(a => a.requestedAmount <= 20000000 && a.cnbsCategory === 'I - Normal' && a.calculatedDTI <= 45);
+  const advisorLimit = state.advisorAutoApprovalThresholdHNL ?? 20000000;
+  const eligible = state.pendingApplications.filter(a => a.requestedAmount <= advisorLimit && a.cnbsCategory === 'I - Normal' && a.calculatedDTI <= 45);
   let curState = state;
   let totalApproved = 0;
   let count = 0;
@@ -1813,6 +1815,31 @@ export function autoApproveAllOfficerEligibleCredits(state: GameState): { update
   });
 
   return { updatedState: curState, count, totalApproved };
+}
+
+/**
+ * Ajusta en tiempo real el límite de autonomía de crédito delegado a los Asesores (de L. 5M a L. 50M)
+ */
+export function setAdvisorCreditLimit(state: GameState, limitHNL: number): GameState {
+  const safeLimit = Math.max(5000000, Math.min(50000000, limitHNL));
+  const updatedApps = state.pendingApplications.map(app => {
+    const isOverLimit = app.requestedAmount > safeLimit;
+    return {
+      ...app,
+      officerCanAutoApprove: !isOverLimit,
+      requiresExecutiveBoardApproval: isOverLimit,
+      officerDecisionStatus: isOverLimit ? ('Enviado a Comité' as const) : ('Pendiente' as const),
+      officerNote: isOverLimit
+        ? `NOTA DEL OFICIAL DE CRÉDITO: Solicitud de ${formatHNL(app.requestedAmount)} excede la autonomía técnica actual (${formatHNL(safeLimit)}). Requiere elevación a Junta Directiva.`
+        : `Oficial de Crédito facultado bajo autonomía de ${formatHNL(safeLimit)}. Apto para aprobación inmediata.`
+    };
+  });
+
+  return {
+    ...state,
+    advisorAutoApprovalThresholdHNL: safeLimit,
+    pendingApplications: updatedApps
+  };
 }
 
 /**
@@ -4545,12 +4572,63 @@ export function advanceAmlComplianceMonth(state: GameState, nextMonth: number): 
   const prevFrozenFunds = calculatedFrozenFunds > 0 ? calculatedFrozenFunds : (current.totalFrozenFundsHNL || current.frozenFundsTotalHNL || 11928000);
   const uifList = current.uifReports || current.historicalUifReports || INITIAL_AML_COMPLIANCE.uifReports || [];
 
+  // Ciclo procesal formal de expedientes UIF (Resolución en 1 a 2 meses)
+  let totalResolvedCount = current.totalResolvedUifCasesCount || 0;
+  let totalForfeitedHNL = current.totalForfeitedToOabiHNL || 0;
+
+  const updatedUifReports = uifList.map(r => {
+    if (r.rulingOutcome && r.rulingOutcome !== 'Pendiente') {
+      return r;
+    }
+
+    const currentRem = r.monthsUntilResolution !== undefined ? r.monthsUntilResolution : 2;
+    if (currentRem > 1) {
+      return {
+        ...r,
+        monthsUntilResolution: currentRem - 1,
+        uifCaseStatus: 'En Investigación Fiscal' as const,
+        status: 'investigacion_fiscal'
+      };
+    } else if (currentRem === 1) {
+      totalResolvedCount++;
+      let outcome: 'Decomiso OABI' | 'Desestimado por Justificación' | 'Sanción Ratificada' = 'Decomiso OABI';
+      let details = '';
+      let statusCase: UifReportDossier['uifCaseStatus'] = 'Bloqueo Judicial Ratificado';
+
+      if (r.typology === 'ofac_onu_match' || r.typology === 'pitufeo_structuring') {
+        outcome = 'Decomiso OABI';
+        statusCase = 'Bloqueo Judicial Ratificado';
+        details = `Juzgado de Letras de Privación de Dominio ratificó extinción de dominio sobre ${formatHNL(r.totalFlaggedAmountHNL)}. Fondos transferidos a la OABI conforme al Decreto 144-2014.`;
+        totalForfeitedHNL += r.totalFlaggedAmountHNL;
+      } else if (r.typology === 'pep_high_risk' || r.typology === 'shell_company') {
+        outcome = 'Sanción Ratificada';
+        statusCase = 'Bloqueo Judicial Ratificado';
+        details = `CNBS y UIF ratificaron sanción legal grave. Cierre forzoso de cuenta y remisión penal al Ministerio Público.`;
+      } else {
+        outcome = 'Desestimado por Justificación';
+        statusCase = 'Enviado a UIF/CNBS';
+        details = `FESCCO y analistas de la UIF admitieron soporte documental tributario SAR. Proceso archivado y levantamiento de alertas.`;
+      }
+
+      return {
+        ...r,
+        monthsUntilResolution: 0,
+        rulingOutcome: outcome,
+        rulingDetails: details,
+        rulingMonth: nextMonth,
+        uifCaseStatus: statusCase,
+        status: 'dictamen_final_emitido'
+      };
+    }
+    return r;
+  });
+
   return {
     ...current,
     alerts,
     transactionAlerts: alerts,
-    uifReports: uifList,
-    historicalUifReports: uifList,
+    uifReports: updatedUifReports,
+    historicalUifReports: updatedUifReports,
     totalScreenedTransactionsMonth: prevScreened + newTransactionsScreened,
     monthlyScreenedTransactionsCount: prevScreened + newTransactionsScreened,
     totalSuspiciousVolumeHNL: prevSuspicious + additionalSuspiciousVol,
@@ -4563,7 +4641,9 @@ export function advanceAmlComplianceMonth(state: GameState, nextMonth: number): 
     pepStrictMonitoringActive: true,
     riskThresholdScore: current.riskThresholdScore || 75,
     complianceAuditRatingScore: current.complianceAuditRatingScore || 94.5,
-    uifReportsFiledCount: current.uifReportsFiledCount || uifList.length
+    uifReportsFiledCount: updatedUifReports.length,
+    totalResolvedUifCasesCount: totalResolvedCount,
+    totalForfeitedToOabiHNL: totalForfeitedHNL
   };
 }
 
@@ -4752,7 +4832,9 @@ export function fileUifSuspiciousReport(
     status: 'remitido_uif',
     submissionTimestamp: Date.now(),
     complianceOfficerSignature: 'Lic. Fernando Zelaya (Oficial de Cumplimiento Titular CNBS #OF-094)',
-    uifAcknowledgmentReceipt: receiptCode
+    uifAcknowledgmentReceipt: receiptCode,
+    monthsUntilResolution: 2,
+    rulingOutcome: 'Pendiente'
   };
 
   const updatedAlerts = baseAlerts.map(a => {
@@ -4856,6 +4938,75 @@ export function resolveAmlAlert(
       successMessage: `Alerta ${alert.ticketCode || alert.id} archivada con dictamen técnico de auditoría y soporte documental.`
     };
   }
+}
+
+/**
+ * Escanea a demanda la red transaccional para auditoría heurística en tiempo real
+ */
+export function scanAmlTransactions(state: GameState): { updatedState: GameState; successMessage: string; newAlertsFound: number } {
+  const current = state.amlCompliance || INITIAL_AML_COMPLIANCE;
+  const baseAlerts = current.alerts || current.transactionAlerts || [];
+  
+  const addedScreened = Math.floor(2200 + Math.random() * 3000);
+  const updatedScreened = (current.totalScreenedTransactionsMonth || 124500) + addedScreened;
+  
+  let alerts = [...baseAlerts];
+  let newAlertCount = 0;
+  
+  // Si hay pocas alertas abiertas, inyectar una nueva detección
+  if (alerts.filter(a => a.status === 'abierta' || a.status === 'en_analisis').length < 4) {
+    newAlertCount = 1;
+    const newId = `aml-scan-${Date.now().toString().slice(-4)}`;
+    alerts.unshift({
+      id: newId,
+      clientId: `CLI-SCAN-${state.gameMonth}`,
+      ticketCode: `AML-2026-SCAN-${Math.floor(10 + Math.random() * 89)}`,
+      clientName: 'Agropecuaria del Aguan S. de R.L.',
+      clientRtn: '0501-1994-09921',
+      clientRtnOrId: '0501-1994-09921',
+      division: 'pyme',
+      type: 'rapid_movement',
+      alertType: 'rapid_movement',
+      severity: 'alta',
+      amountHNL: 3850000,
+      involvedAmountHNL: 3850000,
+      amountUSD: 154000,
+      originCountry: 'Honduras (Depósitos de Efectivo en Tocoa/Colón)',
+      destinationCountry: 'Panamá (Zona Libre de Colón)',
+      status: 'abierta',
+      detectedMonth: state.gameMonth,
+      detectedAtMonth: state.gameMonth,
+      description: 'Transferencias rápidas sucesivas de efectivo bancarizado en Colón enviadas a cuenta en Panamá sin declaración aduanera.',
+      triggerHeuristic: 'Velocidad de liquidación transfronteriza y fraccionamiento múltiple de depósitos.',
+      recommendedAction: 'Requerir facturas proforma y comprobante de importación SAR.',
+      riskScore: 78,
+      evidenceNotes: ['Sin historial previo de importación.', 'Depósitos en efectivo por terceros en taquilla.'],
+      isAccountFrozen: false
+    });
+  }
+
+  const updatedAml: AmlComplianceState = {
+    ...current,
+    alerts,
+    transactionAlerts: alerts,
+    totalScreenedTransactionsMonth: updatedScreened,
+    monthlyScreenedTransactionsCount: updatedScreened,
+    lastScanMonth: state.gameMonth,
+    complianceAuditRatingScore: +Math.min(99.9, (current.complianceAuditRatingScore || 94.5) + 0.2).toFixed(1)
+  };
+
+  const message = newAlertCount > 0
+    ? `Escaneo transaccional completado: ${addedScreened.toLocaleString()} operaciones analizadas. Se detectó 1 alerta que requiere análisis de cumplimiento.`
+    : `Escaneo transaccional completado: ${addedScreened.toLocaleString()} operaciones analizadas. Parámetros de monitoreo 100% conformes a CNBS.`;
+
+  return {
+    updatedState: {
+      ...state,
+      amlCompliance: updatedAml
+    },
+    successMessage: message,
+    newAlertsFound: newAlertCount
+  };
 }
 
 // ============================================================================

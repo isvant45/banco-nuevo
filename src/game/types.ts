@@ -769,6 +769,10 @@ export interface GameState {
   amlCompliance: AmlComplianceState;
   // Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
   executiveDilemmas: ExecutiveDilemmasState;
+  // Autonomía Delegada para Asesores de Crédito (hasta L. 50M) y Timer Automático
+  advisorAutoApprovalThresholdHNL?: number;
+  autoTimerActive?: boolean;
+  autoTimerIntervalSeconds?: number;
 }
 
 export interface BranchDepartment {
@@ -1172,6 +1176,12 @@ export interface UifReportDossier {
   complianceOfficerSignature?: string;
   status?: string;
   uifAcknowledgmentReceipt?: string;
+
+  // Resolución y ciclo temporal de 1 a 2 meses
+  monthsUntilResolution?: number; // 1 o 2 meses para resolución
+  rulingOutcome?: 'Decomiso OABI' | 'Desestimado por Justificación' | 'Sanción Ratificada' | 'Pendiente';
+  rulingDetails?: string;
+  rulingMonth?: number;
 }
 
 export interface AmlComplianceState {
@@ -1189,6 +1199,9 @@ export interface AmlComplianceState {
   // Alias y métricas ejecutivas complementarias
   complianceAuditRatingScore?: number;
   transactionAlerts?: AmlTransactionAlert[];
+  lastScanMonth?: number;
+  totalResolvedUifCasesCount?: number;
+  totalForfeitedToOabiHNL?: number;
   historicalUifReports?: UifReportDossier[];
   monthlyScreenedTransactionsCount?: number;
   suspiciousActivityVolumeHNL?: number;

@@ -1,26 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameState } from '../game/types';
-import { formatHNL, formatUSD, formatPct, getMonthName } from '../game/economyEngine';
+import { formatHNL, formatPct, getMonthName } from '../game/economyEngine';
 import { sound } from '../game/audioFx';
 import { 
   Building2, 
   Volume2, 
   VolumeX, 
   Play, 
+  Pause,
   RotateCcw, 
   ShieldCheck, 
   TrendingUp, 
   BadgePercent, 
   Coins,
   Bell,
-  FileSpreadsheet,
-  Building,
-  Sparkles,
-  RefreshCw,
-  AlertTriangle,
-  FileText,
-  ShieldAlert,
-  Vote
+  Clock,
+  Vote,
+  Sparkles
 } from 'lucide-react';
 
 interface TopExecutiveHUDProps {
@@ -50,13 +46,44 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   onOpenStressTesting,
   onOpenExecutiveDilemmas
 }) => {
-  const [isMuted, setIsMuted] = React.useState(sound.getMuted());
-  const [showAlertsDropdown, setShowAlertsDropdown] = React.useState(false);
+  const [isMuted, setIsMuted] = useState(sound.getMuted());
+  const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
   const { name: monthName, year, fullLabel } = getMonthName(state.gameMonth);
+
+  // Auto-Timer de Avance Mensual (para respuesta a "¿A qué hora se reinicia?")
+  const [isAutoTimerRunning, setIsAutoTimerRunning] = useState<boolean>(false);
+  const [timerIntervalSeconds, setTimerIntervalSeconds] = useState<number>(20);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(20);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isAutoTimerRunning) {
+      timer = setInterval(() => {
+        setSecondsRemaining(prev => {
+          if (prev <= 1) {
+            onAdvanceMonth();
+            return timerIntervalSeconds;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setSecondsRemaining(timerIntervalSeconds);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isAutoTimerRunning, timerIntervalSeconds, onAdvanceMonth]);
 
   const toggleSound = () => {
     const muted = sound.toggleMute();
     setIsMuted(muted);
+  };
+
+  const toggleAutoTimer = () => {
+    sound.playClick();
+    setIsAutoTimerRunning(!isAutoTimerRunning);
+    setSecondsRemaining(timerIntervalSeconds);
   };
 
   const car = state.financials.capitalAdequacyRatioCAR;
@@ -67,30 +94,31 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   const alerts = state.dynamicAlerts || [];
   const unreadAlertsCount = alerts.filter(a => !a.isRead).length;
-  const amlPendingCount = state.amlCompliance?.transactionAlerts?.filter(a => a.status === 'bajo_investigacion' || a.status === 'detectada').length || 0;
+  const amlPendingCount = state.amlCompliance?.transactionAlerts?.filter(a => (a.status as string) === 'bajo_investigacion' || (a.status as string) === 'detectada' || a.status === 'abierta' || a.status === 'en_analisis').length || 0;
   const pendingDilemmasCount = state.executiveDilemmas?.dilemmas?.filter(d => d.status === 'pendiente').length || 0;
 
+  // Jerarquía Estricta: Bancas y Créditos primero, seguidos por Operaciones, AML, Gobernanza y Sandbox
+  const totalRetailClients = state.divisions.personas.clientCount;
   const navItems = [
-    { id: 'overview', label: 'Directorio' },
-    { id: 'aml_compliance', label: `Prevención Fraudes & AML (${amlPendingCount})` },
-    { id: 'dividends', label: 'Ranking Dividendos (10 Años)' },
-    { id: 'sandbox', label: 'Sandbox Políticas & Scoring' },
-    { id: 'strategic_improvements', label: '24 Mejoras Estratégicas' },
-    { id: 'advanced_ops', label: 'Centro de Operaciones (24)' },
-    { id: 'programs20', label: '20 Programas & Clientes' },
-    { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
-    { id: 'divisions', label: '6 Bancas y Clientes' },
-    { id: 'pos_acquiring', label: `Comercios POS (${state.posMerchants.length})` },
-    { id: 'pension_funds', label: 'Fondos de Pensiones' },
-    { id: 'credit_risk', label: 'Riesgo y Competencia' },
-    { id: 'clearing', label: 'CCE y Planilla' },
-    { id: 'origination', label: `Créditos (${state.pendingApplications.length})` },
-    { id: 'treasury', label: 'Tesorería y Mercado Secundario' },
-    { id: 'operations', label: 'Eficiencia Operativa' },
-    { id: 'experts', label: 'Opiniones Expertos' },
-    { id: 'innovations', label: 'Módulos Institucionales' },
-    { id: 'board_staff', label: 'Talento y Directiva' },
-    { id: 'branches', label: 'Sucursales' }
+    { id: 'divisions', label: `1. Bancas & Clientes (${totalRetailClients.toLocaleString()})` },
+    { id: 'origination', label: `2. Créditos & Asesores (${state.pendingApplications.length})` },
+    { id: 'advanced_ops', label: '3. Centro de Operaciones (24)' },
+    { id: 'aml_compliance', label: `4. Prevención Fraudes & AML (${amlPendingCount})` },
+    { id: 'overview', label: `5. Directorio & Resumen (${pendingDilemmasCount})` },
+    { id: 'bch_money_desk', label: '6. Mesa de Dinero BCH' },
+    { id: 'sandbox', label: '7. Sandbox Políticas & Scoring' },
+    { id: 'dividends', label: '8. Ranking Dividendos (10 Años)' },
+    { id: 'strategic_improvements', label: '9. 24 Mejoras Estratégicas' },
+    { id: 'programs20', label: '10. 20 Programas & Clientes' },
+    { id: 'treasury', label: '11. Tesorería & Inversiones' },
+    { id: 'credit_risk', label: '12. Riesgo & Competencia' },
+    { id: 'pos_acquiring', label: `13. Comercios POS (${state.posMerchants.length})` },
+    { id: 'pension_funds', label: '14. Fondos de Pensiones' },
+    { id: 'clearing', label: '15. CCE & Planillas' },
+    { id: 'branches', label: '16. Sucursales' },
+    { id: 'board_staff', label: '17. Talento' },
+    { id: 'experts', label: '18. Expertos' },
+    { id: 'innovations', label: '19. Innovaciones' }
   ];
 
   return (
@@ -142,100 +170,62 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
           </div>
         </div>
 
-        {/* Botones de acción derecha */}
-        <div className="flex items-center gap-2">
-          {/* Botón Estados Financieros CNBS */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenFinancialStatements();
-            }}
-            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
-            title="Ver Estados Financieros Auditados CNBS"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden md:inline">Estados Financieros</span>
-          </button>
-
-          {/* Botón Mercado M&A Interbancario */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenInterbankMarket();
-            }}
-            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
-            title="Mercado Interbancario de Compra y Venta de Carteras"
-          >
-            <Building className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden lg:inline">M&A Carteras</span>
-          </button>
-
-          {/* Botón Forwards & Divisas */}
-          {onOpenFxForwards && (
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenFxForwards();
-              }}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
-              title="Subasta de Divisas BCH & Contratos Forwards"
-            >
-              <Coins className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden xl:inline">Forwards USD</span>
-            </button>
-          )}
-
-          {/* Botón Pruebas de Estrés CNBS */}
-          {onOpenStressTesting && (
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenStressTesting();
-              }}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
-              title="Pruebas de Estrés Macroeconómico CNBS"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden xl:inline">Estrés CNBS</span>
-            </button>
-          )}
-
-          {/* Botón Auditoría Cierre Mensual */}
-          {onOpenMonthlySummary && (
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenMonthlySummary();
-              }}
-              className="px-2.5 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center gap-1.5 text-xs transition-colors font-medium"
-              title="Ver Auditoría y Liquidación Mensual Obligatoria"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Cierre Mensual</span>
-            </button>
-          )}
-
-          {/* Botón Dilemas de Directorio */}
+        {/* Acciones Rápidas, Auto-Timer y Cierre Mensual */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botón Acceso a Dilemas de Junta Directiva */}
           {onOpenExecutiveDilemmas && (
             <button
               onClick={() => {
                 sound.playClick();
                 onOpenExecutiveDilemmas();
               }}
-              className="px-2.5 py-1.5 rounded-lg border border-amber-500/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 flex items-center gap-1.5 text-xs transition-colors font-medium relative"
-              title="Dilemas Estratégicos, Éticos y Simulador de Crisis de Directorio"
+              className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-colors relative"
+              title="Abrir Centro de Dilemas Éticos y Decisiones de Directorio"
             >
               <Vote className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Dilemas Directorio</span>
+              <span>Dilemas Directorio</span>
               {pendingDilemmasCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center">
+                <span className="bg-amber-500 text-slate-950 font-bold px-1.5 py-0.2 rounded-full text-[10px] font-mono">
                   {pendingDilemmasCount}
                 </span>
               )}
             </button>
           )}
 
-          {/* Botón Campana Alertas Dinámicas */}
+          {/* Controlador de Avance Automático por Timer */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg p-0.5">
+            <button
+              onClick={toggleAutoTimer}
+              className={`px-2.5 py-1 rounded text-xs font-bold flex items-center gap-1 transition-all ${
+                isAutoTimerRunning 
+                  ? 'bg-emerald-500 text-slate-950 animate-pulse shadow-sm shadow-emerald-500/30' 
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title={isAutoTimerRunning ? 'Pausar avance automático de mes' : 'Iniciar avance automático de mes contable'}
+            >
+              {isAutoTimerRunning ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+              <span>{isAutoTimerRunning ? `Auto (${secondsRemaining}s)` : 'Auto-Mes'}</span>
+            </button>
+
+            <select
+              value={timerIntervalSeconds}
+              onChange={e => {
+                const sec = Number(e.target.value);
+                setTimerIntervalSeconds(sec);
+                setSecondsRemaining(sec);
+              }}
+              className="bg-transparent text-slate-400 hover:text-slate-200 text-[11px] font-mono pr-1 focus:outline-none cursor-pointer"
+              title="Intervalo en segundos para el avance automático de mes"
+            >
+              <option value={10} className="bg-slate-900 text-white">10s</option>
+              <option value={15} className="bg-slate-900 text-white">15s</option>
+              <option value={20} className="bg-slate-900 text-white">20s</option>
+              <option value={30} className="bg-slate-900 text-white">30s</option>
+              <option value={60} className="bg-slate-900 text-white">60s</option>
+            </select>
+          </div>
+
+          {/* Campanita de Notificaciones Dinámicas */}
           <div className="relative">
             <button
               onClick={() => {
@@ -317,19 +307,21 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
             <span className="hidden sm:inline">Reiniciar</span>
           </button>
 
+          {/* Botón Manual Clásico de Cierre Mensual */}
           <button
             onClick={onAdvanceMonth}
             className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold flex items-center gap-2 text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+            title="Cerrar el mes contable actual y liquidar todas las operaciones"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Avanzar Mes</span>
+            <Clock className="w-3.5 h-3.5" />
+            <span>Cerrar Mes Contable</span>
           </button>
         </div>
       </div>
 
       {/* Zona 2: Indicadores Primarios de Caja y Navegación de Pestañas */}
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
-        {/* Navegación por Pestañas */}
+        {/* Navegación por Pestañas (Prioridad Bancas y Créditos Primero) */}
         <nav className="flex items-center gap-1 overflow-x-auto py-1">
           {navItems.map(item => (
             <button
@@ -340,7 +332,7 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                 activeTab === item.id
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >

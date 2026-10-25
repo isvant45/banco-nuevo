@@ -22,7 +22,8 @@ import {
   openBchRepoOperation,
   executeInterbankCallDeal,
   createFxForwardContract,
-  runMacroStressScenario
+  runMacroStressScenario,
+  setAdvisorCreditLimit
 } from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
@@ -704,9 +705,38 @@ export default function App() {
     setGameState(prev => {
       const remainingApps = prev.pendingApplications.filter(a => a.id !== applicationId);
       const targetDiv = prev.divisions[app.division];
+      const newClient: IndividualClient = {
+        id: `CLI-APR-${app.id}`,
+        cif: `CIF-0501-2026-${Math.floor(10000 + Math.random() * 89999)}`,
+        name: app.applicantName,
+        division: app.division,
+        city: app.location,
+        notes: `Crédito de ${formatHNL(app.requestedAmount)} aprobado de inmediato bajo política delegada.`,
+        joinedMonth: prev.gameMonth,
+        accountType: 'Cuenta de Ahorro Rendimiento',
+        accountBalanceHNL: 0,
+        hasCreditCard: true,
+        creditCardBrand: 'Visa Clásica',
+        creditCardLimitHNL: Math.round(app.monthlyIncome * 1.5),
+        creditCardBalanceHNL: 0,
+        hasLoan: true,
+        loanType: app.productType,
+        loanPrincipalHNL: app.requestedAmount,
+        loanBalanceHNL: app.requestedAmount,
+        loanMonthlyPaymentHNL: Math.round((app.requestedAmount * (app.proposedRate / 100 / 12)) / (1 - Math.pow(1 + (app.proposedRate / 100 / 12), -app.termMonths))),
+        loanInterestRateAnnual: app.proposedRate,
+        loanMonthsRemaining: app.termMonths,
+        guaranteedPayment: true,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        equifaxScore: app.equifaxScore,
+        cnbsCategory: 'I - Normal',
+        otherBankProducts: []
+      };
 
       return {
         ...prev,
+        clients: [newClient, ...prev.clients],
         pendingApplications: remainingApps,
         advisorApprovalsUsedThisMonth: (prev.advisorApprovalsUsedThisMonth || 0) + 1,
         divisions: {
@@ -1200,6 +1230,9 @@ export default function App() {
             onApproveApplication={handleApproveCredit}
             onRejectApplication={handleRejectCredit}
             onUpdateAdvisorLimit={handleUpdateAdvisorLimit}
+            onUpdateAdvisorAmountThreshold={(newThreshold) => {
+              setGameState(prev => setAdvisorCreditLimit(prev, newThreshold));
+            }}
           />
         )}
 

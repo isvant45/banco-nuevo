@@ -4419,6 +4419,9 @@ export const INITIAL_GAME_STATE: GameState = {
   digitalTechLevel: 2,
   advisorMonthlyLimitPerAdvisor: 25,
   advisorApprovalsUsedThisMonth: 0,
+  advisorAutoApprovalThresholdHNL: 20000000,
+  autoTimerActive: false,
+  autoTimerIntervalSeconds: 15,
   // Nuevas propiedades institucionales
   interbankOffers: INITIAL_INTERBANK_OFFERS,
   dynamicAlerts: INITIAL_DYNAMIC_ALERTS,

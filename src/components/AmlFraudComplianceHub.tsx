@@ -5,7 +5,8 @@ import {
   freezeClientAccount, 
   unfreezeClientAccount, 
   fileUifSuspiciousReport, 
-  resolveAmlAlert 
+  resolveAmlAlert,
+  scanAmlTransactions 
 } from '../game/economyEngine';
 import { sound } from '../game/audioFx';
 import { 
@@ -25,7 +26,8 @@ import {
   BadgeAlert,
   HelpCircle,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 
 interface AmlFraudComplianceHubProps {
@@ -122,6 +124,14 @@ export const AmlFraudComplianceHub: React.FC<AmlFraudComplianceHubProps> = ({
     setTimeout(() => setStatusMessage(null), 6000);
   };
 
+  const handleScanNetwork = () => {
+    sound.playApprovalStamp();
+    const res = scanAmlTransactions(state);
+    onUpdateState(res.updatedState);
+    setStatusMessage(res.successMessage);
+    setTimeout(() => setStatusMessage(null), 6000);
+  };
+
   const getSeverityBadge = (sev: AmlAlertSeverity) => {
     switch (sev) {
       case 'critica':
@@ -189,10 +199,20 @@ export const AmlFraudComplianceHub: React.FC<AmlFraudComplianceHubProps> = ({
             </p>
           </div>
 
-          <div className="text-right">
-            <div className="text-xs text-slate-400">Oficial de Cumplimiento Titular</div>
-            <div className="text-sm font-bold text-white font-mono">Lic. Fernando Zelaya</div>
-            <div className="text-[11px] text-emerald-400 font-medium">Acreditación CNBS #OF-094</div>
+          <div className="flex flex-col sm:flex-row items-end gap-3 text-right">
+            <div>
+              <div className="text-xs text-slate-400">Oficial de Cumplimiento Titular</div>
+              <div className="text-sm font-bold text-white font-mono">Lic. Fernando Zelaya</div>
+              <div className="text-[11px] text-emerald-400 font-medium">Acreditación CNBS #OF-094</div>
+            </div>
+            <button
+              onClick={handleScanNetwork}
+              className="px-3.5 py-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-600/20 active:scale-95 transition-all"
+              title="Auditar y escanear transacciones en la red bancaria a demanda"
+            >
+              <Zap className="w-4 h-4" />
+              <span>Escanear Red Transaccional</span>
+            </button>
           </div>
         </div>
 
@@ -560,6 +580,28 @@ export const AmlFraudComplianceHub: React.FC<AmlFraudComplianceHubProps> = ({
                         </p>
                       </div>
                     </div>
+
+                    {/* Estado de Resolución Judicial a 1-2 Meses */}
+                    {dossier.rulingOutcome && dossier.rulingOutcome !== 'Pendiente' ? (
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                          <span className="flex items-center gap-1.5">
+                            <Scale className="w-4 h-4 text-emerald-400" /> Dictamen Judicial Definitivo: {dossier.rulingOutcome}
+                          </span>
+                          <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                            Mes {dossier.rulingMonth || state.gameMonth}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 font-sans leading-relaxed">
+                          {dossier.rulingDetails}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-lg">
+                        <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>En trámite procesal ante la UIF: Resolución judicial esperada en <strong>{dossier.monthsUntilResolution !== undefined ? dossier.monthsUntilResolution : 2} mes(es)</strong></span>
+                      </div>
+                    )}
 
                     <div className="border-t border-slate-800/80 pt-3 flex flex-wrap items-center justify-between gap-3 text-[11px]">
                       <div className="space-y-0.5">
