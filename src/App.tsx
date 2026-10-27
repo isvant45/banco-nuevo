@@ -1454,7 +1454,7 @@ export default function App() {
 
       {/* Pie de página institucional */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500 font-mono">
-        Áureo Bank Honduras S.A. · Institución Supervisada por la Comisión Nacional de Bancos y Seguros (CNBS) y el Banco Central de Honduras (BCH)
+        Áureo Bank · Simulador educativo de operaciones bancarias en Honduras. No es una entidad financiera real ni está afiliado al BCH o la CNBS.
       </footer>
     </div>
   );
