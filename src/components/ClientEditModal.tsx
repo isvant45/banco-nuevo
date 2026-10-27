@@ -164,7 +164,7 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSave} className="space-y-4 text-xs">
+        <form onSubmit={handleSave} noValidate className="space-y-4 text-xs">
           {/* 1. Datos Personales y Nombre Modificable */}
           <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2.5">
             <div className="flex items-center gap-2 text-slate-200 font-semibold">
@@ -262,8 +262,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
               </label>
               <input
                 type="number"
+                step="any"
                 min="0"
-                step="5000"
                 value={accountBalance}
                 onChange={e => setAccountBalance(Number(e.target.value))}
                 className="w-full bg-slate-900 border border-slate-700 text-white rounded p-2 font-mono font-bold text-sm focus:border-amber-500 focus:outline-none"
@@ -311,8 +311,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   <label className="block text-[10px] text-slate-400 mb-1">Límite Aprobado (L.):</label>
                   <input
                     type="number"
-                    min="10000"
-                    step="5000"
+                    step="any"
+                    min="0"
                     value={cardLimit}
                     onChange={e => setCardLimit(Number(e.target.value))}
                     className="w-full bg-slate-900 border border-slate-700 text-white rounded p-1.5 font-mono text-xs"
@@ -323,8 +323,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   <label className="block text-[10px] text-slate-400 mb-1">Saldo Utilizado (L.):</label>
                   <input
                     type="number"
+                    step="any"
                     min="0"
-                    step="1000"
                     value={cardBalance}
                     onChange={e => setCardBalance(Number(e.target.value))}
                     className="w-full bg-slate-900 border border-slate-700 text-amber-400 rounded p-1.5 font-mono text-xs"
@@ -358,8 +358,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   <label className="block text-[10px] text-slate-400 mb-1">Saldo Deudor (L.):</label>
                   <input
                     type="number"
+                    step="any"
                     min="0"
-                    step="5000"
                     value={loanBalance}
                     onChange={e => setLoanBalance(Number(e.target.value))}
                     className="w-full bg-slate-900 border border-slate-700 text-white rounded p-1.5 font-mono text-xs"
@@ -370,9 +370,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   <label className="block text-[10px] text-slate-400 mb-1">Tasa Anual (%):</label>
                   <input
                     type="number"
-                    min="8"
-                    max="36"
-                    step="0.5"
+                    step="any"
+                    min="0"
                     value={loanRate}
                     onChange={e => setLoanRate(Number(e.target.value))}
                     className="w-full bg-slate-900 border border-slate-700 text-white rounded p-1.5 font-mono text-xs"
@@ -383,8 +382,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   <label className="block text-[10px] text-slate-400 mb-1">Meses Restantes:</label>
                   <input
                     type="number"
-                    min="1"
-                    max="240"
+                    step="any"
+                    min="0"
                     value={loanMonths}
                     onChange={e => setLoanMonths(Number(e.target.value))}
                     className="w-full bg-slate-900 border border-slate-700 text-white rounded p-1.5 font-mono text-xs"

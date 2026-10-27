@@ -356,8 +356,8 @@ export const TreasuryMarketTab: React.FC<TreasuryMarketTabProps> = ({
                 <label className="block text-xs text-slate-400 mb-1">Monto a Transaccionar (USD):</label>
                 <input
                   type="number"
-                  min="50000"
-                  step="50000"
+                  step="any"
+                  min="0"
                   value={fxAmountUSD}
                   onChange={e => setFxAmountUSD(Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 text-xs font-mono font-bold focus:border-amber-500 focus:outline-none"
@@ -481,10 +481,10 @@ export const TreasuryMarketTab: React.FC<TreasuryMarketTabProps> = ({
               </label>
               <input
                 type="number"
-                min="1"
-                step={activeTradeSecurity.unitType === 'Acción' ? '100' : '1'}
+                step="any"
+                min="0"
                 value={tradeUnits}
-                onChange={e => setTradeUnits(Math.max(1, Number(e.target.value)))}
+                onChange={e => setTradeUnits(Math.max(0, Number(e.target.value)))}
                 className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 text-xs font-mono font-bold focus:border-amber-500 focus:outline-none"
               />
             </div>
@@ -529,7 +529,7 @@ export const TreasuryMarketTab: React.FC<TreasuryMarketTabProps> = ({
               <button onClick={() => setShowSwiftModal(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <form onSubmit={handleCreateSwift} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateSwift} noValidate className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-400 mb-1">Cliente Solicitante:</label>
                 <input
@@ -561,8 +561,8 @@ export const TreasuryMarketTab: React.FC<TreasuryMarketTabProps> = ({
                 <label className="block text-slate-400 mb-1">Monto en Divisa (USD):</label>
                 <input
                   type="number"
-                  min="10000"
-                  step="5000"
+                  step="any"
+                  min="0"
                   value={swiftAmount}
                   onChange={e => setSwiftAmount(Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 text-xs font-mono font-bold"

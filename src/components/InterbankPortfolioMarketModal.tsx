@@ -216,9 +216,8 @@ export function InterbankPortfolioMarketModal({
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Monto Nominal del Paquete (HNL)</label>
                 <input
                   type="number"
-                  min="5000000"
-                  max="100000000"
-                  step="5000000"
+                  step="any"
+                  min="0"
                   value={sellFaceValue}
                   onChange={e => setSellFaceValue(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm font-mono text-emerald-400 font-bold"

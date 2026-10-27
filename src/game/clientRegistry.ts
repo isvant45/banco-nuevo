@@ -1,4 +1,4 @@
-import { IndividualClient, BankingDivisionId } from './types';
+import { IndividualClient, BankingDivisionId, BankDivisionConfig } from './types';
 
 // Ciudades y departamentos bancarios de Honduras
 export const HONDURAN_CITIES = [
@@ -48,7 +48,11 @@ function seededRandom(seed: number): number {
  * Generador determinista de un cliente individual según índice y división.
  * Garantiza persistencia numérica exacta sin ocupar megabytes excesivos de RAM.
  */
-export function generateSyntheticClient(index: number, division: BankingDivisionId): IndividualClient {
+export function generateSyntheticClient(
+  index: number, 
+  division: BankingDivisionId,
+  customCalibration?: { avgDeposit?: number; avgLoan?: number; loanProbability?: number }
+): IndividualClient {
   const seed = index * 1337 + (division.charCodeAt(0) * 97) + (division.charCodeAt(1) || 42);
   
   const cityObj = HONDURAN_CITIES[Math.floor(seededRandom(seed + 1) * HONDURAN_CITIES.length)];
@@ -207,6 +211,29 @@ export function generateSyntheticClient(index: number, division: BankingDivision
     cnbsCategory = 'V - Pérdida';
   }
 
+  // Sobrescribir con calibración masiva personalizada si fue configurada por el usuario
+  if (customCalibration) {
+    if (customCalibration.avgDeposit !== undefined && customCalibration.avgDeposit > 0) {
+      balance = Math.max(100, Math.floor(customCalibration.avgDeposit * (0.65 + seededRandom(seed + 9) * 0.7)));
+    }
+    if (customCalibration.loanProbability !== undefined) {
+      hasLoan = seededRandom(seed + 14) < customCalibration.loanProbability;
+      if (hasLoan && customCalibration.avgLoan && customCalibration.avgLoan > 0) {
+        loanPrincipal = Math.max(5000, Math.floor(customCalibration.avgLoan * (0.75 + seededRandom(seed + 16) * 0.5)));
+        loanBalance = Math.floor(loanPrincipal * (0.4 + seededRandom(seed + 17) * 0.55));
+        loanRate = loanRate || 17.5;
+        loanMonths = loanMonths || 36;
+        loanPayment = Math.max(500, Math.floor((loanBalance * (1 + loanRate / 100)) / loanMonths));
+        if (loanType === 'Ninguno') loanType = 'Financiamiento Calibrado';
+      } else if (!hasLoan) {
+        loanPrincipal = 0;
+        loanBalance = 0;
+        loanPayment = 0;
+        loanType = 'Ninguno';
+      }
+    }
+  }
+
   return {
     id: `CLI-${division.toUpperCase().slice(0, 3)}-${String(index + 1).padStart(5, '0')}`,
     cif,
@@ -267,7 +294,8 @@ export function queryDivisionClients(
   stateClients: IndividualClient[],
   division: BankingDivisionId,
   divisionClientCount: number,
-  query: ClientFilterQuery
+  query: ClientFilterQuery,
+  divisionConfig?: BankDivisionConfig
 ): PaginatedClientsResult {
   const pageSize = Math.max(10, Math.min(200, query.pageSize || 25));
   const currentPage = Math.max(1, query.page || 1);
@@ -275,6 +303,12 @@ export function queryDivisionClients(
   const selectedCity = (query.city || '').trim();
   const selectedCnbs = (query.cnbsCategory || '').trim();
   const selectedAml = (query.amlStatus || '').trim();
+
+  const customCalibration = (divisionConfig?.customAvgDepositHNL || divisionConfig?.customAvgLoanHNL) ? {
+    avgDeposit: divisionConfig.customAvgDepositHNL,
+    avgLoan: divisionConfig.customAvgLoanHNL,
+    loanProbability: divisionConfig.customLoanBorrowers && divisionConfig.clientCount ? (divisionConfig.customLoanBorrowers / divisionConfig.clientCount) : 0.5
+  } : undefined;
 
   // 1. Filtrar clientes destacados del estado
   const existingDivisionClients = stateClients.filter(c => c.division === division);
@@ -317,7 +351,7 @@ export function queryDivisionClients(
         pageClients.push(existingDivisionClients[i]);
       } else {
         const synthIndex = i - existingDivisionClients.length;
-        pageClients.push(generateSyntheticClient(synthIndex, division));
+        pageClients.push(generateSyntheticClient(synthIndex, division, customCalibration));
       }
     }
 
@@ -344,7 +378,7 @@ export function queryDivisionClients(
   // Generar sintéticos bajo demanda hasta 2,500 candidatos representativos para no bloquear el loop
   const maxScan = Math.min(syntheticCount, 4000);
   for (let i = 0; i < maxScan; i++) {
-    const synth = generateSyntheticClient(i, division);
+    const synth = generateSyntheticClient(i, division, customCalibration);
     if (!existingIds.has(synth.id) && matchesFilter(synth)) {
       matchingList.push(synth);
       if (matchingList.length >= 1000) break; // Límite de seguridad

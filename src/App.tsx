@@ -23,7 +23,11 @@ import {
   executeInterbankCallDeal,
   createFxForwardContract,
   runMacroStressScenario,
-  setAdvisorCreditLimit
+  setAdvisorCreditLimit,
+  applyBulkPortfolioAllocation,
+  BulkAllocationParams,
+  executeSingleClientMoraWaiver,
+  executeBulkDivisionMoraWaiver
 } from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
@@ -1045,46 +1049,94 @@ export default function App() {
     }));
   };
 
+  const handleApplyBulkAllocation = (params: BulkAllocationParams) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const { updatedState } = applyBulkPortfolioAllocation(prev, params);
+      return updatedState;
+    });
+  };
+
+  const handleWaiveClientMora = (client: IndividualClient) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const { updatedState } = executeSingleClientMoraWaiver(prev, client);
+      return updatedState;
+    });
+    setSelectedClientForActions(prev => prev && prev.id === client.id ? { ...prev, pastDueDays: 0, cnbsCategory: 'I - Normal' } : prev);
+  };
+
+  const handleBulkDivisionMoraRelief = (divisionKey: BankingDivisionId) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const { updatedState } = executeBulkDivisionMoraWaiver(prev, divisionKey);
+      return updatedState;
+    });
+  };
+
   const handleNegotiateDebtWorkout = (clientId: string, type: 'reestructurar_quitas' | 'ampliar_plazo' | 'dacion_pago') => {
     sound.playApprovalStamp();
     setGameState(prev => {
-      const updatedClients = prev.clients.map(c => {
-        if (c.id === clientId) {
-          if (type === 'reestructurar_quitas') {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanBalanceHNL: Math.round(c.loanBalanceHNL * 0.85),
-              notes: 'Reestructurado con quita del 15% de intereses moratorios.'
-            };
-          } else if (type === 'ampliar_plazo') {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanTermMonths: 36,
-              loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.6),
-              notes: 'Plazo extendido a 36 meses reduciendo cuota al 60%.'
-            };
-          } else {
-            return {
-              ...c,
-              cnbsCategory: 'I - Normal' as const,
-              pastDueDays: 0,
-              pastDueAmountHNL: 0,
-              loanBalanceHNL: 0,
-              notes: 'Liquidado mediante dación en pago de garantía hipotecaria/prendaria.'
-            };
-          }
-        }
-        return c;
-      });
+      const clientInList = prev.clients.find(c => c.id === clientId);
+      const targetClient = clientInList || selectedClientForActions;
+      if (!targetClient) return prev;
+
+      let updatedTarget: IndividualClient;
+      if (type === 'reestructurar_quitas') {
+        updatedTarget = {
+          ...targetClient,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanBalanceHNL: Math.round(targetClient.loanBalanceHNL * 0.85),
+          notes: 'Reestructurado con quita del 15% de intereses moratorios.'
+        };
+      } else if (type === 'ampliar_plazo') {
+        updatedTarget = {
+          ...targetClient,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanMonthsRemaining: 36,
+          loanMonthlyPaymentHNL: Math.round(targetClient.loanMonthlyPaymentHNL * 0.6),
+          notes: 'Plazo extendido a 36 meses reduciendo cuota al 60%.'
+        };
+      } else {
+        updatedTarget = {
+          ...targetClient,
+          cnbsCategory: 'I - Normal' as const,
+          pastDueDays: 0,
+          pastDueAmountHNL: 0,
+          loanBalanceHNL: 0,
+          notes: 'Liquidado mediante dación en pago de garantía hipotecaria/prendaria.'
+        };
+      }
+
+      const clientExists = prev.clients.some(c => c.id === clientId);
+      const updatedClients = clientExists
+        ? prev.clients.map(c => c.id === clientId ? updatedTarget : c)
+        : [updatedTarget, ...prev.clients];
+
+      const divKey = updatedTarget.division || 'personas';
+      const targetDiv = prev.divisions[divKey];
+      const updatedDivisions = { ...prev.divisions };
+      if (targetDiv) {
+        updatedDivisions[divKey] = {
+          ...targetDiv,
+          delinquencyRate: Math.max(0, +(targetDiv.delinquencyRate * 0.9).toFixed(2))
+        };
+      }
+
+      const updatedFinancials = {
+        ...prev.financials,
+        loanPortfolioPastDue: Math.max(0, prev.financials.loanPortfolioPastDue - (targetClient.pastDueAmountHNL || 10000))
+      };
+
       return {
         ...prev,
-        clients: updatedClients
+        clients: updatedClients,
+        divisions: updatedDivisions,
+        financials: updatedFinancials
       };
     });
   };
@@ -1184,6 +1236,9 @@ export default function App() {
               setSelectedClientForActions(c);
               setIsClientActionsModalOpen(true);
             }}
+            onApplyBulkAllocation={handleApplyBulkAllocation}
+            onBulkDivisionMoraRelief={handleBulkDivisionMoraRelief}
+            onWaiveSingleClientMora={handleWaiveClientMora}
           />
         )}
 
@@ -1383,6 +1438,7 @@ export default function App() {
           onExtraordinaryPrepayment={handleExtraordinaryPrepayment}
           onRecalibrateLimit={handleRecalibrateLimit}
           onRenegotiateDebt={handleNegotiateDebtWorkout}
+          onWaiveClientMora={handleWaiveClientMora}
         />
       )}
 

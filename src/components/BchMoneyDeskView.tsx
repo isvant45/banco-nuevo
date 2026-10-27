@@ -213,9 +213,10 @@ export const BchMoneyDeskView: React.FC<BchMoneyDeskViewProps> = ({
               </div>
               <input
                 type="number"
-                step="5000000"
+                step="any"
+                min="0"
                 value={repoAmount}
-                onChange={e => setRepoAmount(Math.max(5000000, Number(e.target.value)))}
+                onChange={e => setRepoAmount(Number(e.target.value))}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
               />
             </div>
@@ -353,9 +354,10 @@ export const BchMoneyDeskView: React.FC<BchMoneyDeskViewProps> = ({
               </div>
               <input
                 type="number"
-                step="5000000"
+                step="any"
+                min="0"
                 value={callAmount}
-                onChange={e => setCallAmount(Math.max(1000000, Number(e.target.value)))}
+                onChange={e => setCallAmount(Number(e.target.value))}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
               />
             </div>

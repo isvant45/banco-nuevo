@@ -148,6 +148,10 @@ export interface BankDivisionConfig {
   satisfactionScore: number; // 0 - 100
   activeAccountsCount: number;
   activeCardsCount: number;
+  customDepositHolders?: number;
+  customAvgDepositHNL?: number;
+  customLoanBorrowers?: number;
+  customAvgLoanHNL?: number;
   specificFeatures: {
     label: string;
     value: string;

@@ -621,7 +621,8 @@ export function AdvancedOperationsHub({ state, onUpdateState, onNavigateTab }: P
                       type="number"
                       value={reloadAmountHNL}
                       onChange={(e) => setReloadAmountHNL(Number(e.target.value))}
-                      step={100000}
+                      step="any"
+                      min="0"
                       className="w-full bg-slate-900 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs"
                     />
                     <button
@@ -825,7 +826,8 @@ export function AdvancedOperationsHub({ state, onUpdateState, onNavigateTab }: P
                     type="number"
                     value={bondCouponPct}
                     onChange={(e) => setBondCouponPct(Number(e.target.value))}
-                    step={0.25}
+                    step="any"
+                    min="0"
                     className="w-20 bg-slate-900 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs"
                   />
                 </div>
@@ -904,7 +906,8 @@ export function AdvancedOperationsHub({ state, onUpdateState, onNavigateTab }: P
                       type="number"
                       value={fxBidUSD}
                       onChange={(e) => setFxBidUSD(Number(e.target.value))}
-                      step={100000}
+                      step="any"
+                      min="0"
                       className="w-full bg-slate-900 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs font-mono"
                     />
                   </div>
@@ -914,7 +917,8 @@ export function AdvancedOperationsHub({ state, onUpdateState, onNavigateTab }: P
                       type="number"
                       value={fxBidRate}
                       onChange={(e) => setFxBidRate(Number(e.target.value))}
-                      step={0.01}
+                      step="any"
+                      min="0"
                       className="w-full bg-slate-900 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs font-mono"
                     />
                   </div>
@@ -1214,6 +1218,8 @@ export function AdvancedOperationsHub({ state, onUpdateState, onNavigateTab }: P
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
+                      step="any"
+                      min="0"
                       value={ifrsCoveragePct}
                       onChange={(e) => setIfrsCoveragePct(Number(e.target.value))}
                       className="w-16 bg-slate-900 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs text-right"

@@ -127,7 +127,7 @@ export function BankingInnovationsTab({
             Participa en la subasta electrónica de divisas del BCH para asegurar dólares al sector productivo y rentabilizar el spread cambiario bancario.
           </p>
 
-          <form onSubmit={handleBidBch} className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+          <form onSubmit={handleBidBch} noValidate className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400">Tipo de cambio oficial BCH:</span>
               <span className="font-mono font-bold text-slate-200">L. {bch.exchangeRateHNLtoUSD.toFixed(2)} / USD</span>
@@ -135,8 +135,8 @@ export function BankingInnovationsTab({
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                min="100000"
-                step="250000"
+                step="any"
+                min="0"
                 value={fxBidAmount}
                 onChange={e => setFxBidAmount(Number(e.target.value))}
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-emerald-400 font-bold"
@@ -188,8 +188,8 @@ export function BankingInnovationsTab({
           <div className="flex items-center gap-2">
             <input
               type="number"
-              min="5000000"
-              step="5000000"
+              step="any"
+              min="0"
               value={callAmount}
               onChange={e => setCallAmount(Number(e.target.value))}
               className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200"

@@ -226,8 +226,8 @@ export const BoardAndStaffTab: React.FC<BoardAndStaffTabProps> = ({
               <label className="block text-slate-300 text-xs mb-1 font-medium">Bono Anual (Lempiras):</label>
               <input
                 type="number"
+                step="any"
                 min="0"
-                step="50000"
                 value={bonusInput}
                 onChange={e => setBonusInput(Number(e.target.value))}
                 className="w-full bg-slate-950 border border-slate-700 text-white rounded p-2 text-xs font-mono font-bold"

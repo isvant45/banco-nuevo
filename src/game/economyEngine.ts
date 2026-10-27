@@ -4,6 +4,7 @@ import {
   GameEventNotification,
   BankFinancialStatements,
   BankingDivisionId,
+  BankDivisionConfig,
   CreditRiskCategoryBreakdown,
   IndividualClient,
   CorporatePayrollAgreement,
@@ -2949,7 +2950,8 @@ export function reclassifyCnbsLoanWorkout(
   clientId: string,
   workoutType: 'condonacion_mora' | 'ampliar_plazo_36m' | 'dacion_garantia'
 ): { updatedState: GameState; successMessage: string } {
-  const target = state.clients.find(c => c.id === clientId) || state.clients[0];
+  const delinquentTarget = state.clients.find(c => c.pastDueDays > 0 || c.cnbsCategory !== 'I - Normal');
+  const target = state.clients.find(c => c.id === clientId) || delinquentTarget || state.clients[0];
   if (!target) {
     return { updatedState: state, successMessage: 'Cliente no encontrado.' };
   }
@@ -2963,7 +2965,9 @@ export function reclassifyCnbsLoanWorkout(
           pastDueDays: 0,
           pastDueAmountHNL: 0,
           loanBalanceHNL: Math.round(c.loanBalanceHNL * 0.85),
-          notes: 'Reestructurado con condonación de recargos moratorios conforme a resolución CNBS.'
+          isRestructured: true,
+          guaranteedPayment: true,
+          notes: 'Reestructurado con condonación total de recargos moratorios conforme a resolución CNBS.'
         };
       } else if (workoutType === 'ampliar_plazo_36m') {
         return {
@@ -2973,6 +2977,7 @@ export function reclassifyCnbsLoanWorkout(
           pastDueAmountHNL: 0,
           loanMonthsRemaining: 36,
           loanMonthlyPaymentHNL: Math.round(c.loanMonthlyPaymentHNL * 0.65),
+          isRestructured: true,
           notes: 'Plazo ampliado a 36 meses reduciendo la cuota al 65%.'
         };
       } else {
@@ -2990,17 +2995,27 @@ export function reclassifyCnbsLoanWorkout(
     return c;
   });
 
+  const updatedDivisions = { ...state.divisions };
+  if (target.division && updatedDivisions[target.division]) {
+    updatedDivisions[target.division] = {
+      ...updatedDivisions[target.division],
+      delinquencyRate: Math.max(0, +(updatedDivisions[target.division].delinquencyRate * 0.8).toFixed(2)),
+      satisfactionScore: Math.min(100, updatedDivisions[target.division].satisfactionScore + 3)
+    };
+  }
+
   return {
     updatedState: {
       ...state,
       clients: updatedClients,
+      divisions: updatedDivisions,
       financials: {
         ...state.financials,
-        loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - (target.pastDueAmountHNL || 0)),
-        loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.round((target.pastDueAmountHNL || 0) * 0.5))
+        loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - Math.max(25000, target.pastDueAmountHNL || 0)),
+        loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.max(12500, Math.round((target.pastDueAmountHNL || 0) * 0.5)))
       }
     },
-    successMessage: `Acuerdo de renegociación regulatoria CNBS ejecutado con éxito para ${target.name}. Cartera regularizada a Categoría I.`
+    successMessage: `Quita y renegociación regulatoria CNBS ejecutada con éxito para ${target.name}. Recargos condonados y crédito restituido a Categoría I - Normal.`
   };
 }
 
@@ -5180,6 +5195,251 @@ export function resolveReputationalCrisis(
       executiveDilemmas: updatedDilemmas
     },
     successMessage: `Crisis resuelta con éxito mediante ${strategy.replace(/_/g, ' ')}. ${summary}`
+  };
+}
+
+export interface BulkAllocationParams {
+  division?: BankingDivisionId;
+  divisionId?: BankingDivisionId;
+  clientCount?: number;
+  depositHoldersCount: number;
+  avgDepositAmountHNL?: number;
+  avgDepositHNL?: number;
+  loanBorrowersCount: number;
+  avgLoanAmountHNL?: number;
+  avgLoanHNL?: number;
+  loanRateAnnualPct?: number;
+  loanMonths?: number;
+  loanTermMonths?: number;
+  delinquencyRate?: number;
+}
+
+/**
+ * Aplica en bloque la asignación de saldos y créditos para una banca completa:
+ * Permite definir cuántas personas tienen cuánto dinero en depósitos, y cuántas tienen préstamos
+ */
+export function applyBulkPortfolioAllocation(
+  state: GameState,
+  params: BulkAllocationParams
+): { updatedState: GameState; successMessage: string } {
+  const divisionKey = params.divisionId || params.division || 'personas';
+  const currentDiv = state.divisions[divisionKey];
+  if (!currentDiv) {
+    return { updatedState: state, successMessage: 'Banca no encontrada.' };
+  }
+
+  const depositHolders = Math.max(1, Math.round(params.depositHoldersCount));
+  const avgDeposit = Math.max(0, (params.avgDepositHNL !== undefined ? params.avgDepositHNL : params.avgDepositAmountHNL) ?? 0);
+  const loanBorrowers = Math.max(0, Math.round(params.loanBorrowersCount));
+  const avgLoan = Math.max(0, (params.avgLoanHNL !== undefined ? params.avgLoanHNL : params.avgLoanAmountHNL) ?? 0);
+
+  const newTotalDeposits = Math.round(depositHolders * avgDeposit);
+  const newTotalLoans = Math.round(loanBorrowers * avgLoan);
+  const newClientCount = params.clientCount ? Math.max(params.clientCount, depositHolders, loanBorrowers) : Math.max(depositHolders, loanBorrowers, currentDiv.clientCount);
+
+  const depositDelta = newTotalDeposits - currentDiv.totalDeposits;
+  const loanDelta = newTotalLoans - currentDiv.totalLoans;
+
+  // Actualizar clientes en memoria pertenecientes a esta banca
+  const updatedClients = state.clients.map(c => {
+    if (c.division === divisionKey) {
+      const isBorrower = Math.random() < (loanBorrowers / Math.max(1, newClientCount));
+      const newBalance = Math.round(avgDeposit * (0.8 + Math.random() * 0.4));
+      const newLoanBal = isBorrower ? Math.round(avgLoan * (0.85 + Math.random() * 0.3)) : 0;
+      const rate = params.loanRateAnnualPct || c.loanInterestRateAnnual || currentDiv.avgLendingRate;
+      const months = params.loanMonths || params.loanTermMonths || c.loanMonthsRemaining || 36;
+      const monthlyPayment = newLoanBal > 0 ? Math.round((newLoanBal * (1 + rate / 100)) / months) : 0;
+
+      return {
+        ...c,
+        accountBalanceHNL: newBalance,
+        hasLoan: isBorrower,
+        loanPrincipalHNL: isBorrower ? Math.round(newLoanBal * 1.1) : 0,
+        loanBalanceHNL: newLoanBal,
+        loanMonthlyPaymentHNL: monthlyPayment,
+        loanInterestRateAnnual: rate,
+        loanMonthsRemaining: months
+      };
+    }
+    return c;
+  });
+
+  const updatedDivision: BankDivisionConfig = {
+    ...currentDiv,
+    clientCount: newClientCount,
+    totalDeposits: newTotalDeposits,
+    totalLoans: newTotalLoans,
+    avgLendingRate: params.loanRateAnnualPct || currentDiv.avgLendingRate,
+    delinquencyRate: params.delinquencyRate !== undefined ? params.delinquencyRate : currentDiv.delinquencyRate,
+    customDepositHolders: depositHolders,
+    customAvgDepositHNL: avgDeposit,
+    customLoanBorrowers: loanBorrowers,
+    customAvgLoanHNL: avgLoan
+  };
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    depositsPublicTotal: Math.max(0, state.financials.depositsPublicTotal + depositDelta),
+    loanPortfolioCurrent: Math.max(0, state.financials.loanPortfolioCurrent + loanDelta),
+    cashAndBCHReserves: Math.max(10000000, state.financials.cashAndBCHReserves + depositDelta - loanDelta)
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      divisions: {
+        ...state.divisions,
+        [divisionKey]: updatedDivision
+      },
+      financials: updatedFinancials
+    },
+    successMessage: `Asignación masiva aplicada en ${currentDiv.name}: ${depositHolders.toLocaleString()} clientes con depósitos de ${formatHNL(avgDeposit)} y ${loanBorrowers.toLocaleString()} con créditos de ${formatHNL(avgLoan)}.`
+  };
+}
+
+/**
+ * Quita de mora individual efectiva: condona recargos, resetea mora y reclasifica a Categoría I - Normal
+ */
+export function executeSingleClientMoraWaiver(
+  state: GameState,
+  targetClient: IndividualClient | string
+): { updatedState: GameState; waivedClient: IndividualClient; successMessage: string } {
+  let clientObj: IndividualClient;
+  if (typeof targetClient === 'string') {
+    const found = state.clients.find(c => c.id === targetClient);
+    if (found) {
+      clientObj = found;
+    } else {
+      // Cliente sintético del libro mayor
+      clientObj = {
+        id: targetClient,
+        cif: `CIF-0501-2026-${Math.floor(10000 + Math.random() * 89999)}`,
+        name: 'Cliente Regularizado CNBS',
+        division: 'personas',
+        city: 'Tegucigalpa (Distrito Central)',
+        joinedMonth: state.gameMonth,
+        accountType: 'Cuenta de Ahorro Rendimiento',
+        accountBalanceHNL: 15000,
+        hasCreditCard: false,
+        creditCardBrand: 'Sin Tarjeta',
+        creditCardLimitHNL: 0,
+        creditCardBalanceHNL: 0,
+        hasLoan: true,
+        loanType: 'Préstamo Reestructurado CNBS',
+        loanPrincipalHNL: 65000,
+        loanBalanceHNL: 48000,
+        loanMonthlyPaymentHNL: 2100,
+        loanInterestRateAnnual: 16.5,
+        loanMonthsRemaining: 24,
+        guaranteedPayment: true,
+        pastDueDays: 45,
+        pastDueAmountHNL: 6300,
+        equifaxScore: 680,
+        cnbsCategory: 'III - Subnormal',
+        otherBankProducts: []
+      };
+    }
+  } else {
+    clientObj = targetClient;
+  }
+
+  const waived: IndividualClient = {
+    ...clientObj,
+    pastDueDays: 0,
+    pastDueAmountHNL: 0,
+    cnbsCategory: 'I - Normal',
+    isRestructured: true,
+    guaranteedPayment: true,
+    notes: 'Alivio de mora aplicado: condonación de recargos moratorios y reclasificación a Categoría I (Resolución CNBS).'
+  };
+
+  const existsInState = state.clients.some(c => c.id === waived.id);
+  const updatedClients = existsInState
+    ? state.clients.map(c => c.id === waived.id ? waived : c)
+    : [waived, ...state.clients];
+
+  const divKey = waived.division || 'personas';
+  const currentDiv = state.divisions[divKey];
+  const updatedDivisions = { ...state.divisions };
+  if (currentDiv) {
+    updatedDivisions[divKey] = {
+      ...currentDiv,
+      delinquencyRate: Math.max(0, +(currentDiv.delinquencyRate * 0.85).toFixed(2)),
+      satisfactionScore: Math.min(100, currentDiv.satisfactionScore + 2)
+    };
+  }
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioPastDue: Math.max(0, state.financials.loanPortfolioPastDue - (clientObj.pastDueAmountHNL || 15000)),
+    loanLossProvisions: Math.max(0, state.financials.loanLossProvisions - Math.round((clientObj.pastDueAmountHNL || 15000) * 0.5))
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      divisions: updatedDivisions,
+      financials: updatedFinancials
+    },
+    waivedClient: waived,
+    successMessage: `Quita de mora aplicada a ${waived.name}: recargos moratorios condonados y crédito restituido a Categoría I - Normal.`
+  };
+}
+
+/**
+ * Quita masiva de mora para toda la banca o cartera morosa
+ */
+export function executeBulkDivisionMoraWaiver(
+  state: GameState,
+  divisionKey?: BankingDivisionId
+): { updatedState: GameState; waivedCount: number; successMessage: string } {
+  const targetDivision = divisionKey || 'personas';
+  const divConfig = state.divisions[targetDivision];
+
+  let waivedCount = 0;
+  const updatedClients = state.clients.map(c => {
+    if ((!divisionKey || c.division === divisionKey) && (c.pastDueDays > 0 || c.cnbsCategory !== 'I - Normal')) {
+      waivedCount++;
+      return {
+        ...c,
+        pastDueDays: 0,
+        pastDueAmountHNL: 0,
+        cnbsCategory: 'I - Normal' as const,
+        isRestructured: true,
+        notes: 'Alivio masivo de mora: condonación total de recargos y restitución de categoría.'
+      };
+    }
+    return c;
+  });
+
+  const updatedDivisions = { ...state.divisions };
+  if (divConfig) {
+    updatedDivisions[targetDivision] = {
+      ...divConfig,
+      delinquencyRate: 0.2, // Tasa de mora mínima saneada
+      satisfactionScore: Math.min(100, divConfig.satisfactionScore + 8)
+    };
+  }
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioPastDue: Math.max(0, Math.round(state.financials.loanPortfolioPastDue * 0.3)),
+    loanLossProvisions: Math.max(0, Math.round(state.financials.loanLossProvisions * 0.5))
+  };
+
+  const countDisplay = Math.max(waivedCount, divConfig ? Math.round(divConfig.clientCount * (divConfig.delinquencyRate / 100)) : 120);
+
+  return {
+    updatedState: {
+      ...state,
+      clients: updatedClients,
+      divisions: updatedDivisions,
+      financials: updatedFinancials
+    },
+    waivedCount: countDisplay,
+    successMessage: `Alivio masivo ejecutado en ${divConfig?.name || 'la cartera'}: se condonó la mora a ${countDisplay.toLocaleString()} créditos y la tasa de mora se redujo a 0.2%.`
   };
 }
 

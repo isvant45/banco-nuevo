@@ -153,11 +153,10 @@ export const ClearingAndPayrollTab: React.FC<ClearingAndPayrollTabProps> = ({
               <span className="text-slate-400">L.</span>
               <input
                 type="number"
-                min="5"
-                max="50"
-                step="1"
+                step="any"
+                min="0"
                 value={achFee}
-                onChange={e => setAchFee(parseInt(e.target.value) || 20)}
+                onChange={e => setAchFee(parseFloat(e.target.value) || 0)}
                 className="w-16 bg-slate-900 border border-slate-700 text-white rounded px-2 py-1 text-center font-bold"
               />
             </div>

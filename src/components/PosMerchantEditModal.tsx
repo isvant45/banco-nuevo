@@ -101,7 +101,7 @@ export function PosMerchantEditModal({
         </div>
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Comercial de la Empresa / Negocio</label>
             <input
@@ -153,8 +153,8 @@ export function PosMerchantEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Saldo en Cuenta de Ahorro / Cheques (HNL)</label>
                 <input
                   type="number"
+                  step="any"
                   min="0"
-                  step="5000"
                   value={formData.bankAccountBalanceHNL}
                   onChange={e => setFormData({ ...formData, bankAccountBalanceHNL: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm font-mono text-emerald-400 font-bold focus:outline-none focus:border-emerald-500/50"
@@ -166,8 +166,8 @@ export function PosMerchantEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Facturación / Ventas POS Mensuales (HNL)</label>
                 <input
                   type="number"
-                  min="10000"
-                  step="10000"
+                  step="any"
+                  min="0"
                   value={formData.monthlySalesVolumeHNL}
                   onChange={e => setFormData({ ...formData, monthlySalesVolumeHNL: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm font-mono text-slate-100 font-bold focus:outline-none focus:border-amber-500/50"
@@ -181,8 +181,8 @@ export function PosMerchantEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Terminales POS Físicos</label>
                 <input
                   type="number"
-                  min="1"
-                  max="50"
+                  step="any"
+                  min="0"
                   value={formData.physicalPosCount}
                   onChange={e => setFormData({ ...formData, physicalPosCount: Number(e.target.value) })}
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200"
@@ -192,8 +192,8 @@ export function PosMerchantEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">POS Virtuales / Web</label>
                 <input
                   type="number"
+                  step="any"
                   min="0"
-                  max="20"
                   value={formData.virtualPosCount}
                   onChange={e => setFormData({ ...formData, virtualPosCount: Number(e.target.value) })}
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200"
@@ -203,9 +203,8 @@ export function PosMerchantEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Comisión POS (%)</label>
                 <input
                   type="number"
-                  min="1.0"
-                  max="4.0"
-                  step="0.1"
+                  step="any"
+                  min="0"
                   value={formData.transactionFeePct}
                   onChange={e => setFormData({ ...formData, transactionFeePct: Number(e.target.value) })}
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-amber-300"

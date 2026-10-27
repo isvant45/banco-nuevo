@@ -957,6 +957,49 @@ export const INITIAL_SECONDARY_SECURITIES: SecondaryMarketSecurity[] = [
     totalInvestedHNL: 0,
     riskRating: 'AA',
     description: 'Acciones ordinarias de agroalimentos y productos para el hogar con fuerte exportación regional.'
+  },
+  // 5. Nuevos Títulos de Renta Fija y Sostenibilidad en Bolsa Centroamericana de Valores (BCV)
+  {
+    id: 'sec-cdn-ficohsa',
+    name: 'Certificado de Depósito Negociable (CDN) Ficohsa BCV 180D',
+    category: 'Bono Corporativo Bancario',
+    issuer: 'Banco Ficohsa S.A. / BCV',
+    issuerBadgeColor: '#1d4ed8',
+    annualYieldOrDividendPct: 8.45,
+    pricePerUnitHNL: 100000,
+    unitType: 'Bono',
+    ownedUnits: 50,
+    totalInvestedHNL: 5000000,
+    riskRating: 'AA+',
+    description: 'Instrumento monetario de alta liquidez transado en la Bolsa Centroamericana de Valores con pago semestral.'
+  },
+  {
+    id: 'sec-green-bch',
+    name: 'Bono Verde BCH: Parque Solar & Eólico Copán 2032',
+    category: 'Bono Soberano BCH / SEFIN',
+    issuer: 'Banco Central de Honduras (BCH)',
+    issuerBadgeColor: '#16a34a',
+    annualYieldOrDividendPct: 8.75,
+    pricePerUnitHNL: 100000,
+    unitType: 'Bono',
+    ownedUnits: 40,
+    totalInvestedHNL: 4000000,
+    riskRating: 'AAA',
+    description: 'Emisión soberana etiquetada para descarbonización de la matriz energética y financiamiento de parques eólicos.'
+  },
+  {
+    id: 'sec-fid-inmob',
+    name: 'Certificado Fiduciario Inmobiliario Metrópolis Tegucigalpa',
+    category: 'Bono Corporativo Empresa',
+    issuer: 'Fideicomiso Inmobiliario Morazán',
+    issuerBadgeColor: '#8b5cf6',
+    annualYieldOrDividendPct: 9.35,
+    pricePerUnitHNL: 50000,
+    unitType: 'Bono',
+    ownedUnits: 60,
+    totalInvestedHNL: 3000000,
+    riskRating: 'AA',
+    description: 'Participación en rentas comerciales corporativas AAA con dividendo distribuido trimestralmente.'
   }
 ];
 
@@ -1088,6 +1131,42 @@ export const INITIAL_POS_MERCHANTS: PosMerchant[] = [
     commercialLoanAmount: 0,
     hasBusinessCard: false,
     accountNumber: 'CTA-PYM-1101-5516-11',
+    division: 'pyme'
+  },
+  {
+    id: 'pos-06',
+    merchantName: 'Supermercados La Colonia San Pedro',
+    businessCategory: 'Supermercado & Abarrotería',
+    city: 'San Pedro Sula',
+    physicalPosCount: 16,
+    virtualPosCount: 4,
+    hasTapToPay: true,
+    monthlySalesVolumeHNL: 5400000,
+    bankAccountBalanceHNL: 1850000,
+    transactionFeePct: 2.0,
+    creditEligible: true,
+    hasCommercialLoan: true,
+    commercialLoanAmount: 2000000,
+    hasBusinessCard: true,
+    accountNumber: 'CTA-PYM-0501-7788-22',
+    division: 'pyme'
+  },
+  {
+    id: 'pos-07',
+    merchantName: 'Distribuidora Farmacéutica del Caribe',
+    businessCategory: 'Farmacia & Salud',
+    city: 'La Ceiba',
+    physicalPosCount: 8,
+    virtualPosCount: 2,
+    hasTapToPay: true,
+    monthlySalesVolumeHNL: 3100000,
+    bankAccountBalanceHNL: 940000,
+    transactionFeePct: 2.2,
+    creditEligible: true,
+    hasCommercialLoan: false,
+    commercialLoanAmount: 0,
+    hasBusinessCard: true,
+    accountNumber: 'CTA-PYM-0101-3344-99',
     division: 'pyme'
   }
 ];
@@ -1422,6 +1501,40 @@ export const INITIAL_PAYROLL_AGREEMENTS: CorporatePayrollAgreement[] = [
     linkedDivision: 'pyme',
     bankAccountBalanceHNL: 4200000,
     accountNumber: 'CTA-PYM-0801-9921-03'
+  },
+  {
+    id: 'pay-04',
+    companyName: 'Consorcio Hospitalario & Clínicas del Valle S.A.',
+    industry: 'Salud y Especialidades Médicas (SPS)',
+    employeeCount: 1200,
+    monthlyPayrollVolume: 38400000,
+    feePerEmployee: 22,
+    averageSalary: 32000,
+    eligiblePayrollLoansCount: 520,
+    status: 'Activo',
+    monthsWithBank: 6,
+    isAutoRenewed: true,
+    loyaltyBonusPct: 5,
+    linkedDivision: 'corporativa',
+    bankAccountBalanceHNL: 21500000,
+    accountNumber: 'CTA-CORP-0501-6677-12'
+  },
+  {
+    id: 'pay-05',
+    companyName: 'Grupo Maquilador del Norte / Green Valley Industrial',
+    industry: 'Manufactura Textil & Ensamble (Choloma)',
+    employeeCount: 3400,
+    monthlyPayrollVolume: 62900000,
+    feePerEmployee: 16,
+    averageSalary: 18500,
+    eligiblePayrollLoansCount: 1100,
+    status: 'Activo',
+    monthsWithBank: 9,
+    isAutoRenewed: true,
+    loyaltyBonusPct: 5,
+    linkedDivision: 'corporativa',
+    bankAccountBalanceHNL: 34800000,
+    accountNumber: 'CTA-CORP-0501-8899-34'
   }
 ];
 
@@ -2306,6 +2419,48 @@ export const INITIAL_BANKING_PROGRAMS_20: AureoProgramsState = {
       keyMetricLabel: 'Índice Auditoría AML',
       keyMetricValue: '98.5% Favorable',
       description: 'Módulo de gobernanza y prevención de lavado de activos conforme a la Ley Especial de la CNBS, con trazabilidad digital y bloqueo de operaciones atípicas.'
+    },
+    {
+      id: 'prog-plan-respiro-bch',
+      number: 21,
+      pillar: 'tesoreria_regulacion',
+      name: 'Plan Respiro BCH: Condonación Total de Mora & Saneamiento',
+      tagline: 'Quita del 100% de recargos moratorios y restitución de créditos atrasados a Categoría I (Normal)',
+      status: 'activo',
+      monthlyVolumeHNL: 72000000,
+      monthlyNetIncomeHNL: 950000,
+      participantsCount: 1420,
+      keyMetricLabel: 'Condonación Mora',
+      keyMetricValue: '100% Intereses Punitorios',
+      description: 'Mecanismo de alivio y saneamiento financiero institucional que condona cargos moratorios a personas y empresas, reincorporándolos al sistema financiero solvente.'
+    },
+    {
+      id: 'prog-fogapi-pyme',
+      number: 22,
+      pillar: 'pyme',
+      name: 'Garantía FOGAPI PYME: Respaldo Estatal al 80%',
+      tagline: 'Fondo de garantía recíproca para micro y pequeñas empresas que cubre hasta L. 5M en capital de trabajo',
+      status: 'optimizado',
+      monthlyVolumeHNL: 42000000,
+      monthlyNetIncomeHNL: 760000,
+      participantsCount: 310,
+      keyMetricLabel: 'Cobertura de Aval',
+      keyMetricValue: '80% Saldo Deudor',
+      description: 'Facilidad de crédito con fianza fiduciaria del Estado de Honduras que reduce la exigencia de hipotecas directas para negocios locales.'
+    },
+    {
+      id: 'prog-cero-mora-educativo',
+      number: 23,
+      pillar: 'retail',
+      name: 'Cero Mora Estudiantil & Tecnológica Hondureña',
+      tagline: 'Quita total de morosidad y refinanciamiento a tasa 0% en cuotas vencidas para estudiantes universitarios',
+      status: 'activo',
+      monthlyVolumeHNL: 19500000,
+      monthlyNetIncomeHNL: 310000,
+      participantsCount: 890,
+      keyMetricLabel: 'Alivio Interés Moratorio',
+      keyMetricValue: 'Tasa 0% Recargo',
+      description: 'Programa social y de retención juvenil que elimina penalidades por atraso en préstamos educativos de pregrado y posgrado y financiamiento de equipos de cómputo.'
     }
   ],
 

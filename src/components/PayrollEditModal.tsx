@@ -120,7 +120,7 @@ export function PayrollEditModal({
         </div>
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Razón Social de la Empresa</label>
             <input
@@ -169,8 +169,8 @@ export function PayrollEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Cantidad de Empleados en Planilla</label>
                 <input
                   type="number"
-                  min="5"
-                  step="10"
+                  step="any"
+                  min="0"
                   value={formData.employeeCount}
                   onChange={e => handleEmployeesChange(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm font-mono text-slate-100 font-bold focus:outline-none focus:border-indigo-500/50"
@@ -182,8 +182,8 @@ export function PayrollEditModal({
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Monto Mensual de Nómina (HNL)</label>
                 <input
                   type="number"
-                  min="50000"
-                  step="50000"
+                  step="any"
+                  min="0"
                   value={formData.monthlyPayrollVolume}
                   onChange={e => handleVolumeChange(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm font-mono text-emerald-400 font-bold focus:outline-none focus:border-emerald-500/50"
@@ -200,8 +200,8 @@ export function PayrollEditModal({
               <div className="flex items-center gap-2">
                 <input
                   type="number"
+                  step="any"
                   min="0"
-                  step="100000"
                   value={formData.bankAccountBalanceHNL}
                   onChange={e => setFormData({ ...formData, bankAccountBalanceHNL: Number(e.target.value) })}
                   className="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm font-mono text-amber-300 font-bold focus:outline-none focus:border-amber-500/50"
@@ -231,8 +231,8 @@ export function PayrollEditModal({
               <label className="block text-[11px] text-slate-400 mb-1">Comisión por Empleado Dispersado (HNL)</label>
               <input
                 type="number"
-                min="5"
-                max="50"
+                step="any"
+                min="0"
                 value={formData.feePerEmployee}
                 onChange={e => setFormData({ ...formData, feePerEmployee: Number(e.target.value) })}
                 className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200"

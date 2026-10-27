@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { GameState, BankingDivisionId, IndividualClient } from '../game/types';
-import { formatHNL, formatPct } from '../game/economyEngine';
+import { formatHNL, formatPct, BulkAllocationParams } from '../game/economyEngine';
 import { queryDivisionClients, HONDURAN_CITIES } from '../game/clientRegistry';
 import { sound } from '../game/audioFx';
+import { BulkPortfolioAllocatorModal } from './BulkPortfolioAllocatorModal';
 import { 
   Users, 
   Sparkles, 
@@ -23,7 +24,10 @@ import {
   ChevronsRight,
   Filter,
   ShieldAlert,
-  MapPin
+  ShieldCheck,
+  MapPin,
+  Sliders,
+  Layers
 } from 'lucide-react';
 
 interface BankingDivisionsTabProps {
@@ -34,6 +38,9 @@ interface BankingDivisionsTabProps {
   onToggleClientGuaranteed: (clientId: string) => void;
   onAddClient: (divisionId: BankingDivisionId) => void;
   onOpenClientActions?: (client: IndividualClient) => void;
+  onApplyBulkAllocation?: (params: BulkAllocationParams) => void;
+  onBulkDivisionMoraRelief?: (divisionId: BankingDivisionId) => void;
+  onWaiveSingleClientMora?: (client: IndividualClient) => void;
 }
 
 export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
@@ -43,7 +50,10 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
   onOpenClient360,
   onToggleClientGuaranteed,
   onAddClient,
-  onOpenClientActions
+  onOpenClientActions,
+  onApplyBulkAllocation,
+  onBulkDivisionMoraRelief,
+  onWaiveSingleClientMora
 }) => {
   const [selectedDivId, setSelectedDivId] = useState<BankingDivisionId>('personas');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -52,6 +62,9 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
   const [selectedAml, setSelectedAml] = useState<string>('Todos los Estados');
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
+
+  const [isBulkAllocatorOpen, setIsBulkAllocatorOpen] = useState<boolean>(false);
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
   const divisionsList: { id: BankingDivisionId; label: string; icon: React.ReactNode; tag: string }[] = [
     { id: 'personas', label: 'Banca Minorista & Patrimonial', icon: <Users className="w-4 h-4" />, tag: 'Consumer & Nómina' },
@@ -78,7 +91,7 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
     onUpdateRates(selectedDivId, depositRate, lendingRate);
   };
 
-  // Consulta paginada y filtrada sobre la cartera completa (18,000+ clientes)
+  // Consulta paginada y filtrada sobre la cartera completa (18,000+ clientes) con calibración masiva
   const paginatedResult = useMemo(() => {
     return queryDivisionClients(
       state.clients,
@@ -91,9 +104,10 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
         amlStatus: selectedAml,
         page,
         pageSize
-      }
+      },
+      currentDiv
     );
-  }, [state.clients, selectedDivId, currentDiv.clientCount, searchTerm, selectedCity, selectedCnbs, selectedAml, page, pageSize]);
+  }, [state.clients, selectedDivId, currentDiv, searchTerm, selectedCity, selectedCnbs, selectedAml, page, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -281,6 +295,34 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
+                sound.playClick();
+                setIsBulkAllocatorOpen(true);
+              }}
+              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20 active:scale-95"
+              title="Configurar masivamente cantidad de clientes, saldos y montos promedio de préstamos sin modificar uno a uno"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Asignación Masiva («El Coso»)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playApprovalStamp();
+                if (onBulkDivisionMoraRelief) {
+                  onBulkDivisionMoraRelief(selectedDivId);
+                }
+                setFeedbackToast(`¡Condonación masiva aplicada en ${currentDiv.name}! La mora se redujo a 0.2% y los clientes recuperaron Categoría I.`);
+                setTimeout(() => setFeedbackToast(null), 4500);
+              }}
+              className="px-3 py-1.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/20 active:scale-95"
+              title="Condonar 100% de intereses moratorios a todos los clientes morosos de esta banca"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-rose-200" />
+              <span>Condonar Toda la Mora</span>
+            </button>
+
+            <button
+              onClick={() => {
                 sound.playApprovalStamp();
                 onAddClient(selectedDivId);
               }}
@@ -291,6 +333,14 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Notificación Toast de Operaciones Masivas */}
+        {feedbackToast && (
+          <div className="p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{feedbackToast}</span>
+          </div>
+        )}
 
         {/* Filtros de Búsqueda y Paginación Rápida */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80 text-xs">
@@ -467,10 +517,28 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
 
                       <td className="py-3 px-3 text-center font-sans">
                         {isDelinquent ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                            <AlertTriangle className="w-3 h-3 text-rose-400" />
-                            <span>Mora {client.pastDueDays}d</span>
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              <AlertTriangle className="w-3 h-3 text-rose-400" />
+                              <span>Mora {client.pastDueDays}d</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sound.playApprovalStamp();
+                                if (onWaiveSingleClientMora) {
+                                  onWaiveSingleClientMora(client);
+                                }
+                                setFeedbackToast(`¡Mora condonada para ${client.name}! Expediente restaurado a Categoría I.`);
+                                setTimeout(() => setFeedbackToast(null), 3500);
+                              }}
+                              className="px-1.5 py-0.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white rounded text-[9px] font-bold shadow-sm transition-all flex items-center gap-0.5 active:scale-95"
+                              title="Quitar mora y penalizaciones de inmediato"
+                            >
+                              <span>⚡ Quitar Mora</span>
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-[10px] text-emerald-400 font-semibold">Al día</span>
                         )}
@@ -601,6 +669,23 @@ export const BankingDivisionsTab: React.FC<BankingDivisionsTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de Asignación Masiva ("El Coso") */}
+      {isBulkAllocatorOpen && (
+        <BulkPortfolioAllocatorModal
+          isOpen={true}
+          onClose={() => setIsBulkAllocatorOpen(false)}
+          division={currentDiv}
+          onApplyBulkAllocation={(params) => {
+            if (onApplyBulkAllocation) {
+              onApplyBulkAllocation(params);
+            }
+            setIsBulkAllocatorOpen(false);
+            setFeedbackToast(`¡Asignación masiva en ${currentDiv.name} aplicada exitosamente!`);
+            setTimeout(() => setFeedbackToast(null), 4000);
+          }}
+        />
+      )}
     </div>
   );
 };

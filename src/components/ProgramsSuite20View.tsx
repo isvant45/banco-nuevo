@@ -23,7 +23,8 @@ import {
   openStepUpDpfDeposit,
   executeInterbankRepoTrade,
   reclassifyCnbsLoanWorkout,
-  fileUifComplianceDeclaration
+  fileUifComplianceDeclaration,
+  executeBulkDivisionMoraWaiver
 } from '../game/economyEngine';
 import { sound } from '../game/audioFx';
 import { 
@@ -73,7 +74,7 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
   // Form states for modals
   const [inputVal1, setInputVal1] = useState<string>('');
   const [inputVal2, setInputVal2] = useState<string>('');
-  const [inputAmount, setInputAmount] = useState<number>(50000);
+  const [inputAmount, setInputAmount] = useState<string | number>(50000);
 
   const programsData = state.bankingPrograms20 || {
     programs: []
@@ -111,6 +112,7 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
 
     sound.playApprovalStamp();
     let res: { updatedState: GameState; successMessage: string } | null = null;
+    const numericAmount = typeof inputAmount === 'number' ? inputAmount : (parseFloat(String(inputAmount)) || 0);
 
     switch (activeModalProgram.number) {
       case 1:
@@ -118,54 +120,54 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
           state, 
           'Estados Unidos', 
           inputVal1.trim() || 'Juan Ángel Rivera', 
-          inputAmount || 450
+          numericAmount || 450
         );
         break;
       case 2:
-        res = redeemAureoRewardsPoints(state, inputAmount || 10000);
+        res = redeemAureoRewardsPoints(state, numericAmount || 10000);
         break;
       case 3:
-        res = configureMicroSavings(state, 50, inputAmount || 25000);
+        res = configureMicroSavings(state, 50, numericAmount || 25000);
         break;
       case 4:
-        res = disburseSalaryAdvance(state, inputVal1.trim() || 'Empleado Planilla', inputAmount || 5000);
+        res = disburseSalaryAdvance(state, inputVal1.trim() || 'Empleado Planilla', numericAmount || 5000);
         break;
       case 5:
         res = enrollClientInInsuranceProtege(state, state.clients[0]?.id || 'CLI-01');
         break;
       case 6:
-        res = drawPymeRevolvingCredit(state, inputVal1.trim() || 'Distribuidora del Norte', inputAmount || 150000);
+        res = drawPymeRevolvingCredit(state, inputVal1.trim() || 'Distribuidora del Norte', numericAmount || 150000);
         break;
       case 7:
-        res = approveMujerEmprendeCredit(state, inputVal1.trim() || 'Confecciones Maya S. de R.L.', inputAmount || 120000);
+        res = approveMujerEmprendeCredit(state, inputVal1.trim() || 'Confecciones Maya S. de R.L.', numericAmount || 120000);
         break;
       case 8:
-        res = advancePosSalesImmediate(state, state.posMerchants[0]?.id || 'pos-01', inputAmount || 85000);
+        res = advancePosSalesImmediate(state, state.posMerchants[0]?.id || 'pos-01', numericAmount || 85000);
         break;
       case 9:
         res = createEscrowContract(
           state, 
           inputVal1.trim() || 'Comercial Sula', 
           inputVal2.trim() || 'Importadora Maya', 
-          inputAmount || 75000, 
+          numericAmount || 75000, 
           'Entrega de lote de abarrotes con guía sellada'
         );
         break;
       case 10:
-        res = disburseAgroCosechaSegura(state, inputVal1.trim() || 'Cooperativa Cafetalera Marcala', inputAmount || 500000);
+        res = disburseAgroCosechaSegura(state, inputVal1.trim() || 'Cooperativa Cafetalera Marcala', numericAmount || 500000);
         break;
       case 11:
-        res = disburseEcoCreditoVerde(state, inputVal1.trim() || 'Granja Solar Valle de Sula', inputAmount || 850000, 'Paneles Solares');
+        res = disburseEcoCreditoVerde(state, inputVal1.trim() || 'Granja Solar Valle de Sula', numericAmount || 850000, 'Paneles Solares');
         break;
       case 12:
-        res = issueBonoPrendaCafe(state, inputVal1.trim() || 'Almacenes Generales de Depósito AGD', 450, inputAmount || 650000);
+        res = issueBonoPrendaCafe(state, inputVal1.trim() || 'Almacenes Generales de Depósito AGD', 450, numericAmount || 650000);
         break;
       case 13:
         res = discountFactoringInvoice(
           state, 
           inputVal1.trim() || 'Proveedor Textil S.A.', 
           inputVal2.trim() || 'Maquila Villanueva', 
-          inputAmount || 350000, 
+          numericAmount || 350000, 
           60
         );
         break;
@@ -174,7 +176,7 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
           state, 
           inputVal1.trim() || 'Importadora de Motores S.A.', 
           'JPMorgan Chase Nueva York', 
-          inputAmount || 85000
+          numericAmount || 85000
         );
         break;
       case 15:
@@ -182,7 +184,7 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
           state, 
           inputVal1.trim() || 'Roberto Facussé', 
           inputVal2.trim() || 'Harinera del Valle', 
-          inputAmount || 150000, 
+          numericAmount || 150000, 
           25.10, 
           60
         );
@@ -192,14 +194,14 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
           state, 
           inputVal1.trim() || 'Torre Morazán Residencial', 
           inputVal2.trim() || 'Desarrolladora Urbana SPS', 
-          inputAmount || 2500000
+          numericAmount || 2500000
         );
         break;
       case 17:
-        res = openStepUpDpfDeposit(state, inputVal1.trim() || 'Fundación Inversora Copán', inputAmount || 500000);
+        res = openStepUpDpfDeposit(state, inputVal1.trim() || 'Fundación Inversora Copán', numericAmount || 500000);
         break;
       case 18:
-        res = executeInterbankRepoTrade(state, 'Banco Atlántida', inputAmount || 20000000, 14, 6.25);
+        res = executeInterbankRepoTrade(state, 'Banco Atlántida', numericAmount || 20000000, 14, 6.25);
         break;
       case 19:
         res = reclassifyCnbsLoanWorkout(state, state.clients[0]?.id || 'CLI-01', 'condonacion_mora');
@@ -208,10 +210,42 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
         res = fileUifComplianceDeclaration(
           state, 
           inputVal1.trim() || 'Empresario Inversionista', 
-          inputAmount || 25000, 
+          numericAmount || 25000, 
           'Venta de Activos Inmobiliarios Comerciales'
         );
         break;
+      case 21:
+        res = executeBulkDivisionMoraWaiver(state, 'personas');
+        break;
+      case 22: {
+        const amt = numericAmount || 5000000;
+        const updatedDivisions = { ...state.divisions };
+        updatedDivisions.pyme = {
+          ...updatedDivisions.pyme,
+          totalLoans: updatedDivisions.pyme.totalLoans + amt,
+          delinquencyRate: Math.max(0, +(updatedDivisions.pyme.delinquencyRate * 0.8).toFixed(2))
+        };
+        res = {
+          updatedState: {
+            ...state,
+            divisions: updatedDivisions,
+            financials: {
+              ...state.financials,
+              loanPortfolioCurrent: state.financials.loanPortfolioCurrent + amt
+            }
+          },
+          successMessage: `Fondo FOGAPI PYME activado: Aval al 80% emitido para ${inputVal1 || 'Comercios de SPS y Tegucigalpa'} por ${formatHNL(amt)}.`
+        };
+        break;
+      }
+      case 23: {
+        const waiverRes = executeBulkDivisionMoraWaiver(state, 'personas');
+        res = {
+          updatedState: waiverRes.updatedState,
+          successMessage: `Plan Cero Mora Estudiantil aplicado: 100% de recargos moratorios condonados y cuotas atrasadas regularizadas a tasa 0%.`
+        };
+        break;
+      }
       default:
         break;
     }
@@ -475,7 +509,7 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                 <p className="font-mono text-[11px] text-emerald-200/90">{actionFeedback}</p>
               </div>
             ) : (
-              <form onSubmit={handleExecuteModalAction} className="space-y-4 text-xs">
+              <form onSubmit={handleExecuteModalAction} noValidate className="space-y-4 text-xs">
                 {/* Campos contextuales según el programa */}
                 {activeModalProgram.number === 1 && (
                   <>
@@ -494,11 +528,11 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                       <span className="text-slate-400">Monto de la Remesa (USD):</span>
                       <input
                         type="number"
-                        min="50"
-                        step="50"
+                        step="any"
+                        min="0"
                         required
                         value={inputAmount}
-                        onChange={e => setInputAmount(Number(e.target.value))}
+                        onChange={e => setInputAmount(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-amber-400 font-bold"
                       />
                     </label>
@@ -510,15 +544,15 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                     <span className="text-slate-400">Puntos a Canjear (L. 0.25 por punto):</span>
                     <input
                       type="number"
-                      min="1000"
-                      step="1000"
+                      step="any"
+                      min="0"
                       required
                       value={inputAmount}
-                      onChange={e => setInputAmount(Number(e.target.value))}
+                      onChange={e => setInputAmount(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-amber-400 font-bold"
                     />
                     <span className="text-[11px] text-slate-500 block">
-                      Abono estimado: {formatHNL(inputAmount * 0.25)}
+                      Abono estimado: {formatHNL((parseFloat(String(inputAmount)) || 0) * 0.25)}
                     </span>
                   </label>
                 )}
@@ -528,11 +562,11 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                     <span className="text-slate-400">Depósito Adicional a la Hucha Digital:</span>
                     <input
                       type="number"
-                      min="500"
-                      step="500"
+                      step="any"
+                      min="0"
                       required
                       value={inputAmount}
-                      onChange={e => setInputAmount(Number(e.target.value))}
+                      onChange={e => setInputAmount(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-emerald-400 font-bold"
                     />
                   </label>
@@ -555,11 +589,11 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                       <span className="text-slate-400">Monto de Adelanto Solicitado (Lempiras):</span>
                       <input
                         type="number"
-                        min="1000"
-                        step="500"
+                        step="any"
+                        min="0"
                         required
                         value={inputAmount}
-                        onChange={e => setInputAmount(Number(e.target.value))}
+                        onChange={e => setInputAmount(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-amber-400 font-bold"
                       />
                     </label>
@@ -583,11 +617,11 @@ export const ProgramsSuite20View: React.FC<ProgramsSuite20ViewProps> = ({
                       <span className="text-slate-400">Monto de la Operación (HNL):</span>
                       <input
                         type="number"
-                        min="5000"
-                        step="5000"
+                        step="any"
+                        min="0"
                         required
                         value={inputAmount}
-                        onChange={e => setInputAmount(Number(e.target.value))}
+                        onChange={e => setInputAmount(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-amber-400 font-bold"
                       />
                     </label>

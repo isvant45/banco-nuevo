@@ -228,9 +228,8 @@ export const Client360Modal: React.FC<Client360ModalProps> = ({
                             <span className="text-[10px] text-slate-400">Tasa oferta:</span>
                             <input
                               type="number"
-                              min="8"
-                              max="20"
-                              step="0.5"
+                              step="any"
+                              min="0"
                               value={proposedLoanRate}
                               onChange={e => setProposedLoanRate(Number(e.target.value))}
                               className="w-12 bg-transparent text-amber-300 font-mono font-bold text-xs focus:outline-none"
