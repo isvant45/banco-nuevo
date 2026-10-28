@@ -27,12 +27,23 @@ import {
   applyBulkPortfolioAllocation,
   BulkAllocationParams,
   executeSingleClientMoraWaiver,
-  executeBulkDivisionMoraWaiver
+  executeBulkDivisionMoraWaiver,
+  issueTermDepositCertificate,
+  originateBackToBackFacility,
+  payBackToBackInstallment,
+  executePledgedDepositForeclosure,
+  processCorporatePayrollDispersion,
+  executeAchTransfer
 } from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
 import { OverviewDashboard } from './components/OverviewDashboard';
 import { BankingDivisionsTab } from './components/BankingDivisionsTab';
+import { BackToBackLendingTab } from './components/BackToBackLendingTab';
+import { TermDepositsTab } from './components/TermDepositsTab';
+import { DemandDepositsTab } from './components/DemandDepositsTab';
+import { TreasuryAndAlmTab } from './components/TreasuryAndAlmTab';
+import { CorporateTradeTab } from './components/CorporateTradeTab';
 import { ClearingAndPayrollTab } from './components/ClearingAndPayrollTab';
 import { CreditOriginationTab } from './components/CreditOriginationTab';
 import { TreasuryMarketTab } from './components/TreasuryMarketTab';
@@ -54,11 +65,9 @@ import { MonthlyClosingSummaryModal } from './components/MonthlyClosingSummaryMo
 import { FxAndForwardsModal } from './components/FxAndForwardsModal';
 import { ClientActionsModal } from './components/ClientActionsModal';
 import { StressTestingModal } from './components/StressTestingModal';
-import { ProgramsSuite20View } from './components/ProgramsSuite20View';
 import { AdvancedOperationsHub } from './components/AdvancedOperationsHub';
 import { DividendRankingDashboard } from './components/DividendRankingDashboard';
 import { PolicySandboxPanel } from './components/PolicySandboxPanel';
-import { StrategicImprovementsHub } from './components/StrategicImprovementsHub';
 import { AmlFraudComplianceHub } from './components/AmlFraudComplianceHub';
 import { ExecutiveDilemmasModal } from './components/ExecutiveDilemmasModal';
 import { restoreGameState } from './game/savedState';
@@ -1141,6 +1150,186 @@ export default function App() {
     });
   };
 
+  // ----------------------------------------------------------------------------------
+  // HANDLERS CORE BANCARIO INSTITUCIONAL (BACK-TO-BACK, DPF, ACH, NÓMINAS, TESORERÍA)
+  // ----------------------------------------------------------------------------------
+
+  const handleOriginateBackToBack = (params: {
+    dpfCertificateId: string;
+    type: 'prestamo_garantizado' | 'tarjeta_garantizada';
+    coverageRatioPct: number;
+    termMonths: number;
+    spreadRatePct: number;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const res = originateBackToBackFacility(prev, params);
+      if (res.errorMessage) {
+        alert(res.errorMessage);
+        return prev;
+      }
+      return res.updatedState;
+    });
+  };
+
+  const handlePayBackToBack = (facilityId: string, amountHNL?: number) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const res = payBackToBackInstallment(prev, facilityId, amountHNL);
+      return res.updatedState;
+    });
+  };
+
+  const handleForecloseBackToBack = (facilityId: string) => {
+    setGameState(prev => {
+      const res = executePledgedDepositForeclosure(prev, facilityId);
+      return res.updatedState;
+    });
+  };
+
+  const handleIssueTermDeposit = (params: {
+    clientName: string;
+    clientCif?: string;
+    division: BankingDivisionId;
+    principalHNL: number;
+    termDays: number;
+    interestRateAnnualPct: number;
+    couponPaymentFrequency: 'mensual' | 'al_vencimiento';
+    autoRenew: boolean;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const res = issueTermDepositCertificate(prev, params);
+      return res.updatedState;
+    });
+  };
+
+  const handleExecuteAch = (params: {
+    sourceAccountNumber: string;
+    sourceClientName: string;
+    destinationBank: any;
+    destinationAccount: string;
+    recipientName: string;
+    amountHNL: number;
+    referenceNote: string;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const res = executeAchTransfer(prev, params);
+      return res.updatedState;
+    });
+  };
+
+  const handleProcessPayroll = (params: {
+    companyName: string;
+    companyAccountNumber?: string;
+    employeeCount: number;
+    totalPayrollAmountHNL: number;
+    feePerEmployeeHNL?: number;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const res = processCorporatePayrollDispersion(prev, params);
+      return res.updatedState;
+    });
+  };
+
+  const handleTradeSpotUSD = (amountUSD: number, direction: 'comprar' | 'vender') => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const rate = direction === 'comprar' ? prev.bch.exchangeRateHNLtoUSD - 0.08 : prev.bch.exchangeRateHNLtoUSD + 0.08;
+      const hnlEquivalent = Math.round(amountUSD * rate);
+      const spreadProfit = Math.round(amountUSD * 0.16);
+      return {
+        ...prev,
+        financials: {
+          ...prev.financials,
+          cashAndBCHReserves: direction === 'comprar'
+            ? prev.financials.cashAndBCHReserves - hnlEquivalent + spreadProfit
+            : prev.financials.cashAndBCHReserves + hnlEquivalent + spreadProfit,
+          feeIncomeSwiftAndFX: prev.financials.feeIncomeSwiftAndFX + spreadProfit,
+          totalFeeIncome: prev.financials.totalFeeIncome + spreadProfit
+        }
+      };
+    });
+  };
+
+  const handleBuyBchBill = (amountHNL: number, termMonths: number, yieldPct: number) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const interestEarned = Math.round(amountHNL * (yieldPct / 100) * (termMonths / 12));
+      return {
+        ...prev,
+        financials: {
+          ...prev.financials,
+          cashAndBCHReserves: Math.max(10000000, prev.financials.cashAndBCHReserves - amountHNL),
+          treasuryBondsBCH: prev.financials.treasuryBondsBCH + amountHNL,
+          interestIncomeTreasury: prev.financials.interestIncomeTreasury + Math.round(interestEarned / termMonths)
+        }
+      };
+    });
+  };
+
+  const handleIssueLetterOfCredit = (params: {
+    applicantName: string;
+    beneficiaryName: string;
+    amountUSD: number;
+    expiryMonths: number;
+    goodsDescription: string;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const fxRate = prev.bch.exchangeRateHNLtoUSD;
+      const hnlAmount = Math.round(params.amountUSD * fxRate);
+      const fee = Math.round(hnlAmount * 0.0075);
+      const newLc = {
+        id: `LC-2026-US-${Math.floor(100 + Math.random() * 899)}`,
+        applicantName: params.applicantName,
+        beneficiaryName: params.beneficiaryName,
+        issuingBank: 'Áureo Bank Honduras S.A.',
+        advisingBank: 'Citibank N.A. New York' as const,
+        amountUSD: params.amountUSD,
+        amountHNL: hnlAmount,
+        commissionRatePct: 0.75,
+        commissionCollectedHNL: fee,
+        expiryMonths: params.expiryMonths,
+        goodsDescription: params.goodsDescription,
+        status: 'emitida_confirmada' as const,
+        monthIssued: prev.gameMonth
+      };
+      return {
+        ...prev,
+        lettersOfCredit: [newLc, ...(prev.lettersOfCredit || [])],
+        financials: {
+          ...prev.financials,
+          feeIncomeSwiftAndFX: prev.financials.feeIncomeSwiftAndFX + fee,
+          totalFeeIncome: prev.financials.totalFeeIncome + fee,
+          cashAndBCHReserves: prev.financials.cashAndBCHReserves + fee
+        }
+      };
+    });
+  };
+
+  const handleStructureTrust = (params: {
+    trustName: string;
+    fiduciaryAssetHNL: number;
+    purpose: string;
+  }) => {
+    sound.playApprovalStamp();
+    setGameState(prev => {
+      const structFee = Math.round(params.fiduciaryAssetHNL * 0.01);
+      return {
+        ...prev,
+        financials: {
+          ...prev.financials,
+          feeIncomeSwiftAndFX: prev.financials.feeIncomeSwiftAndFX + structFee,
+          totalFeeIncome: prev.financials.totalFeeIncome + structFee,
+          cashAndBCHReserves: prev.financials.cashAndBCHReserves + structFee
+        }
+      };
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col font-sans">
       {/* Barra Superior HUD Ejecutiva */}
@@ -1191,27 +1380,45 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'strategic_improvements' && (
-          <StrategicImprovementsHub
+        {activeTab === 'back_to_back' && (
+          <BackToBackLendingTab
             state={gameState}
-            onUpdateState={setGameState}
-            onNavigateTab={setActiveTab}
+            onOriginateFacility={handleOriginateBackToBack}
+            onPayInstallment={handlePayBackToBack}
+            onForecloseCollateral={handleForecloseBackToBack}
+            onNavigateToTermDeposits={() => setActiveTab('term_deposits')}
           />
         )}
 
-        {activeTab === 'advanced_ops' && (
-          <AdvancedOperationsHub
+        {activeTab === 'term_deposits' && (
+          <TermDepositsTab
             state={gameState}
-            onUpdateState={setGameState}
-            onNavigateTab={setActiveTab}
+            onIssueCertificate={handleIssueTermDeposit}
+            onNavigateToBackToBack={() => setActiveTab('back_to_back')}
           />
         )}
 
-        {activeTab === 'programs20' && (
-          <ProgramsSuite20View
+        {activeTab === 'demand_accounts' && (
+          <DemandDepositsTab
             state={gameState}
-            onUpdateState={setGameState}
-            onNavigateTab={setActiveTab}
+            onExecuteAch={handleExecuteAch}
+            onProcessPayroll={handleProcessPayroll}
+          />
+        )}
+
+        {activeTab === 'treasury_alm' && (
+          <TreasuryAndAlmTab
+            state={gameState}
+            onTradeSpotUSD={handleTradeSpotUSD}
+            onBuyBchBill={handleBuyBchBill}
+          />
+        )}
+
+        {activeTab === 'corporate_trade' && (
+          <CorporateTradeTab
+            state={gameState}
+            onIssueLetterOfCredit={handleIssueLetterOfCredit}
+            onStructureTrust={handleStructureTrust}
           />
         )}
 

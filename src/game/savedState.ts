@@ -47,5 +47,23 @@ export function restoreGameState(saved: unknown): GameState {
   if (!state.executiveDilemmas) {
     state.executiveDilemmas = structuredClone(INITIAL_GAME_STATE.executiveDilemmas);
   }
+  if (!state.termDeposits || state.termDeposits.length === 0) {
+    state.termDeposits = structuredClone(INITIAL_GAME_STATE.termDeposits);
+  }
+  if (!state.backToBackFacilities || state.backToBackFacilities.length === 0) {
+    state.backToBackFacilities = structuredClone(INITIAL_GAME_STATE.backToBackFacilities);
+  }
+  if (!state.demandAccounts || state.demandAccounts.length === 0) {
+    state.demandAccounts = structuredClone(INITIAL_GAME_STATE.demandAccounts);
+  }
+  if (!state.achTransactions || state.achTransactions.length === 0) {
+    state.achTransactions = structuredClone(INITIAL_GAME_STATE.achTransactions);
+  }
+  if (!state.payrollBatches || state.payrollBatches.length === 0) {
+    state.payrollBatches = structuredClone(INITIAL_GAME_STATE.payrollBatches);
+  }
+  if (!state.lettersOfCredit || state.lettersOfCredit.length === 0) {
+    state.lettersOfCredit = structuredClone(INITIAL_GAME_STATE.lettersOfCredit);
+  }
   return state;
 }

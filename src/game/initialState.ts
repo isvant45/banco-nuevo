@@ -34,7 +34,13 @@ import {
   UifReportDossier,
   ExecutiveDilemmasState,
   ExecutiveDilemma,
-  DilemmaOption
+  DilemmaOption,
+  TermDepositCertificate,
+  BackToBackFacility,
+  DemandDepositAccount,
+  AchTransferTransaction,
+  CorporatePayrollBatch,
+  TradeFinanceLetterOfCredit
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -4525,6 +4531,290 @@ export const INITIAL_EXECUTIVE_DILEMMAS: ExecutiveDilemmasState = {
   crisisActive: false
 };
 
+export const INITIAL_TERM_DEPOSITS: TermDepositCertificate[] = [
+  {
+    id: 'DPF-2026-001',
+    cif: 'CIF-0501-1982-01994',
+    clientName: 'Corporación Agroindustrial del Norte S.A.',
+    division: 'corporativa',
+    principalHNL: 2000000,
+    interestRateAnnualPct: 8.5,
+    termDays: 360,
+    startMonth: 1,
+    startYear: 2026,
+    maturityMonth: 13,
+    maturityYear: 2027,
+    status: 'pignorado',
+    isPledged: true,
+    pledgedToFacilityId: 'B2B-CR-2026-001',
+    accumulatedGrossInterestHNL: 170000,
+    accumulatedSarTaxWithheldHNL: 17000,
+    netInterestPaidHNL: 153000,
+    couponPaymentFrequency: 'mensual',
+    autoRenew: true
+  },
+  {
+    id: 'DPF-2026-002',
+    cif: 'CIF-0501-1990-04421',
+    clientName: 'Inversiones & Distribuidora Sula S. de R.L.',
+    division: 'pyme',
+    principalHNL: 1000000,
+    interestRateAnnualPct: 7.8,
+    termDays: 180,
+    startMonth: 1,
+    startYear: 2026,
+    maturityMonth: 7,
+    maturityYear: 2026,
+    status: 'pignorado',
+    isPledged: true,
+    pledgedToFacilityId: 'B2B-TC-2026-002',
+    accumulatedGrossInterestHNL: 39000,
+    accumulatedSarTaxWithheldHNL: 3900,
+    netInterestPaidHNL: 35100,
+    couponPaymentFrequency: 'mensual',
+    autoRenew: true
+  },
+  {
+    id: 'DPF-2026-003',
+    cif: 'CIF-0801-1979-08112',
+    clientName: 'Lic. Claudia María Castellanos',
+    division: 'premier',
+    principalHNL: 500000,
+    interestRateAnnualPct: 8.2,
+    termDays: 360,
+    startMonth: 1,
+    startYear: 2026,
+    maturityMonth: 13,
+    maturityYear: 2027,
+    status: 'vigente',
+    isPledged: false,
+    accumulatedGrossInterestHNL: 41000,
+    accumulatedSarTaxWithheldHNL: 4100,
+    netInterestPaidHNL: 36900,
+    couponPaymentFrequency: 'mensual',
+    autoRenew: true
+  },
+  {
+    id: 'DPF-2026-004',
+    cif: 'CIF-0502-1985-00331',
+    clientName: 'Grupo Textil de Honduras (ZIP Choloma)',
+    division: 'corporativa',
+    principalHNL: 4500000,
+    interestRateAnnualPct: 9.5,
+    termDays: 720,
+    startMonth: 1,
+    startYear: 2026,
+    maturityMonth: 25,
+    maturityYear: 2028,
+    status: 'vigente',
+    isPledged: false,
+    accumulatedGrossInterestHNL: 855000,
+    accumulatedSarTaxWithheldHNL: 85500,
+    netInterestPaidHNL: 769500,
+    couponPaymentFrequency: 'mensual',
+    autoRenew: true
+  }
+];
+
+export const INITIAL_BACK_TO_BACK_FACILITIES: BackToBackFacility[] = [
+  {
+    id: 'B2B-CR-2026-001',
+    type: 'prestamo_garantizado',
+    clientName: 'Corporación Agroindustrial del Norte S.A.',
+    clientCif: 'CIF-0501-1982-01994',
+    division: 'corporativa',
+    dpfCertificateId: 'DPF-2026-001',
+    dpfPrincipalHNL: 2000000,
+    dpfInterestRatePct: 8.5,
+    coverageRatioPct: 90,
+    approvedAmountHNL: 1800000,
+    outstandingBalanceHNL: 1800000,
+    spreadRatePct: 3.0,
+    effectiveInterestRatePct: 11.5,
+    termMonths: 24,
+    monthlyQuotaHNL: 84310,
+    disbursementFeeHNL: 9000, // 0.5%
+    monthlyDebtorInsuranceHNL: 11700, // L. 6.50 por millar
+    riskWeightingRwaPct: 0,
+    requiredProvisionHNL: 0,
+    status: 'vigente',
+    pastDueDays: 0,
+    originationMonth: 1
+  },
+  {
+    id: 'B2B-TC-2026-002',
+    type: 'tarjeta_garantizada',
+    clientName: 'Inversiones & Distribuidora Sula S. de R.L.',
+    clientCif: 'CIF-0501-1990-04421',
+    division: 'pyme',
+    dpfCertificateId: 'DPF-2026-002',
+    dpfPrincipalHNL: 1000000,
+    dpfInterestRatePct: 7.8,
+    coverageRatioPct: 90,
+    approvedAmountHNL: 900000,
+    outstandingBalanceHNL: 245000,
+    spreadRatePct: 3.2,
+    effectiveInterestRatePct: 11.0,
+    termMonths: 36,
+    monthlyQuotaHNL: 29460,
+    disbursementFeeHNL: 4500,
+    monthlyDebtorInsuranceHNL: 5850,
+    riskWeightingRwaPct: 0,
+    requiredProvisionHNL: 0,
+    status: 'vigente',
+    pastDueDays: 0,
+    originationMonth: 1
+  }
+];
+
+export const INITIAL_DEMAND_ACCOUNTS: DemandDepositAccount[] = [
+  {
+    id: 'CTA-0501-1029-01',
+    accountNumber: '1102-0501-0084-912',
+    clientName: 'Corporación Agroindustrial del Norte S.A.',
+    clientCif: 'CIF-0501-1982-01994',
+    division: 'corporativa',
+    type: 'cuenta_corriente',
+    currency: 'HNL',
+    availableBalanceHNL: 840000,
+    transitBalanceHNL: 120000,
+    interestRateAnnualPct: 1.0,
+    overdraftLimitHNL: 250000,
+    overdraftUsedHNL: 0,
+    checksIssuedCount: 42,
+    checksBouncedCount: 0,
+    achTransfersCount: 18,
+    status: 'activa',
+    openedMonth: 1
+  },
+  {
+    id: 'CTA-0501-2044-02',
+    accountNumber: '1102-0501-0091-384',
+    clientName: 'Distribuidora Farmacéutica del Centro',
+    clientCif: 'CIF-0501-1990-04421',
+    division: 'pyme',
+    type: 'cuenta_corriente',
+    currency: 'HNL',
+    availableBalanceHNL: 1450000,
+    transitBalanceHNL: 50000,
+    interestRateAnnualPct: 1.2,
+    overdraftLimitHNL: 500000,
+    overdraftUsedHNL: 0,
+    checksIssuedCount: 88,
+    checksBouncedCount: 0,
+    achTransfersCount: 35,
+    status: 'activa',
+    openedMonth: 1
+  },
+  {
+    id: 'CTA-0801-4491-03',
+    accountNumber: '1101-0801-0012-763',
+    clientName: 'Café Exportación Santa Bárbara',
+    clientCif: 'CIF-1601-1975-00129',
+    division: 'pyme',
+    type: 'ahorro_rendimiento',
+    currency: 'HNL',
+    availableBalanceHNL: 620000,
+    transitBalanceHNL: 0,
+    interestRateAnnualPct: 3.5,
+    overdraftLimitHNL: 0,
+    overdraftUsedHNL: 0,
+    checksIssuedCount: 0,
+    checksBouncedCount: 0,
+    achTransfersCount: 12,
+    status: 'activa',
+    openedMonth: 1
+  }
+];
+
+export const INITIAL_ACH_TRANSACTIONS: AchTransferTransaction[] = [
+  {
+    id: 'ACH-2026-881201',
+    sourceAccountNumber: '1102-0501-0084-912',
+    sourceClientName: 'Corporación Agroindustrial del Norte S.A.',
+    destinationBank: 'Banco Ficohsa',
+    destinationAccount: '2001-0045-8120',
+    recipientName: 'Proveedora de Empaques Flexibles S.A.',
+    amountHNL: 85000,
+    commissionFeeHNL: 20.0,
+    referenceNote: 'Pago Factura Comercial F-4921',
+    status: 'liquidada',
+    timestamp: Date.now() - 3600000,
+    month: 1
+  },
+  {
+    id: 'ACH-2026-881202',
+    sourceAccountNumber: '1102-0501-0091-384',
+    sourceClientName: 'Distribuidora Farmacéutica del Centro',
+    destinationBank: 'Banco Atlántida',
+    destinationAccount: '1100-0891-3419',
+    recipientName: 'Laboratorios Químicos de Honduras',
+    amountHNL: 120000,
+    commissionFeeHNL: 20.0,
+    referenceNote: 'Cancelación Lote Medicamentos Enero',
+    status: 'liquidada',
+    timestamp: Date.now() - 7200000,
+    month: 1
+  },
+  {
+    id: 'ACH-2026-881203',
+    sourceAccountNumber: '1102-0501-0084-912',
+    sourceClientName: 'Corporación Agroindustrial del Norte S.A.',
+    destinationBank: 'BAC Credomatic',
+    destinationAccount: '7201-9941-0021',
+    recipientName: 'Transportes Rápidos de Cortés',
+    amountHNL: 45000,
+    commissionFeeHNL: 20.0,
+    referenceNote: 'Flete marítimo Puerto Cortés',
+    status: 'liquidada',
+    timestamp: Date.now() - 14400000,
+    month: 1
+  }
+];
+
+export const INITIAL_PAYROLL_BATCHES: CorporatePayrollBatch[] = [
+  {
+    id: 'PAY-2026-101',
+    companyName: 'Gildan Activewear Honduras',
+    companyAccountNumber: '1102-0501-0044-801',
+    employeeCount: 1250,
+    totalPayrollAmountHNL: 18750000,
+    feePerEmployeeHNL: 20.0,
+    totalFeeCollectedHNL: 25000,
+    status: 'procesada',
+    processedMonth: 1
+  },
+  {
+    id: 'PAY-2026-102',
+    companyName: 'Supermercados Colonial SPS',
+    companyAccountNumber: '1102-0501-0099-231',
+    employeeCount: 420,
+    totalPayrollAmountHNL: 5460000,
+    feePerEmployeeHNL: 20.0,
+    totalFeeCollectedHNL: 8400,
+    status: 'procesada',
+    processedMonth: 1
+  }
+];
+
+export const INITIAL_LETTERS_OF_CREDIT: TradeFinanceLetterOfCredit[] = [
+  {
+    id: 'LC-2026-US-01',
+    applicantName: 'Importadora Automotriz S.A.',
+    beneficiaryName: 'Toyota Tsusho America Inc.',
+    issuingBank: 'Áureo Bank Honduras S.A.',
+    advisingBank: 'Citibank N.A. New York',
+    amountUSD: 180000,
+    amountHNL: 4478400,
+    commissionRatePct: 0.75,
+    commissionCollectedHNL: 33588,
+    expiryMonths: 3,
+    goodsDescription: 'Embarque de repuestos genuinos y motores industriales vía Puerto Cortés',
+    status: 'emitida_confirmada',
+    monthIssued: 1
+  }
+];
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -4598,7 +4888,14 @@ export const INITIAL_GAME_STATE: GameState = {
   // Centro Global de Prevención de Fraudes, Lavado de Dinero (AML/CFT) y Reportes UIF
   amlCompliance: INITIAL_AML_COMPLIANCE,
   // Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
-  executiveDilemmas: INITIAL_EXECUTIVE_DILEMMAS
+  executiveDilemmas: INITIAL_EXECUTIVE_DILEMMAS,
+  // Core Bancario Institucional (Honduras & Centroamérica)
+  termDeposits: INITIAL_TERM_DEPOSITS,
+  backToBackFacilities: INITIAL_BACK_TO_BACK_FACILITIES,
+  demandAccounts: INITIAL_DEMAND_ACCOUNTS,
+  achTransactions: INITIAL_ACH_TRANSACTIONS,
+  payrollBatches: INITIAL_PAYROLL_BATCHES,
+  lettersOfCredit: INITIAL_LETTERS_OF_CREDIT
 };
 
 

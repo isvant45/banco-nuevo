@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación completado al 100%: Asignador masivo de cartera ('El Coso'), reingeniería reactiva de la Quita de Mora individual y masiva, y adición de los nuevos ítems de las 3 categorías (alivio financiero, tesorería y alianzas/POS). Todas las 37 pruebas unitarias pasan exitosamente.",
-  "updatedAt":  "2026-10-27T00:55:33.881027677Z",
+  "summary":  "Plan maestro integral de modernización a Core Bancario Institucional de Alta Fidelidad, fundamentado en el análisis tecnológico y tarifario exhaustivo de los 7 bancos líderes de Honduras y la región (Banco Atlántida - SAP, Ficohsa - Temenos T24, BAC Credomatic, Banpaís - Bantotal/IBS, Davivienda, Promerica y Banco de Occidente). Incorpora más de 60 mejoras operativas, financieras e institucionales, matriz de productos pasivos y activos, módulo especializado de Back-to-Back (préstamos y tarjetas garantizadas con DPF pignorado al 0% RWA), ACH Pronto CEPROBAN, dispersión de planillas, fideicomisos y tesorería con encaje legal BCH al 12%.",
+  "updatedAt":  "2026-10-27T23:51:13.207139009Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

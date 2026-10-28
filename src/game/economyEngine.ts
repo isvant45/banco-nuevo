@@ -53,7 +53,13 @@ import {
   ExecutiveDilemma,
   DilemmaCategory,
   DilemmaStatus,
-  DilemmaOption
+  DilemmaOption,
+  TermDepositCertificate,
+  BackToBackFacility,
+  DemandDepositAccount,
+  AchTransferTransaction,
+  CorporatePayrollBatch,
+  TradeFinanceLetterOfCredit
 } from './types';
 import { 
   INITIAL_BANKING_PROGRAMS_20, 
@@ -5442,4 +5448,444 @@ export function executeBulkDivisionMoraWaiver(
     successMessage: `Alivio masivo ejecutado en ${divConfig?.name || 'la cartera'}: se condonó la mora a ${countDisplay.toLocaleString()} créditos y la tasa de mora se redujo a 0.2%.`
   };
 }
+
+// ------------------------------------------------------------------------------------
+// CORE BANCARIO INSTITUCIONAL (MÓDULOS DE ALTA FIDELIDAD)
+// ------------------------------------------------------------------------------------
+
+/**
+ * Emisión de Certificado de Depósito a Plazo Fijo (DPF / Time Certificate)
+ * Aplica tasa escalonada según plazo (30 a 720 días) y cálculo de retención fiscal SAR 10%
+ */
+export function issueTermDepositCertificate(
+  state: GameState,
+  params: {
+    clientName: string;
+    clientCif?: string;
+    division?: BankingDivisionId;
+    principalHNL: number;
+    termDays: number;
+    interestRateAnnualPct: number;
+    couponPaymentFrequency?: 'mensual' | 'al_vencimiento';
+    autoRenew?: boolean;
+  }
+): { updatedState: GameState; certificate: TermDepositCertificate; successMessage: string } {
+  const principal = Math.max(1000, params.principalHNL || 50000);
+  const termDays = params.termDays || 360;
+  const ratePct = params.interestRateAnnualPct || 8.5;
+  const grossInterest = Math.round(principal * (ratePct / 100) * (termDays / 360));
+  const sarTaxWithheld = Math.round(grossInterest * 0.10); // 10% Retención SAR obligatoria
+  const netInterest = grossInterest - sarTaxWithheld;
+
+  const certId = `DPF-2026-${Math.floor(1000 + Math.random() * 8999)}`;
+  const certCif = params.clientCif || `CIF-0501-19${Math.floor(70 + Math.random() * 29)}-${Math.floor(10000 + Math.random() * 89999)}`;
+  const div = params.division || 'personas';
+
+  const newCert: TermDepositCertificate = {
+    id: certId,
+    cif: certCif,
+    clientName: params.clientName,
+    division: div,
+    principalHNL: principal,
+    interestRateAnnualPct: ratePct,
+    termDays: termDays,
+    startMonth: state.gameMonth,
+    startYear: 2026,
+    maturityMonth: state.gameMonth + Math.ceil(termDays / 30),
+    maturityYear: 2026 + Math.floor((state.gameMonth + Math.ceil(termDays / 30) - 1) / 12),
+    status: 'vigente',
+    isPledged: false,
+    accumulatedGrossInterestHNL: grossInterest,
+    accumulatedSarTaxWithheldHNL: sarTaxWithheld,
+    netInterestPaidHNL: netInterest,
+    couponPaymentFrequency: params.couponPaymentFrequency || 'mensual',
+    autoRenew: params.autoRenew ?? true
+  };
+
+  const existingCertificates = state.termDeposits || [];
+  const updatedCertificates = [newCert, ...existingCertificates];
+
+  // Actualizar Balance General (Pasivo exigible a plazo)
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    depositsPublicTotal: state.financials.depositsPublicTotal + principal,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + principal
+  };
+
+  const divConfig = state.divisions[div];
+  const updatedDivisions = {
+    ...state.divisions,
+    [div]: {
+      ...divConfig,
+      totalDeposits: divConfig.totalDeposits + principal
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      termDeposits: updatedCertificates,
+      financials: updatedFinancials,
+      divisions: updatedDivisions
+    },
+    certificate: newCert,
+    successMessage: `Certificado DPF ${certId} emitido exitosamente a ${params.clientName} por ${formatHNL(principal)} al ${ratePct}% (${termDays} días). Rendimiento neto estimado: ${formatHNL(netInterest)} (Retención SAR 10%: ${formatHNL(sarTaxWithheld)}).`
+  };
+}
+
+/**
+ * Originación de Préstamo o Tarjeta Back-to-Back (Garantía Líquida 100% / Riesgo Cero RWA)
+ * Respaldado mediante pignoración de DPF en custodia.
+ */
+export function originateBackToBackFacility(
+  state: GameState,
+  params: {
+    dpfCertificateId: string;
+    type: 'prestamo_garantizado' | 'tarjeta_garantizada';
+    coverageRatioPct?: number; // 80% a 95%
+    termMonths?: number; // 12 a 60 meses
+    spreadRatePct?: number; // Spread sobre DPF (estándar +3.0%)
+  }
+): { updatedState: GameState; facility?: BackToBackFacility; successMessage?: string; errorMessage?: string } {
+  const certs = state.termDeposits || [];
+  const dpf = certs.find(c => c.id === params.dpfCertificateId);
+
+  if (!dpf) {
+    return { updatedState: state, errorMessage: 'Certificado DPF no encontrado en custodia.' };
+  }
+
+  if (dpf.isPledged || dpf.status === 'pignorado') {
+    return { updatedState: state, errorMessage: `El DPF ${dpf.id} ya se encuentra pignorado a otra facilidad de crédito.` };
+  }
+
+  const coverage = Math.min(95, Math.max(80, params.coverageRatioPct || 90));
+  const spread = params.spreadRatePct ?? 3.0;
+  const termMonths = params.termMonths || 24;
+  const approvedAmount = Math.round(dpf.principalHNL * (coverage / 100));
+  const effectiveRate = +(dpf.interestRateAnnualPct + spread).toFixed(2);
+
+  // Comisión por otorgamiento / desembolso: 0.50% (mínimo L. 500)
+  const disbursementFee = Math.max(500, Math.round(approvedAmount * 0.005));
+  // Seguro de saldo deudor: L. 6.50 por millar
+  const debtorInsurance = Math.round((approvedAmount / 1000) * 6.50);
+
+  // Cuota mensual nivelada francesa
+  const monthlyRate = (effectiveRate / 100) / 12;
+  const monthlyQuota = Math.round((approvedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+
+  const facilityId = params.type === 'prestamo_garantizado'
+    ? `B2B-CR-${Math.floor(1000 + Math.random() * 8999)}`
+    : `B2B-TC-${Math.floor(1000 + Math.random() * 8999)}`;
+
+  const newFacility: BackToBackFacility = {
+    id: facilityId,
+    type: params.type,
+    clientName: dpf.clientName,
+    clientCif: dpf.cif,
+    division: dpf.division,
+    dpfCertificateId: dpf.id,
+    dpfPrincipalHNL: dpf.principalHNL,
+    dpfInterestRatePct: dpf.interestRateAnnualPct,
+    coverageRatioPct: coverage,
+    approvedAmountHNL: approvedAmount,
+    outstandingBalanceHNL: approvedAmount,
+    spreadRatePct: spread,
+    effectiveInterestRatePct: effectiveRate,
+    termMonths: termMonths,
+    monthlyQuotaHNL: monthlyQuota,
+    disbursementFeeHNL: disbursementFee,
+    monthlyDebtorInsuranceHNL: debtorInsurance,
+    riskWeightingRwaPct: 0, // 0% RWA según normativa CNBS
+    requiredProvisionHNL: 0, // L. 0.00 provisiones de riesgo
+    status: 'vigente',
+    pastDueDays: 0,
+    originationMonth: state.gameMonth
+  };
+
+  // Pignorar y bloquear el DPF colateral
+  const updatedCertificates = certs.map(c => {
+    if (c.id === dpf.id) {
+      return {
+        ...c,
+        isPledged: true,
+        status: 'pignorado' as const,
+        pledgedToFacilityId: facilityId
+      };
+    }
+    return c;
+  });
+
+  const existingFacilities = state.backToBackFacilities || [];
+  const updatedFacilities = [newFacility, ...existingFacilities];
+
+  // Actualizar balances financieros (Colocación y cobro de comisión)
+  const netCashOutflow = approvedAmount - disbursementFee;
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + approvedAmount,
+    cashAndBCHReserves: Math.max(1000000, state.financials.cashAndBCHReserves - netCashOutflow),
+    totalFeeIncome: state.financials.totalFeeIncome + disbursementFee,
+    nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + disbursementFee
+  };
+
+  const divConfig = state.divisions[dpf.division];
+  const updatedDivisions = {
+    ...state.divisions,
+    [dpf.division]: {
+      ...divConfig,
+      totalLoans: divConfig.totalLoans + approvedAmount,
+      feeIncomeMonthly: divConfig.feeIncomeMonthly + disbursementFee
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      termDeposits: updatedCertificates,
+      backToBackFacilities: updatedFacilities,
+      financials: updatedFinancials,
+      divisions: updatedDivisions
+    },
+    facility: newFacility,
+    successMessage: `Facilidad Back-to-Back ${facilityId} aprobada al 100%: Monto ${formatHNL(approvedAmount)} (cobertura ${coverage}% sobre DPF ${dpf.id}). Tasa activa: ${effectiveRate}% (DPF + ${spread}%). Comisión de apertura cobrada: ${formatHNL(disbursementFee)}. RWA: 0% / Provisión: L. 0.00.`
+  };
+}
+
+/**
+ * Pago o liquidación de cuota de crédito Back-to-Back
+ * Si el saldo llega a 0, se libera el gravamen del DPF colateral automáticamente.
+ */
+export function payBackToBackInstallment(
+  state: GameState,
+  facilityId: string,
+  amountHNL?: number
+): { updatedState: GameState; facility?: BackToBackFacility; successMessage: string } {
+  const facilities = state.backToBackFacilities || [];
+  const facility = facilities.find(f => f.id === facilityId);
+
+  if (!facility || facility.status !== 'vigente') {
+    return { updatedState: state, successMessage: 'La facilidad no se encuentra activa.' };
+  }
+
+  const payment = amountHNL ? Math.min(amountHNL, facility.outstandingBalanceHNL) : Math.min(facility.monthlyQuotaHNL, facility.outstandingBalanceHNL);
+  const newBalance = Math.max(0, facility.outstandingBalanceHNL - payment);
+  const isFullyPaid = newBalance === 0;
+
+  const updatedFacilities = facilities.map(f => {
+    if (f.id === facilityId) {
+      return {
+        ...f,
+        outstandingBalanceHNL: newBalance,
+        status: isFullyPaid ? ('cancelado' as const) : f.status,
+        lastPaymentMonth: state.gameMonth
+      };
+    }
+    return f;
+  });
+
+  // Si se canceló totalmente, desgravar / liberar el DPF pignorado
+  let updatedCertificates = state.termDeposits || [];
+  if (isFullyPaid) {
+    updatedCertificates = updatedCertificates.map(c => {
+      if (c.id === facility.dpfCertificateId) {
+        return {
+          ...c,
+          isPledged: false,
+          status: 'vigente' as const,
+          pledgedToFacilityId: undefined
+        };
+      }
+      return c;
+    });
+  }
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioCurrent: Math.max(0, state.financials.loanPortfolioCurrent - payment),
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + payment
+  };
+
+  const updatedFacility = updatedFacilities.find(f => f.id === facilityId);
+
+  return {
+    updatedState: {
+      ...state,
+      backToBackFacilities: updatedFacilities,
+      termDeposits: updatedCertificates,
+      financials: updatedFinancials
+    },
+    facility: updatedFacility,
+    successMessage: isFullyPaid
+      ? `Crédito Back-to-Back ${facilityId} cancelado al 100%. Se liberó el gravamen sobre el DPF ${facility.dpfCertificateId}.`
+      : `Abono de ${formatHNL(payment)} aplicado a ${facilityId}. Saldo pendiente: ${formatHNL(newBalance)}.`
+  };
+}
+
+/**
+ * Ejecución extrajudicial forzosa de garantía líquida DPF
+ * En caso de mora insalvable, se compensa la deuda directamente contra el DPF sin juicio.
+ */
+export function executePledgedDepositForeclosure(
+  state: GameState,
+  facilityId: string
+): { updatedState: GameState; successMessage: string } {
+  const facilities = state.backToBackFacilities || [];
+  const facility = facilities.find(f => f.id === facilityId);
+
+  if (!facility || facility.status !== 'vigente') {
+    return { updatedState: state, successMessage: 'Facilidad no disponible para ejecución.' };
+  }
+
+  const debtToLiquidate = facility.outstandingBalanceHNL;
+
+  const updatedFacilities = facilities.map(f => {
+    if (f.id === facilityId) {
+      return {
+        ...f,
+        outstandingBalanceHNL: 0,
+        status: 'ejecutado' as const
+      };
+    }
+    return f;
+  });
+
+  const updatedCertificates = (state.termDeposits || []).map(c => {
+    if (c.id === facility.dpfCertificateId) {
+      const remainingPrincipal = Math.max(0, c.principalHNL - debtToLiquidate);
+      return {
+        ...c,
+        principalHNL: remainingPrincipal,
+        isPledged: false,
+        status: remainingPrincipal > 0 ? ('vigente' as const) : ('ejecutado' as const),
+        pledgedToFacilityId: undefined
+      };
+    }
+    return c;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioCurrent: Math.max(0, state.financials.loanPortfolioCurrent - debtToLiquidate),
+    depositsPublicTotal: Math.max(0, state.financials.depositsPublicTotal - debtToLiquidate)
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      backToBackFacilities: updatedFacilities,
+      termDeposits: updatedCertificates,
+      financials: updatedFinancials
+    },
+    successMessage: `Garantía líquida ejecutada en core: se canceló el saldo insoluto de ${formatHNL(debtToLiquidate)} contra el DPF ${facility.dpfCertificateId}. El colateral cubrió el 100% sin pérdidas para el banco.`
+  };
+}
+
+/**
+ * Procesamiento de dispersión masiva de planilla empresarial (ACH Corporativo)
+ * Cobra tarifa oficial por colaborador (L. 18 a L. 22)
+ */
+export function processCorporatePayrollDispersion(
+  state: GameState,
+  params: {
+    companyName: string;
+    companyAccountNumber?: string;
+    employeeCount: number;
+    totalPayrollAmountHNL: number;
+    feePerEmployeeHNL?: number;
+  }
+): { updatedState: GameState; batch: CorporatePayrollBatch; successMessage: string } {
+  const feeRate = params.feePerEmployeeHNL || 20.0;
+  const totalFee = Math.round(params.employeeCount * feeRate);
+  const batchId = `PAY-2026-${Math.floor(100 + Math.random() * 899)}`;
+
+  const newBatch: CorporatePayrollBatch = {
+    id: batchId,
+    companyName: params.companyName,
+    companyAccountNumber: params.companyAccountNumber || 'CTA-0501-8841-01',
+    employeeCount: params.employeeCount,
+    totalPayrollAmountHNL: params.totalPayrollAmountHNL,
+    feePerEmployeeHNL: feeRate,
+    totalFeeCollectedHNL: totalFee,
+    status: 'procesada',
+    processedMonth: state.gameMonth
+  };
+
+  const existingBatches = state.payrollBatches || [];
+  const updatedBatches = [newBatch, ...existingBatches];
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    feeIncomePayrollServices: state.financials.feeIncomePayrollServices + totalFee,
+    totalFeeIncome: state.financials.totalFeeIncome + totalFee,
+    nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + totalFee,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + totalFee
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      payrollBatches: updatedBatches,
+      financials: updatedFinancials
+    },
+    batch: newBatch,
+    successMessage: `Planilla de ${params.companyName} procesada: ${params.employeeCount.toLocaleString()} colaboradores acreditados por ${formatHNL(params.totalPayrollAmountHNL)}. Comisión por dispersión cobrada: ${formatHNL(totalFee)}.`
+  };
+}
+
+/**
+ * Ejecución de transferencia interbancaria ACH Pronto (CEPROBAN)
+ * Costo oficial regulado de L. 20.00 por transacción
+ */
+export function executeAchTransfer(
+  state: GameState,
+  params: {
+    sourceAccountNumber: string;
+    sourceClientName: string;
+    destinationBank: 'Banco Atlántida' | 'Banco Ficohsa' | 'BAC Credomatic' | 'Banpaís' | 'Banco de Occidente' | 'Davivienda' | 'Promerica';
+    destinationAccount: string;
+    recipientName: string;
+    amountHNL: number;
+    referenceNote: string;
+  }
+): { updatedState: GameState; transaction: AchTransferTransaction; successMessage: string } {
+  const achFee = 20.0; // Tarifa oficial regulada CEPROBAN
+  const txId = `ACH-2026-${Math.floor(100000 + Math.random() * 899999)}`;
+
+  const newTx: AchTransferTransaction = {
+    id: txId,
+    sourceAccountNumber: params.sourceAccountNumber,
+    sourceClientName: params.sourceClientName,
+    destinationBank: params.destinationBank,
+    destinationAccount: params.destinationAccount,
+    recipientName: params.recipientName,
+    amountHNL: params.amountHNL,
+    commissionFeeHNL: achFee,
+    referenceNote: params.referenceNote,
+    status: 'liquidada',
+    timestamp: Date.now(),
+    month: state.gameMonth
+  };
+
+  const existingTxs = state.achTransactions || [];
+  const updatedTxs = [newTx, ...existingTxs];
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    feeIncomeClearingACH: state.financials.feeIncomeClearingACH + achFee,
+    totalFeeIncome: state.financials.totalFeeIncome + achFee,
+    nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + achFee,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + achFee
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      achTransactions: updatedTxs,
+      financials: updatedFinancials
+    },
+    transaction: newTx,
+    successMessage: `Transferencia ACH Pronto ${txId} liquidada hacia ${params.destinationBank} por ${formatHNL(params.amountHNL)}. Comisión CEPROBAN cobrada: L. 20.00.`
+  };
+}
+
 

@@ -355,6 +355,11 @@ export interface BankFinancialStatements {
   feeIncomePensionFunds: number; // Comisiones por administración de pensiones
   totalFeeIncome: number;
 
+  // Propiedades complementarias de Core Bancario
+  nonInterestFeeIncomeMonthly?: number;
+  treasurySecuritiesBCH?: number;
+  netInterestIncomeMonthly?: number;
+
   staffSalariesExpense: number;
   branchesOpexExpense: number;
   technologyAndMarketingExpense: number;
@@ -777,6 +782,128 @@ export interface GameState {
   advisorAutoApprovalThresholdHNL?: number;
   autoTimerActive?: boolean;
   autoTimerIntervalSeconds?: number;
+  // Core Bancario Institucional (Honduras & Centroamérica)
+  termDeposits?: TermDepositCertificate[];
+  backToBackFacilities?: BackToBackFacility[];
+  demandAccounts?: DemandDepositAccount[];
+  achTransactions?: AchTransferTransaction[];
+  payrollBatches?: CorporatePayrollBatch[];
+  lettersOfCredit?: TradeFinanceLetterOfCredit[];
+}
+
+// ------------------------------------------------------------------------------------
+// CORE BANCARIO INSTITUCIONAL: DPF, BACK-TO-BACK, CUENTAS VISTA & COMERCIO EXTERIOR
+// ------------------------------------------------------------------------------------
+
+export interface TermDepositCertificate {
+  id: string; // ej. DPF-2026-001
+  cif: string;
+  clientName: string;
+  division: BankingDivisionId;
+  principalHNL: number;
+  interestRateAnnualPct: number; // Tasa pasiva anual ej. 8.5%
+  termDays: number; // 30, 60, 90, 180, 360, 720
+  startMonth: number;
+  startYear: number;
+  maturityMonth: number;
+  maturityYear: number;
+  status: 'vigente' | 'vencido' | 'pignorado' | 'cancelado' | 'ejecutado';
+  isPledged: boolean; // Pignorado en garantía líquida Back-to-Back
+  pledgedToFacilityId?: string; // ID del crédito o tarjeta que respalda
+  accumulatedGrossInterestHNL: number;
+  accumulatedSarTaxWithheldHNL: number; // 10% retención fiscal SAR
+  netInterestPaidHNL: number;
+  couponPaymentFrequency: 'mensual' | 'al_vencimiento';
+  autoRenew: boolean;
+}
+
+export interface BackToBackFacility {
+  id: string; // ej. B2B-CR-2026-001 o B2B-TC-2026-001
+  type: 'prestamo_garantizado' | 'tarjeta_garantizada';
+  clientName: string;
+  clientCif: string;
+  division: BankingDivisionId;
+  dpfCertificateId: string;
+  dpfPrincipalHNL: number;
+  dpfInterestRatePct: number;
+  coverageRatioPct: number; // 80% a 95%
+  approvedAmountHNL: number; // Monto desembolsado o cupo de tarjeta
+  outstandingBalanceHNL: number; // Saldo actual adeudado
+  spreadRatePct: number; // Margen del banco (+3.0% a +4.0%)
+  effectiveInterestRatePct: number; // dpfRate + spreadRate
+  termMonths: number;
+  monthlyQuotaHNL: number; // Cuota francesa mensual
+  disbursementFeeHNL: number; // 0.5% flat (mínimo L. 500)
+  monthlyDebtorInsuranceHNL: number; // L. 6.50 por millar de saldo
+  riskWeightingRwaPct: 0; // 0% RWA bajo normativa CNBS
+  requiredProvisionHNL: 0; // L. 0.00 provisiones de riesgo
+  status: 'vigente' | 'cancelado' | 'ejecutado';
+  pastDueDays: number;
+  originationMonth: number;
+  lastPaymentMonth?: number;
+}
+
+export interface DemandDepositAccount {
+  id: string;
+  accountNumber: string;
+  clientName: string;
+  clientCif: string;
+  division: BankingDivisionId;
+  type: 'cuenta_corriente' | 'ahorro_rendimiento';
+  currency: 'HNL' | 'USD';
+  availableBalanceHNL: number;
+  transitBalanceHNL: number; // Saldo en compensación de cheques
+  interestRateAnnualPct: number; // Rendimiento pasivo anual
+  overdraftLimitHNL: number; // Límite de sobregiro contratado
+  overdraftUsedHNL: number;
+  checksIssuedCount: number;
+  checksBouncedCount: number; // Rechazados por insuficiencia de fondos
+  achTransfersCount: number;
+  status: 'activa' | 'bloqueada' | 'embargada';
+  openedMonth: number;
+}
+
+export interface AchTransferTransaction {
+  id: string; // ACH-2026-XXXXX
+  sourceAccountNumber: string;
+  sourceClientName: string;
+  destinationBank: 'Banco Atlántida' | 'Banco Ficohsa' | 'BAC Credomatic' | 'Banpaís' | 'Banco de Occidente' | 'Davivienda' | 'Promerica';
+  destinationAccount: string;
+  recipientName: string;
+  amountHNL: number;
+  commissionFeeHNL: number; // Tarifa fija regulada L. 20.00
+  referenceNote: string;
+  status: 'liquidada' | 'en_proceso' | 'rechazada';
+  timestamp: number;
+  month: number;
+}
+
+export interface CorporatePayrollBatch {
+  id: string;
+  companyName: string;
+  companyAccountNumber: string;
+  employeeCount: number;
+  totalPayrollAmountHNL: number;
+  feePerEmployeeHNL: number; // L. 18.00 a L. 22.00
+  totalFeeCollectedHNL: number;
+  status: 'procesada' | 'en_revision';
+  processedMonth: number;
+}
+
+export interface TradeFinanceLetterOfCredit {
+  id: string;
+  applicantName: string; // Empresa importadora
+  beneficiaryName: string; // Exportador extranjero
+  issuingBank: string;
+  advisingBank: 'Citibank N.A. New York' | 'JPMorgan Chase' | 'Bank of America';
+  amountUSD: number;
+  amountHNL: number;
+  commissionRatePct: number; // 0.75% trimestral
+  commissionCollectedHNL: number;
+  expiryMonths: number;
+  goodsDescription: string;
+  status: 'emitida_confirmada' | 'embarque_recibido' | 'liquidada';
+  monthIssued: number;
 }
 
 export interface BranchDepartment {
