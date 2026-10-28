@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateClientDivisionUpgrade, formatHNL, getMonthName } from '../src/game/economyEngine.ts';
-import type { IndividualClient } from '../src/game/types.ts';
+import { evaluateClientDivisionUpgrade, formatHNL, getMonthName } from '../src/game/economyEngine';
+import type { IndividualClient } from '../src/game/types';
 
 function client(division: IndividualClient['division']): IndividualClient {
   return {
@@ -29,6 +29,7 @@ function client(division: IndividualClient['division']): IndividualClient {
     pastDueAmountHNL: 0,
     equifaxScore: 700,
     cnbsCategory: 'I - Normal',
+    otherBankProducts: []
   };
 }
 
