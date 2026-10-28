@@ -40,7 +40,11 @@ import {
   DemandDepositAccount,
   AchTransferTransaction,
   CorporatePayrollBatch,
-  TradeFinanceLetterOfCredit
+  TradeFinanceLetterOfCredit,
+  CampaignState,
+  TerritoryCompetitionState,
+  BankTechTreeState,
+  SyndicatedLendingState
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -4656,7 +4660,10 @@ export const INITIAL_BACK_TO_BACK_FACILITIES: BackToBackFacility[] = [
     spreadRatePct: 3.2,
     effectiveInterestRatePct: 11.0,
     termMonths: 36,
-    monthlyQuotaHNL: 29460,
+    monthlyQuotaHNL: 0, // Tarjeta garantizada revolvente: SIN cuota fija nivelada
+    isRevolving: true,
+    creditCardLimitHNL: 900000,
+    minimumMonthlyPaymentHNL: 12250, // 5% del saldo utilizado (L. 245,000 * 0.05)
     disbursementFeeHNL: 4500,
     monthlyDebtorInsuranceHNL: 5850,
     riskWeightingRwaPct: 0,
@@ -4815,6 +4822,580 @@ export const INITIAL_LETTERS_OF_CREDIT: TradeFinanceLetterOfCredit[] = [
   }
 ];
 
+export const INITIAL_CAMPAIGN_STATE: CampaignState = {
+  currentChapter: 1,
+  totalRewardsClaimedHNL: 0,
+  totalMissionsCompleted: 0,
+  chapters: [
+    {
+      chapterNumber: 1,
+      title: 'Capítulo I: Despegue Bancario & Solvencia CNBS',
+      subtitle: 'Establecimiento del Core Institucional',
+      objectiveSummary: 'Consolida la posición de capital, coloca los primeros créditos de alto rendimiento y capta depósitos a plazo.',
+      isUnlocked: true,
+      isCompleted: false,
+      missions: [
+        {
+          id: 'camp-c1-m1',
+          title: 'Fortaleza Patrimonial Tier 1',
+          description: 'Mantén un Índice de Adecuación de Capital (CAR) igual o superior al 14.0% ante la CNBS.',
+          targetMetric: 'carPct',
+          currentValue: 14.8,
+          targetValue: 14.0,
+          unit: '%',
+          rewardHNL: 2500000,
+          rewardReputation: 3,
+          rewardPerkLabel: 'Acreditación CNBS A+ y Bono de Tesorería L. 2.5M',
+          isCompleted: true,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c1-m2',
+          title: 'Emisión de Certificados DPF',
+          description: 'Capta al menos L. 30,000,000 en depósitos a plazo fijo para asegurar fondeo estable.',
+          targetMetric: 'totalDpfPrincipal',
+          currentValue: 3000000,
+          targetValue: 30000000,
+          unit: 'HNL',
+          rewardHNL: 3000000,
+          rewardReputation: 4,
+          rewardPerkLabel: 'Spread pasivo preferente -25 bps y Bono L. 3.0M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c1-m3',
+          title: 'Innovación Back-to-Back Revolvente',
+          description: 'Emite al menos una Tarjeta de Crédito Garantizada por DPF con límite del 90%-95% y 0% RWA.',
+          targetMetric: 'guaranteedCardsCount',
+          currentValue: 1,
+          targetValue: 1,
+          unit: 'unidades',
+          rewardHNL: 1500000,
+          rewardReputation: 2,
+          rewardPerkLabel: 'Incentivo de Innovación de Medios de Pago L. 1.5M',
+          isCompleted: true,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c1-m4',
+          title: 'Colocación en Cartera de Consumo',
+          description: 'Alcanza una cartera de crédito al consumo individual superior a L. 350,000,000.',
+          targetMetric: 'consumerPortfolioHNL',
+          currentValue: 320000000,
+          targetValue: 350000000,
+          unit: 'HNL',
+          rewardHNL: 3500000,
+          rewardReputation: 5,
+          rewardPerkLabel: 'Bono de Expansión Crediticia L. 3.5M',
+          isCompleted: false,
+          isClaimed: false
+        }
+      ]
+    },
+    {
+      chapterNumber: 2,
+      title: 'Capítulo II: Guerra de Medios de Pago & POS',
+      subtitle: 'Conquistando el Ecosistema Transaccional',
+      objectiveSummary: 'Reta el duopolio de Ficohsa y BAC en facturación de tarjetas y adquirencia en comercios.',
+      isUnlocked: false,
+      isCompleted: false,
+      missions: [
+        {
+          id: 'camp-c2-m1',
+          title: 'Facturación Mensual de Tarjetas',
+          description: 'Supera L. 15,000,000 en facturación mensual consolidada de plásticos de crédito.',
+          targetMetric: 'cardBillingMonthlyHNL',
+          currentValue: 8500000,
+          targetValue: 15000000,
+          unit: 'HNL',
+          rewardHNL: 4000000,
+          rewardReputation: 5,
+          rewardPerkLabel: 'Intercambio Visa/Mastercard optimizado +15 bps',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c2-m2',
+          title: 'Red de Adquirencia Smart POS',
+          description: 'Afilia al menos 30 comercios y empresas a la red de cobro POS de Áureo Bank.',
+          targetMetric: 'posMerchantsCount',
+          currentValue: 12,
+          targetValue: 30,
+          unit: 'comercios',
+          rewardHNL: 3000000,
+          rewardReputation: 4,
+          rewardPerkLabel: 'Tasa de descuento comercial adquirente L. 3.0M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c2-m3',
+          title: 'Control Estricto de Calidad Crediticia',
+          description: 'Reduce la morosidad global NPL por debajo del 2.2% mediante scoring riguroso.',
+          targetMetric: 'nplRatioPct',
+          currentValue: 2.8,
+          targetValue: 2.2,
+          unit: '%',
+          rewardHNL: 4500000,
+          rewardReputation: 6,
+          rewardPerkLabel: 'Ahorro de Provisiones CNBS y Bono L. 4.5M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c2-m4',
+          title: 'Modernización Tecnológica',
+          description: 'Desbloquea al menos 3 nodos en el Árbol Tecnológico Bancario.',
+          targetMetric: 'unlockedTechCount',
+          currentValue: 0,
+          targetValue: 3,
+          unit: 'tecnologías',
+          rewardHNL: 2000000,
+          rewardReputation: 4,
+          rewardPerkLabel: 'Acelerador de Eficiencia OPEX permanente',
+          isCompleted: false,
+          isClaimed: false
+        }
+      ]
+    },
+    {
+      chapterNumber: 3,
+      title: 'Capítulo III: Expansión Territorial & Préstamos Sindicados',
+      subtitle: 'El Salto al Tablero Corporativo Nacional',
+      objectiveSummary: 'Disputa departamentos estratégicos a Banco Atlántida y lidera créditos sindicados estilo J.P. Morgan.',
+      isUnlocked: false,
+      isCompleted: false,
+      missions: [
+        {
+          id: 'camp-c3-m1',
+          title: 'Liderar un Crédito Sindicado Corporativo',
+          description: 'Actúa como Lead Arranger en una facilidad sindicada y cobra la comisión de estructuración.',
+          targetMetric: 'leadArrangerDealsCount',
+          currentValue: 0,
+          targetValue: 1,
+          unit: 'operación',
+          rewardHNL: 8000000,
+          rewardReputation: 8,
+          rewardPerkLabel: 'Reconocimiento de Banca de Inversión Regional L. 8.0M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c3-m2',
+          title: 'Conquista del Valle de Sula (Cortés)',
+          description: 'Alcanza al menos un 10.0% de cuota de mercado en el departamento de Cortés.',
+          targetMetric: 'cortesMarketSharePct',
+          currentValue: 7.8,
+          targetValue: 10.0,
+          unit: '%',
+          rewardHNL: 6000000,
+          rewardReputation: 7,
+          rewardPerkLabel: 'Hegemonía industrial en San Pedro Sula',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c3-m3',
+          title: 'Planillas Empresariales Corporativas',
+          description: 'Procesa al menos 3 planillas masivas ACH con más de 2,000 colaboradores en total.',
+          targetMetric: 'payrollEmployeesDisbursed',
+          currentValue: 1250,
+          targetValue: 2000,
+          unit: 'empleados',
+          rewardHNL: 3500000,
+          rewardReputation: 5,
+          rewardPerkLabel: 'Fidelización de cuentas sueldo y captación a la vista',
+          isCompleted: false,
+          isClaimed: false
+        }
+      ]
+    },
+    {
+      chapterNumber: 4,
+      title: 'Capítulo IV: Banca Privada J.P. Morgan & Dominio Total',
+      subtitle: 'La Cúspide del Sistema Financiero',
+      objectiveSummary: 'Alcanza el Top 3 bancario, domina la gestión fiduciaria de familias de alto patrimonio y maximiza ROE.',
+      isUnlocked: false,
+      isCompleted: false,
+      missions: [
+        {
+          id: 'camp-c4-m1',
+          title: 'Liderazgo en Banca Privada & Wealth Management',
+          description: 'Alcanza L. 500,000,000 en Activos Bajo Administración (AUM) y fideicomisos privados.',
+          targetMetric: 'wealthManagementAumHNL',
+          currentValue: 180000000,
+          targetValue: 500000000,
+          unit: 'HNL',
+          rewardHNL: 12000000,
+          rewardReputation: 10,
+          rewardPerkLabel: 'Sello Private Bank J.P. Morgan Premier L. 12.0M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c4-m2',
+          title: 'Retorno Sobre Capital (ROE > 20%)',
+          description: 'Genera un ROE anualizado auditado superior al 20.0% con eficiencia operativa CIR < 45%.',
+          targetMetric: 'roePct',
+          currentValue: 17.5,
+          targetValue: 20.0,
+          unit: '%',
+          rewardHNL: 15000000,
+          rewardReputation: 12,
+          rewardPerkLabel: 'Dividendo extraordinario de directores L. 15.0M',
+          isCompleted: false,
+          isClaimed: false
+        },
+        {
+          id: 'camp-c4-m3',
+          title: 'Podio Nacional de Activos',
+          description: 'Ingresa al Top 3 de los bancos más grandes de Honduras por volumen total de activos.',
+          targetMetric: 'nationalAssetsRank',
+          currentValue: 6,
+          targetValue: 3,
+          unit: 'puesto ranking',
+          rewardHNL: 20000000,
+          rewardReputation: 15,
+          rewardPerkLabel: 'Premio Banquero del Año Euromoney & LatinFinance',
+          isCompleted: false,
+          isClaimed: false
+        }
+      ]
+    }
+  ]
+};
+
+export const INITIAL_TERRITORY_STATE: TerritoryCompetitionState = {
+  totalMarketShareNationalPct: 7.2,
+  departments: [
+    {
+      id: 'cortes',
+      name: 'Cortés (San Pedro Sula / Puerto Cortés)',
+      capitalCity: 'San Pedro Sula',
+      economicFocus: 'Eje Maquilador, Comercio Mayorista, Logística Portuaria',
+      totalMarketDepositsHNL: 85000000000,
+      totalMarketLoansHNL: 78000000000,
+      playerMarketSharePct: 7.8,
+      leadingBankName: 'Banco Ficohsa',
+      leadingBankSharePct: 29.5,
+      branchesPlayerCount: 4,
+      atmPlayerCount: 16,
+      offensiveCampaignActive: false
+    },
+    {
+      id: 'francisco_morazan',
+      name: 'Francisco Morazán (Tegucigalpa M.D.C.)',
+      capitalCity: 'Tegucigalpa',
+      economicFocus: 'Gobierno Central, Corporativos Multinacionales, Consumo Masivo',
+      totalMarketDepositsHNL: 95000000000,
+      totalMarketLoansHNL: 82000000000,
+      playerMarketSharePct: 6.9,
+      leadingBankName: 'Banco Atlántida',
+      leadingBankSharePct: 32.1,
+      branchesPlayerCount: 5,
+      atmPlayerCount: 20,
+      offensiveCampaignActive: false
+    },
+    {
+      id: 'atlantida',
+      name: 'Atlántida (La Ceiba / Tela)',
+      capitalCity: 'La Ceiba',
+      economicFocus: 'Agroindustria Palma Africana, Turismo Costero, Remesas Familiares',
+      totalMarketDepositsHNL: 18000000000,
+      totalMarketLoansHNL: 14000000000,
+      playerMarketSharePct: 5.5,
+      leadingBankName: 'Banco Atlántida',
+      leadingBankSharePct: 36.4,
+      branchesPlayerCount: 2,
+      atmPlayerCount: 8,
+      offensiveCampaignActive: false
+    },
+    {
+      id: 'islas_bahia',
+      name: 'Islas de la Bahía (Roatán / Utila)',
+      capitalCity: 'Roatán (Coxen Hole)',
+      economicFocus: 'Captación en Dólares USD, Hotelería de Alta Gama, Fideicomisos',
+      totalMarketDepositsHNL: 12000000000,
+      totalMarketLoansHNL: 9500000000,
+      playerMarketSharePct: 4.8,
+      leadingBankName: 'BAC Credomatic',
+      leadingBankSharePct: 38.0,
+      branchesPlayerCount: 1,
+      atmPlayerCount: 6,
+      offensiveCampaignActive: false
+    },
+    {
+      id: 'occidente',
+      name: 'Región de Occidente (Copán / Ocotepeque / Santa Bárbara)',
+      capitalCity: 'Santa Rosa de Copán',
+      economicFocus: 'Exportación de Café Especial, Comercio Transfronterizo, Microfinanzas',
+      totalMarketDepositsHNL: 22000000000,
+      totalMarketLoansHNL: 19000000000,
+      playerMarketSharePct: 6.2,
+      leadingBankName: 'Banco de Occidente',
+      leadingBankSharePct: 42.0,
+      branchesPlayerCount: 2,
+      atmPlayerCount: 7,
+      offensiveCampaignActive: false
+    }
+  ],
+  recentCounterattacks: [
+    {
+      id: 'cnt-01',
+      month: 1,
+      rivalBankId: 'ficohsa',
+      rivalBankName: 'Banco Ficohsa',
+      headline: 'Contraofensiva de Fidelización: 10% Cashback en Gasolineras Puma',
+      impactSummary: 'Ficohsa incrementó su facturación un +4.2% presionando a los comercios afiliados en Cortés y Tegucigalpa.',
+      offensiveType: 'tarjetas_cashback',
+      playerDefenseRecommended: 'Lanza campañas de tarjetas garantizadas con cero cuota y 5% de pago mínimo.'
+    },
+    {
+      id: 'cnt-02',
+      month: 1,
+      rivalBankId: 'banpais',
+      rivalBankName: 'Banpaís',
+      headline: 'Guerra de Tasas Pasivas: DPFs Corporativos al 9.25% Anual',
+      impactSummary: 'Banpaís captó L. 80M de tesorerías medianas en la zona norte.',
+      offensiveType: 'guerra_tasas_pasivas',
+      playerDefenseRecommended: 'Ofrece pignoración líquida Back-to-Back para desbloquear liquidez a los ahorrantes.'
+    }
+  ]
+};
+
+export const INITIAL_TECH_TREE_STATE: BankTechTreeState = {
+  totalCapexInvestedHNL: 0,
+  totalMonthlyOpexSavingsHNL: 0,
+  nodes: [
+    // Rama 1: Canales Digitales & Experiencia Cliente
+    {
+      id: 'tech-dig-1',
+      branch: 'canales_digitales',
+      tier: 1,
+      name: 'Banca Móvil 3.0 & Onboarding Biométrico',
+      description: 'Apertura remota de cuentas de ahorro con validación RNP facial y token digital.',
+      capexCostHNL: 800000,
+      monthlyOpexSavingsHNL: 45000,
+      unlockedPerkDescription: '+15% satisfacción retail y reducción de filas en sucursales físicas.',
+      prerequisites: [],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-dig-2',
+      branch: 'canales_digitales',
+      tier: 2,
+      name: 'Portal Cash Management Corporativo',
+      description: 'Plataforma empresarial multi-usuario para transferencias masivas ACH y pago a proveedores.',
+      capexCostHNL: 1600000,
+      monthlyOpexSavingsHNL: 95000,
+      unlockedPerkDescription: '+25% retención de clientes corporativos y comisiones por dispersión.',
+      prerequisites: ['tech-dig-1'],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-dig-3',
+      branch: 'canales_digitales',
+      tier: 3,
+      name: 'Open Banking API & Integración Fintech',
+      description: 'Conexión por API abierta para pasarelas de pago e-commerce y billeteras interoperables.',
+      capexCostHNL: 3200000,
+      monthlyOpexSavingsHNL: 180000,
+      unlockedPerkDescription: 'Duplica el volumen de procesamiento de pagos y reduce costos transaccionales.',
+      prerequisites: ['tech-dig-2'],
+      isUnlocked: false
+    },
+
+    // Rama 2: Motor de Scoring & Riesgo Crediticio
+    {
+      id: 'tech-scr-1',
+      branch: 'motor_scoring',
+      tier: 1,
+      name: 'Conexión Automatizada Buró Equifax / TransUnion',
+      description: 'Consulta algorítmica instantánea del historial crediticio y cálculo de capacidad de pago.',
+      capexCostHNL: 900000,
+      monthlyOpexSavingsHNL: 60000,
+      unlockedPerkDescription: 'Aprobaciones de créditos de consumo automáticas de hasta L. 100,000 en 3 minutos.',
+      prerequisites: [],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-scr-2',
+      branch: 'motor_scoring',
+      tier: 2,
+      name: 'Algoritmo Early-Warning de Morosidad NPL',
+      description: 'Modelos predictivos que detectan desvíos en flujos de caja de clientes 60 días antes de la mora.',
+      capexCostHNL: 1800000,
+      monthlyOpexSavingsHNL: 120000,
+      unlockedPerkDescription: 'Reduce la morosidad proyectada en -0.6% y economiza provisiones regulatorias.',
+      prerequisites: ['tech-scr-1'],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-scr-3',
+      branch: 'motor_scoring',
+      tier: 3,
+      name: 'Motor Revolvente Inteligente de Tarjetas',
+      description: 'Ajuste dinámico de límites de crédito en tiempo real según historial de pago y facturación.',
+      capexCostHNL: 3500000,
+      monthlyOpexSavingsHNL: 210000,
+      unlockedPerkDescription: '+30% en facturación de tarjetas con cero incremento en pérdidas por incobrabilidad.',
+      prerequisites: ['tech-scr-2'],
+      isUnlocked: false
+    },
+
+    // Rama 3: Eficiencia Operativa & Automatización OPEX
+    {
+      id: 'tech-eff-1',
+      branch: 'eficiencia_opex',
+      tier: 1,
+      name: 'Automatización Robótica (RPA) de Conciliación ACH',
+      description: 'Robots de software que concilian automáticamente las cámaras de compensación CEPROBAN.',
+      capexCostHNL: 700000,
+      monthlyOpexSavingsHNL: 50000,
+      unlockedPerkDescription: 'Elimina errores operativos de compensación y libera 4 analistas de operaciones.',
+      prerequisites: [],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-eff-2',
+      branch: 'eficiencia_opex',
+      tier: 2,
+      name: 'Expediente Único Digital Cero Papel',
+      description: 'Digitalización legal de pagarés, contratos de mutuo y firmas electrónicas avanzadas.',
+      capexCostHNL: 1400000,
+      monthlyOpexSavingsHNL: 110000,
+      unlockedPerkDescription: 'Auditorías CNBS sin observaciones documentales y reducción de archivo físico.',
+      prerequisites: ['tech-eff-1'],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-eff-3',
+      branch: 'eficiencia_opex',
+      tier: 3,
+      name: 'Nube Bancaria Soberana de Alta Disponibilidad',
+      description: 'Migración a arquitectura de microservicios con replicación activa en San Pedro Sula y Tegucigalpa.',
+      capexCostHNL: 2800000,
+      monthlyOpexSavingsHNL: 250000,
+      unlockedPerkDescription: 'Disponibilidad 99.99% del Core y reducción permanente del costo por transacción.',
+      prerequisites: ['tech-eff-2'],
+      isUnlocked: false
+    },
+
+    // Rama 4: Tesorería & Banca de Inversión Avanzada
+    {
+      id: 'tech-trs-1',
+      branch: 'tesoreria_avanzada',
+      tier: 1,
+      name: 'Optimizador Algorítmico de Encaje Legal BCH',
+      description: 'Previsión de saldos de compensación diaria para maximizar rendimiento interbancario sin déficit.',
+      capexCostHNL: 1100000,
+      monthlyOpexSavingsHNL: 80000,
+      unlockedPerkDescription: 'Garantiza 100% de cumplimiento de encaje legal y optimiza el rendimiento del excedente.',
+      prerequisites: [],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-trs-2',
+      branch: 'tesoreria_avanzada',
+      tier: 2,
+      name: 'Mesa FX Algorítmica & Forwards Divisas',
+      description: 'Conexión a precios cambiarios internacionales con cobertura automática de descalces USD/HNL.',
+      capexCostHNL: 2200000,
+      monthlyOpexSavingsHNL: 160000,
+      unlockedPerkDescription: 'Aumenta el spread cambiario en +35 bps en subastas de divisas del BCH.',
+      prerequisites: ['tech-trs-1'],
+      isUnlocked: false
+    },
+    {
+      id: 'tech-trs-3',
+      branch: 'tesoreria_avanzada',
+      tier: 3,
+      name: 'Estructuración de Créditos Sindicados Corporativos',
+      description: 'Módulo de sindicación multilateral estilo J.P. Morgan para coordinar sindicatos de hasta L. 1,000M.',
+      capexCostHNL: 4000000,
+      monthlyOpexSavingsHNL: 320000,
+      unlockedPerkDescription: 'Capacidad de originar mega-deals corporativos cobrando comisiones de Lead Arranger (1.5% a 2.5%).',
+      prerequisites: ['tech-trs-2'],
+      isUnlocked: false
+    }
+  ]
+};
+
+export const INITIAL_SYNDICATED_STATE: SyndicatedLendingState = {
+  activeDeals: [
+    {
+      id: 'SYN-2026-001',
+      projectTitle: 'Parque Solar Fotovoltaico Valle de Nacaome (120 MW)',
+      borrowerCompany: 'Consorcio Solar del Sur S.A. de C.V.',
+      industrySector: 'Energía Limpia Renovable',
+      totalFacilityAmountHNL: 450000000,
+      currency: 'HNL',
+      interestRateAnnualPct: 10.5,
+      termYears: 10,
+      arrangerFeePct: 2.0, // 2% de comisión para el banco estructurador
+      leadArrangerBankName: 'Áureo Bank Honduras S.A.',
+      isPlayerLeadArranger: true,
+      playerCommitmentAmountHNL: 150000000, // 33.3% retenido por Áureo
+      arrangerFeeEarnedHNL: 9000000, // L. 9.0 Millones de comisión cobrada
+      status: 'cerrado_vigente',
+      originationMonth: 1,
+      participatingBanks: [
+        { bankName: 'Áureo Bank Honduras S.A.', allocatedAmountHNL: 150000000, sharePct: 33.33, role: 'Lead Arranger' },
+        { bankName: 'Banco Atlántida', allocatedAmountHNL: 120000000, sharePct: 26.67, role: 'Participant' },
+        { bankName: 'Banco Ficohsa', allocatedAmountHNL: 100000000, sharePct: 22.22, role: 'Participant' },
+        { bankName: 'Banco de Occidente', allocatedAmountHNL: 80000000, sharePct: 17.78, role: 'Participant' }
+      ]
+    },
+    {
+      id: 'SYN-2026-002',
+      projectTitle: 'Terminal de Graneles Líquidos & Químicos Puerto Cortés',
+      borrowerCompany: 'Operadora Portuaria del Atlántico S.A.',
+      industrySector: 'Infraestructura Portuaria & Logística',
+      totalFacilityAmountHNL: 680000000,
+      currency: 'HNL',
+      interestRateAnnualPct: 9.8,
+      termYears: 12,
+      arrangerFeePct: 1.8,
+      leadArrangerBankName: 'Banco Ficohsa',
+      isPlayerLeadArranger: false,
+      playerCommitmentAmountHNL: 100000000,
+      arrangerFeeEarnedHNL: 0,
+      status: 'en_sindicacion',
+      originationMonth: 1,
+      participatingBanks: [
+        { bankName: 'Banco Ficohsa', allocatedAmountHNL: 250000000, sharePct: 36.76, role: 'Lead Arranger' },
+        { bankName: 'BAC Credomatic', allocatedAmountHNL: 180000000, sharePct: 26.47, role: 'Participant' },
+        { bankName: 'Áureo Bank Honduras S.A.', allocatedAmountHNL: 100000000, sharePct: 14.71, role: 'Participant' },
+        { bankName: 'Banpaís', allocatedAmountHNL: 150000000, sharePct: 22.06, role: 'Participant' }
+      ]
+    },
+    {
+      id: 'SYN-2026-003',
+      projectTitle: 'Línea de Interconexión Eléctrica Regional SIEPAC II',
+      borrowerCompany: 'Empresa Propietaria de la Red SIEPAC Honduras',
+      industrySector: 'Transmisión Eléctrica Regional',
+      totalFacilityAmountHNL: 320000000,
+      currency: 'HNL',
+      interestRateAnnualPct: 11.2,
+      termYears: 8,
+      arrangerFeePct: 2.2,
+      leadArrangerBankName: 'Áureo Bank Honduras S.A.',
+      isPlayerLeadArranger: true,
+      playerCommitmentAmountHNL: 120000000,
+      arrangerFeeEarnedHNL: 7040000, // L. 7.04M de comisión estructuradora
+      status: 'prospecto_abierto',
+      originationMonth: 1,
+      participatingBanks: [
+        { bankName: 'Áureo Bank Honduras S.A.', allocatedAmountHNL: 120000000, sharePct: 37.5, role: 'Lead Arranger' }
+      ]
+    }
+  ],
+  totalSyndicatedVolumeOriginatedHNL: 770000000,
+  totalArrangerFeesCollectedHNL: 16040000,
+  reputationMultiplier: 1.25
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -4895,7 +5476,12 @@ export const INITIAL_GAME_STATE: GameState = {
   demandAccounts: INITIAL_DEMAND_ACCOUNTS,
   achTransactions: INITIAL_ACH_TRANSACTIONS,
   payrollBatches: INITIAL_PAYROLL_BATCHES,
-  lettersOfCredit: INITIAL_LETTERS_OF_CREDIT
+  lettersOfCredit: INITIAL_LETTERS_OF_CREDIT,
+  // Sistemas Dinámicos de Juego, Rankings y Competencia
+  campaignState: INITIAL_CAMPAIGN_STATE,
+  territoryCompetition: INITIAL_TERRITORY_STATE,
+  bankTechTree: INITIAL_TECH_TREE_STATE,
+  syndicatedLending: INITIAL_SYNDICATED_STATE
 };
 
 

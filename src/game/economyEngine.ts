@@ -59,7 +59,18 @@ import {
   DemandDepositAccount,
   AchTransferTransaction,
   CorporatePayrollBatch,
-  TradeFinanceLetterOfCredit
+  TradeFinanceLetterOfCredit,
+  BankLeagueRankingItem,
+  CampaignMission,
+  CampaignChapter,
+  CampaignState,
+  DepartmentTerritoryMarket,
+  CompetitorCounterattackEvent,
+  TerritoryCompetitionState,
+  TechTreeNode,
+  BankTechTreeState,
+  SyndicatedLoanDeal,
+  SyndicatedLendingState
 } from './types';
 import { 
   INITIAL_BANKING_PROGRAMS_20, 
@@ -68,7 +79,11 @@ import {
   INITIAL_FINANCIAL_SANDBOX,
   INITIAL_STRATEGIC_IMPROVEMENTS,
   INITIAL_AML_COMPLIANCE,
-  INITIAL_EXECUTIVE_DILEMMAS
+  INITIAL_EXECUTIVE_DILEMMAS,
+  INITIAL_CAMPAIGN_STATE,
+  INITIAL_TERRITORY_STATE,
+  INITIAL_TECH_TREE_STATE,
+  INITIAL_SYNDICATED_STATE
 } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -1108,7 +1123,7 @@ export function advanceGameMonth(state: GameState): GameState {
   // 18. Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
   const newExecutiveDilemmas = advanceExecutiveDilemmasMonth(state, nextMonth);
 
-  return {
+  const closingState: GameState = {
     ...state,
     gameMonth: nextMonth,
     bch: {
@@ -1157,8 +1172,14 @@ export function advanceGameMonth(state: GameState): GameState {
     advancedOperations: newAdvancedOperations,
     strategicImprovements: newStrategicImprovements,
     amlCompliance: newAmlCompliance,
-    executiveDilemmas: newExecutiveDilemmas
+    executiveDilemmas: newExecutiveDilemmas,
+    campaignState: state.campaignState,
+    territoryCompetition: state.territoryCompetition,
+    bankTechTree: state.bankTechTree,
+    syndicatedLending: state.syndicatedLending
   };
+
+  return evaluateCampaignProgress(closingState);
 }
 
 /**
@@ -5558,24 +5579,43 @@ export function originateBackToBackFacility(
     return { updatedState: state, errorMessage: `El DPF ${dpf.id} ya se encuentra pignorado a otra facilidad de crédito.` };
   }
 
-  const coverage = Math.min(95, Math.max(80, params.coverageRatioPct || 90));
-  const spread = params.spreadRatePct ?? 3.0;
-  const termMonths = params.termMonths || 24;
+  const isCard = params.type === 'tarjeta_garantizada';
+  // Tarjetas garantizadas permiten cobertura de 90% a 95% del DPF
+  const coverage = Math.min(95, Math.max(80, params.coverageRatioPct || (isCard ? 92 : 90)));
+  const spread = params.spreadRatePct ?? (isCard ? 3.5 : 3.0);
+  const termMonths = params.termMonths || (isCard ? 36 : 24);
   const approvedAmount = Math.round(dpf.principalHNL * (coverage / 100));
   const effectiveRate = +(dpf.interestRateAnnualPct + spread).toFixed(2);
 
-  // Comisión por otorgamiento / desembolso: 0.50% (mínimo L. 500)
+  // Comisión por emisión / otorgamiento: 0.50% (mínimo L. 500)
   const disbursementFee = Math.max(500, Math.round(approvedAmount * 0.005));
-  // Seguro de saldo deudor: L. 6.50 por millar
+  // Seguro de saldo deudor mensual: L. 6.50 por millar
   const debtorInsurance = Math.round((approvedAmount / 1000) * 6.50);
 
-  // Cuota mensual nivelada francesa
-  const monthlyRate = (effectiveRate / 100) / 12;
-  const monthlyQuota = Math.round((approvedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+  // IMPORTANTE: Si es tarjeta garantizada por DPF, NO tiene cuota mensual nivelada francesa.
+  // Es una línea revolvente con límite de hasta 90%-95% del DPF.
+  let monthlyQuota = 0;
+  let initialOutstandingBalance = 0;
+  let creditCardLimit = 0;
+  let minPayment = 0;
 
-  const facilityId = params.type === 'prestamo_garantizado'
-    ? `B2B-CR-${Math.floor(1000 + Math.random() * 8999)}`
-    : `B2B-TC-${Math.floor(1000 + Math.random() * 8999)}`;
+  if (isCard) {
+    creditCardLimit = approvedAmount;
+    initialOutstandingBalance = 0; // Tarjeta se emite con límite disponible pero saldo inicial en cero
+    monthlyQuota = 0; // Sin cuota fija nivelada
+    minPayment = 0; // Pago mínimo solo aplica cuando se utilice saldo (5% del saldo)
+  } else {
+    // Préstamo garantizado con cuota nivelada francesa
+    const monthlyRate = (effectiveRate / 100) / 12;
+    monthlyQuota = Math.round((approvedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+    initialOutstandingBalance = approvedAmount;
+    creditCardLimit = 0;
+    minPayment = monthlyQuota;
+  }
+
+  const facilityId = isCard
+    ? `B2B-TC-${Math.floor(1000 + Math.random() * 8999)}`
+    : `B2B-CR-${Math.floor(1000 + Math.random() * 8999)}`;
 
   const newFacility: BackToBackFacility = {
     id: facilityId,
@@ -5588,11 +5628,14 @@ export function originateBackToBackFacility(
     dpfInterestRatePct: dpf.interestRateAnnualPct,
     coverageRatioPct: coverage,
     approvedAmountHNL: approvedAmount,
-    outstandingBalanceHNL: approvedAmount,
+    outstandingBalanceHNL: initialOutstandingBalance,
     spreadRatePct: spread,
     effectiveInterestRatePct: effectiveRate,
     termMonths: termMonths,
     monthlyQuotaHNL: monthlyQuota,
+    isRevolving: isCard,
+    creditCardLimitHNL: creditCardLimit,
+    minimumMonthlyPaymentHNL: minPayment,
     disbursementFeeHNL: disbursementFee,
     monthlyDebtorInsuranceHNL: debtorInsurance,
     riskWeightingRwaPct: 0, // 0% RWA según normativa CNBS
@@ -5618,12 +5661,16 @@ export function originateBackToBackFacility(
   const existingFacilities = state.backToBackFacilities || [];
   const updatedFacilities = [newFacility, ...existingFacilities];
 
-  // Actualizar balances financieros (Colocación y cobro de comisión)
-  const netCashOutflow = approvedAmount - disbursementFee;
+  // Actualizar balances financieros:
+  // Si es préstamo, se desembolsa efectivo neto (monto - comisión).
+  // Si es tarjeta, el cliente paga la comisión de emisión y el banco capta esa comisión de inmediato.
+  const cashDelta = isCard ? disbursementFee : -(approvedAmount - disbursementFee);
+  const loanAddition = isCard ? 0 : approvedAmount;
+
   const updatedFinancials: BankFinancialStatements = {
     ...state.financials,
-    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + approvedAmount,
-    cashAndBCHReserves: Math.max(1000000, state.financials.cashAndBCHReserves - netCashOutflow),
+    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + loanAddition,
+    cashAndBCHReserves: Math.max(1000000, state.financials.cashAndBCHReserves + cashDelta),
     totalFeeIncome: state.financials.totalFeeIncome + disbursementFee,
     nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + disbursementFee
   };
@@ -5633,10 +5680,14 @@ export function originateBackToBackFacility(
     ...state.divisions,
     [dpf.division]: {
       ...divConfig,
-      totalLoans: divConfig.totalLoans + approvedAmount,
+      totalLoans: divConfig.totalLoans + loanAddition,
       feeIncomeMonthly: divConfig.feeIncomeMonthly + disbursementFee
     }
   };
+
+  const msg = isCard
+    ? `Tarjeta de Crédito Garantizada ${facilityId} aprobada al instante: Límite revolvente ${formatHNL(approvedAmount)} (${coverage}% sobre DPF ${dpf.id}). Sin cuota fija obligatoria; pago mínimo del 5% solo al consumir saldo. Tasa: ${effectiveRate}% (DPF + ${spread}%). RWA 0% / Provisión: L. 0.00.`
+    : `Préstamo Back-to-Back ${facilityId} desembolsado: Monto ${formatHNL(approvedAmount)} (cobertura ${coverage}% sobre DPF ${dpf.id}) con cuota mensual nivelada de ${formatHNL(monthlyQuota)}. Tasa: ${effectiveRate}%. RWA 0% / Provisión: L. 0.00.`;
 
   return {
     updatedState: {
@@ -5647,13 +5698,85 @@ export function originateBackToBackFacility(
       divisions: updatedDivisions
     },
     facility: newFacility,
-    successMessage: `Facilidad Back-to-Back ${facilityId} aprobada al 100%: Monto ${formatHNL(approvedAmount)} (cobertura ${coverage}% sobre DPF ${dpf.id}). Tasa activa: ${effectiveRate}% (DPF + ${spread}%). Comisión de apertura cobrada: ${formatHNL(disbursementFee)}. RWA: 0% / Provisión: L. 0.00.`
+    successMessage: msg
   };
 }
 
 /**
- * Pago o liquidación de cuota de crédito Back-to-Back
- * Si el saldo llega a 0, se libera el gravamen del DPF colateral automáticamente.
+ * Simulación de consumo o compras con Tarjeta de Crédito Garantizada
+ * Consume saldo contra el límite disponible y calcula pago mínimo del 5% (mínimo L. 500)
+ * Genera comisión de adquirencia/intercambio (1.8%) para el banco emisor.
+ */
+export function useGuaranteedCreditCard(
+  state: GameState,
+  facilityId: string,
+  chargeAmountHNL: number
+): { updatedState: GameState; facility?: BackToBackFacility; successMessage?: string; errorMessage?: string } {
+  const facilities = state.backToBackFacilities || [];
+  const facility = facilities.find(f => f.id === facilityId);
+
+  if (!facility || facility.status !== 'vigente') {
+    return { updatedState: state, errorMessage: 'La tarjeta garantizada no está disponible o activa.' };
+  }
+
+  if (facility.type !== 'tarjeta_garantizada' || !facility.isRevolving) {
+    return { updatedState: state, errorMessage: 'Esta operación solo aplica a tarjetas de crédito revolventes.' };
+  }
+
+  const limit = facility.creditCardLimitHNL || facility.approvedAmountHNL;
+  const currentBalance = facility.outstandingBalanceHNL;
+  const availableCredit = Math.max(0, limit - currentBalance);
+
+  if (chargeAmountHNL <= 0) {
+    return { updatedState: state, errorMessage: 'El monto de consumo debe ser mayor a cero.' };
+  }
+
+  if (chargeAmountHNL > availableCredit) {
+    return { updatedState: state, errorMessage: `Consumo denegado por sobregiro: Límite disponible ${formatHNL(availableCredit)}, intento de cargo ${formatHNL(chargeAmountHNL)}.` };
+  }
+
+  const newBalance = currentBalance + chargeAmountHNL;
+  // Pago mínimo regulado: 5% del saldo consumido o mínimo L. 500
+  const minPayment = Math.max(500, Math.round(newBalance * 0.05));
+  // Comisión por intercambio interbancario de adquirencia (1.8% a favor de Áureo Bank)
+  const interchangeIncome = Math.round(chargeAmountHNL * 0.018);
+
+  const updatedFacilities = facilities.map(f => {
+    if (f.id === facilityId) {
+      return {
+        ...f,
+        outstandingBalanceHNL: newBalance,
+        minimumMonthlyPaymentHNL: minPayment,
+        lastPaymentMonth: state.gameMonth
+      };
+    }
+    return f;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + chargeAmountHNL,
+    totalFeeIncome: state.financials.totalFeeIncome + interchangeIncome,
+    nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + interchangeIncome
+  };
+
+  const updatedFacility = updatedFacilities.find(f => f.id === facilityId);
+
+  return {
+    updatedState: {
+      ...state,
+      backToBackFacilities: updatedFacilities,
+      financials: updatedFinancials
+    },
+    facility: updatedFacility,
+    successMessage: `Compra autorizada por ${formatHNL(chargeAmountHNL)} en Tarjeta ${facilityId}. Saldo consumido: ${formatHNL(newBalance)} (disponible: ${formatHNL(limit - newBalance)}). Pago mínimo mensual: ${formatHNL(minPayment)} (5%). Ingreso por intercambio generado: ${formatHNL(interchangeIncome)}.`
+  };
+}
+
+/**
+ * Pago o liquidación de abono a saldo de crédito o tarjeta Back-to-Back
+ * Para préstamos: si saldo llega a 0, se cancela y se libera el DPF pignorado.
+ * Para tarjetas revolventes: el pago libera cupo de crédito y recalcula el 5% de pago mínimo.
  */
 export function payBackToBackInstallment(
   state: GameState,
@@ -5667,25 +5790,35 @@ export function payBackToBackInstallment(
     return { updatedState: state, successMessage: 'La facilidad no se encuentra activa.' };
   }
 
-  const payment = amountHNL ? Math.min(amountHNL, facility.outstandingBalanceHNL) : Math.min(facility.monthlyQuotaHNL, facility.outstandingBalanceHNL);
+  const isCard = facility.type === 'tarjeta_garantizada' || !!facility.isRevolving;
+  const defaultPay = isCard 
+    ? (facility.minimumMonthlyPaymentHNL || Math.max(500, Math.round(facility.outstandingBalanceHNL * 0.05)))
+    : facility.monthlyQuotaHNL;
+
+  const payment = amountHNL !== undefined ? Math.min(amountHNL, facility.outstandingBalanceHNL) : Math.min(defaultPay, facility.outstandingBalanceHNL);
   const newBalance = Math.max(0, facility.outstandingBalanceHNL - payment);
-  const isFullyPaid = newBalance === 0;
+  
+  // En préstamos, saldo 0 cancela el crédito; en tarjeta, saldo 0 simplemente deja el saldo en limpio con 100% cupo disponible
+  const isLoanFullyPaid = !isCard && newBalance === 0;
+
+  const newMinPayment = isCard ? (newBalance === 0 ? 0 : Math.max(500, Math.round(newBalance * 0.05))) : (newBalance === 0 ? 0 : facility.monthlyQuotaHNL);
 
   const updatedFacilities = facilities.map(f => {
     if (f.id === facilityId) {
       return {
         ...f,
         outstandingBalanceHNL: newBalance,
-        status: isFullyPaid ? ('cancelado' as const) : f.status,
+        minimumMonthlyPaymentHNL: newMinPayment,
+        status: isLoanFullyPaid ? ('cancelado' as const) : f.status,
         lastPaymentMonth: state.gameMonth
       };
     }
     return f;
   });
 
-  // Si se canceló totalmente, desgravar / liberar el DPF pignorado
+  // Si se canceló totalmente un préstamo, desgravar / liberar el DPF pignorado
   let updatedCertificates = state.termDeposits || [];
-  if (isFullyPaid) {
+  if (isLoanFullyPaid) {
     updatedCertificates = updatedCertificates.map(c => {
       if (c.id === facility.dpfCertificateId) {
         return {
@@ -5707,6 +5840,12 @@ export function payBackToBackInstallment(
 
   const updatedFacility = updatedFacilities.find(f => f.id === facilityId);
 
+  const msg = isCard
+    ? `Abono de ${formatHNL(payment)} procesado a la Tarjeta ${facilityId}. Saldo utilizado actual: ${formatHNL(newBalance)} (Cupo disponible: ${formatHNL((facility.creditCardLimitHNL || facility.approvedAmountHNL) - newBalance)}). Nuevo pago mínimo mensual (5%): ${formatHNL(newMinPayment)}.`
+    : isLoanFullyPaid
+      ? `Préstamo Back-to-Back ${facilityId} cancelado al 100%. Se liberó el gravamen sobre el DPF ${facility.dpfCertificateId}.`
+      : `Abono a cuota de ${formatHNL(payment)} aplicado a ${facilityId}. Saldo insoluto: ${formatHNL(newBalance)}.`;
+
   return {
     updatedState: {
       ...state,
@@ -5715,9 +5854,57 @@ export function payBackToBackInstallment(
       financials: updatedFinancials
     },
     facility: updatedFacility,
-    successMessage: isFullyPaid
-      ? `Crédito Back-to-Back ${facilityId} cancelado al 100%. Se liberó el gravamen sobre el DPF ${facility.dpfCertificateId}.`
-      : `Abono de ${formatHNL(payment)} aplicado a ${facilityId}. Saldo pendiente: ${formatHNL(newBalance)}.`
+    successMessage: msg
+  };
+}
+
+/**
+ * Cancelación voluntaria de tarjeta de crédito garantizada y liberación del DPF
+ */
+export function closeGuaranteedCreditCard(
+  state: GameState,
+  facilityId: string
+): { updatedState: GameState; successMessage?: string; errorMessage?: string } {
+  const facilities = state.backToBackFacilities || [];
+  const facility = facilities.find(f => f.id === facilityId);
+
+  if (!facility || facility.status !== 'vigente') {
+    return { updatedState: state, errorMessage: 'Tarjeta no encontrada o no está activa.' };
+  }
+
+  if (facility.outstandingBalanceHNL > 0) {
+    return { updatedState: state, errorMessage: `No se puede cancelar la tarjeta: registra saldo pendiente de ${formatHNL(facility.outstandingBalanceHNL)}. Debe liquidar el saldo primero.` };
+  }
+
+  const updatedFacilities = facilities.map(f => {
+    if (f.id === facilityId) {
+      return {
+        ...f,
+        status: 'cancelado' as const
+      };
+    }
+    return f;
+  });
+
+  const updatedCertificates = (state.termDeposits || []).map(c => {
+    if (c.id === facility.dpfCertificateId) {
+      return {
+        ...c,
+        isPledged: false,
+        status: 'vigente' as const,
+        pledgedToFacilityId: undefined
+      };
+    }
+    return c;
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      backToBackFacilities: updatedFacilities,
+      termDeposits: updatedCertificates
+    },
+    successMessage: `Tarjeta garantizada ${facilityId} cancelada exitosamente. Se liberó la pignoración sobre el DPF ${facility.dpfCertificateId}.`
   };
 }
 
@@ -5885,6 +6072,833 @@ export function executeAchTransfer(
     },
     transaction: newTx,
     successMessage: `Transferencia ACH Pronto ${txId} liquidada hacia ${params.destinationBank} por ${formatHNL(params.amountHNL)}. Comisión CEPROBAN cobrada: L. 20.00.`
+  };
+}
+
+// ------------------------------------------------------------------------------------
+// SISTEMA DE LEAGUE TABLES & RANKINGS BANCARIOS (J.P. MORGAN & CENTROAMÉRICA)
+// ------------------------------------------------------------------------------------
+
+/**
+ * Calcula la tabla de posiciones (League Tables) del sistema financiero hondureño
+ * en 4 categorías: Tarjetas de Crédito, Préstamos de Consumo, Banca Privada AUM, Solvencia CAR.
+ */
+export function getLeagueTableRankings(
+  state: GameState,
+  category: 'tarjetas_credito' | 'prestamos_consumo' | 'banca_privada_aum' | 'solvencia_car'
+): BankLeagueRankingItem[] {
+  const competitorBase = state.competitors;
+  const backToBackFacilities = state.backToBackFacilities || [];
+  const cardFacilities = backToBackFacilities.filter(f => f.type === 'tarjeta_garantizada' && f.status === 'vigente');
+  const guaranteedCardBalance = cardFacilities.reduce((sum, f) => sum + f.outstandingBalanceHNL, 0);
+
+  if (category === 'tarjetas_credito') {
+    // Cartera y facturación mensual de tarjetas (Mercado dominado por Ficohsa y BAC)
+    const playerCardLoans = Math.round(((state.divisions.personas?.totalLoans || 215000000) * 0.35) + guaranteedCardBalance);
+    const playerBillingMonthly = Math.round(playerCardLoans * 0.42);
+    const playerCardCount = Math.round(playerCardLoans / 16500);
+
+    const nationalTotalCards = 18500000000; // L. 18,500M mercado nacional de tarjetas
+    const playerShare = +((playerCardLoans / nationalTotalCards) * 100).toFixed(2);
+
+    const items: BankLeagueRankingItem[] = [
+      {
+        bankId: 'ficohsa',
+        bankName: 'Banco Ficohsa S.A.',
+        shortName: 'Ficohsa',
+        isPlayer: false,
+        volumeHNL: 5850000000,
+        marketSharePct: 31.6,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(2457000000),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: '385,000 tarjetas (Líder Cashback)',
+        rank: 1
+      },
+      {
+        bankId: 'bac',
+        bankName: 'BAC Credomatic Honduras',
+        shortName: 'BAC',
+        isPlayer: false,
+        volumeHNL: 5240000000,
+        marketSharePct: 28.3,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(2200000000),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: '340,000 tarjetas (Cuotas 0%)',
+        rank: 2
+      },
+      {
+        bankId: 'atlantida',
+        bankName: 'Banco Atlántida S.A.',
+        shortName: 'Atlántida',
+        isPlayer: false,
+        volumeHNL: 2620000000,
+        marketSharePct: 14.2,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(1100000000),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: '190,000 tarjetas',
+        rank: 3
+      },
+      {
+        bankId: 'banpais',
+        bankName: 'Banco del País S.A.',
+        shortName: 'Banpaís',
+        isPlayer: false,
+        volumeHNL: 1980000000,
+        marketSharePct: 10.7,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(830000000),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: '135,000 tarjetas',
+        rank: 4
+      },
+      {
+        bankId: 'occidente',
+        bankName: 'Banco de Occidente S.A.',
+        shortName: 'Occidente',
+        isPlayer: false,
+        volumeHNL: 1390000000,
+        marketSharePct: 7.5,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(580000000),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: '95,000 tarjetas',
+        rank: 5
+      },
+      {
+        bankId: 'player',
+        bankName: state.bankName,
+        shortName: 'Áureo Bank',
+        isPlayer: true,
+        volumeHNL: playerCardLoans,
+        marketSharePct: playerShare,
+        metricLabel: 'Facturación Mensual',
+        metricValueFormatted: formatHNL(playerBillingMonthly),
+        secondaryMetricLabel: 'Plásticos Activos',
+        secondaryMetricValue: `${playerCardCount.toLocaleString()} tarjetas (Garantizadas 0% RWA)`,
+        rank: 6
+      }
+    ];
+
+    items.sort((a, b) => b.volumeHNL - a.volumeHNL);
+    items.forEach((item, index) => { item.rank = index + 1; });
+    return items;
+  }
+
+  if (category === 'prestamos_consumo') {
+    // Créditos personales, nómina y consumo no garantizado
+    const playerConsumerLoans = state.divisions.personas?.totalLoans || 420000000;
+    const playerDelinquency = state.divisions.personas?.delinquencyRate || 2.4;
+    const nationalTotalConsumer = 52000000000; // L. 52,000M mercado nacional de consumo
+    const playerShare = +((playerConsumerLoans / nationalTotalConsumer) * 100).toFixed(2);
+
+    const items: BankLeagueRankingItem[] = [
+      {
+        bankId: 'atlantida',
+        bankName: 'Banco Atlántida S.A.',
+        shortName: 'Atlántida',
+        isPlayer: false,
+        volumeHNL: 13800000000,
+        marketSharePct: 26.5,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(13800000000),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: '1.9% Mora · Tasa 16.5%',
+        rank: 1
+      },
+      {
+        bankId: 'ficohsa',
+        bankName: 'Banco Ficohsa S.A.',
+        shortName: 'Ficohsa',
+        isPlayer: false,
+        volumeHNL: 11650000000,
+        marketSharePct: 22.4,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(11650000000),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: '2.1% Mora · Tasa 17.0%',
+        rank: 2
+      },
+      {
+        bankId: 'bac',
+        bankName: 'BAC Credomatic Honduras',
+        shortName: 'BAC',
+        isPlayer: false,
+        volumeHNL: 9930000000,
+        marketSharePct: 19.1,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(9930000000),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: '1.8% Mora · Tasa 16.8%',
+        rank: 3
+      },
+      {
+        bankId: 'occidente',
+        bankName: 'Banco de Occidente S.A.',
+        shortName: 'Occidente',
+        isPlayer: false,
+        volumeHNL: 8320000000,
+        marketSharePct: 16.0,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(8320000000),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: '1.5% Mora · Tasa 15.5%',
+        rank: 4
+      },
+      {
+        bankId: 'banpais',
+        bankName: 'Banco del País S.A.',
+        shortName: 'Banpaís',
+        isPlayer: false,
+        volumeHNL: 5300000000,
+        marketSharePct: 10.2,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(5300000000),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: '2.0% Mora · Tasa 16.2%',
+        rank: 5
+      },
+      {
+        bankId: 'player',
+        bankName: state.bankName,
+        shortName: 'Áureo Bank',
+        isPlayer: true,
+        volumeHNL: playerConsumerLoans,
+        marketSharePct: playerShare,
+        metricLabel: 'Cartera Consumo',
+        metricValueFormatted: formatHNL(playerConsumerLoans),
+        secondaryMetricLabel: 'Morosidad NPL / Tasa',
+        secondaryMetricValue: `${playerDelinquency}% Mora · Tasa ${state.divisions.personas?.avgLendingRate || 16.0}%`,
+        rank: 6
+      }
+    ];
+
+    items.sort((a, b) => b.volumeHNL - a.volumeHNL);
+    items.forEach((item, index) => { item.rank = index + 1; });
+    return items;
+  }
+
+  if (category === 'banca_privada_aum') {
+    // Wealth Management / Private Banking estilo J.P. Morgan Private Bank
+    const trustContracts = state.advancedOperations?.fiduciaryTrustContracts || [];
+    const playerFiduciaryAum = trustContracts.reduce((sum, t) => sum + t.fiduciaryAssetsHNL, 0);
+    const termDeposits = state.termDeposits || [];
+    const largeDpfs = termDeposits.filter(d => d.principalHNL >= 500000).reduce((sum, d) => sum + d.principalHNL, 0);
+    const playerAumTotal = Math.max(220000000, playerFiduciaryAum + largeDpfs);
+    const playerClientCount = Math.max(18, Math.round(playerAumTotal / 8500000));
+
+    const totalAumMarket = 75000000000; // L. 75,000M AUM privado en Honduras
+    const playerShare = +((playerAumTotal / totalAumMarket) * 100).toFixed(2);
+
+    const items: BankLeagueRankingItem[] = [
+      {
+        bankId: 'atlantida',
+        bankName: 'Atlántida Fiduciaria & Wealth',
+        shortName: 'Atlántida Private',
+        isPlayer: false,
+        volumeHNL: 18500000000,
+        marketSharePct: 24.7,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(18500000000),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: '420 familias · 8.9% retorno fiduciario',
+        rank: 1
+      },
+      {
+        bankId: 'ficohsa',
+        bankName: 'Ficohsa Premier & Private Wealth',
+        shortName: 'Ficohsa Premier',
+        isPlayer: false,
+        volumeHNL: 16200000000,
+        marketSharePct: 21.6,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(16200000000),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: '360 familias · 8.6% retorno fiduciario',
+        rank: 2
+      },
+      {
+        bankId: 'bac',
+        bankName: 'BAC Private Banking Regional',
+        shortName: 'BAC Private',
+        isPlayer: false,
+        volumeHNL: 14800000000,
+        marketSharePct: 19.7,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(14800000000),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: '310 familias · 8.4% retorno fiduciario',
+        rank: 3
+      },
+      {
+        bankId: 'banpais',
+        bankName: 'Banpaís Select Fideicomisos',
+        shortName: 'Banpaís Select',
+        isPlayer: false,
+        volumeHNL: 9400000000,
+        marketSharePct: 12.5,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(9400000000),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: '210 familias · 8.1% retorno fiduciario',
+        rank: 4
+      },
+      {
+        bankId: 'occidente',
+        bankName: 'Banco de Occidente Patrimonial',
+        shortName: 'Occidente Patrimonial',
+        isPlayer: false,
+        volumeHNL: 8100000000,
+        marketSharePct: 10.8,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(8100000000),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: '190 familias · 7.8% retorno fiduciario',
+        rank: 5
+      },
+      {
+        bankId: 'player',
+        bankName: `${state.bankName} Private Banking`,
+        shortName: 'Áureo Wealth',
+        isPlayer: true,
+        volumeHNL: playerAumTotal,
+        marketSharePct: playerShare,
+        metricLabel: 'AUM Administrado',
+        metricValueFormatted: formatHNL(playerAumTotal),
+        secondaryMetricLabel: 'Familias HNWI / Retorno',
+        secondaryMetricValue: `${playerClientCount} familias · 8.8% retorno fiduciario J.P. Morgan standard`,
+        rank: 6
+      }
+    ];
+
+    items.sort((a, b) => b.volumeHNL - a.volumeHNL);
+    items.forEach((item, index) => { item.rank = index + 1; });
+    return items;
+  }
+
+  // category === 'solvencia_car'
+  const playerCar = (state.financials && typeof state.financials.capitalAdequacyRatioCAR === 'number')
+    ? state.financials.capitalAdequacyRatioCAR
+    : 14.8;
+  const playerCir = (state.financials && typeof state.financials.efficiencyRatioCIR === 'number')
+    ? state.financials.efficiencyRatioCIR
+    : 48.2;
+
+  const items: BankLeagueRankingItem[] = [
+    {
+      bankId: 'occidente',
+      bankName: 'Banco de Occidente S.A.',
+      shortName: 'Occidente',
+      isPlayer: false,
+      volumeHNL: 16.5,
+      marketSharePct: 16.5,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: '16.50% (Tier 1 Robusto)',
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: '43.2% CIR · 165% cobertura',
+      rank: 1
+    },
+    {
+      bankId: 'player',
+      bankName: state.bankName,
+      shortName: 'Áureo Bank',
+      isPlayer: true,
+      volumeHNL: playerCar,
+      marketSharePct: playerCar,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: `${playerCar.toFixed(2)}% (Mínimo CNBS 10.0%)`,
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: `${playerCir.toFixed(1)}% CIR · 150% cobertura`,
+      rank: 2
+    },
+    {
+      bankId: 'atlantida',
+      bankName: 'Banco Atlántida S.A.',
+      shortName: 'Atlántida',
+      isPlayer: false,
+      volumeHNL: 14.6,
+      marketSharePct: 14.6,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: '14.60% (Adecuado)',
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: '48.5% CIR · 142% cobertura',
+      rank: 3
+    },
+    {
+      bankId: 'bac',
+      bankName: 'BAC Credomatic Honduras',
+      shortName: 'BAC',
+      isPlayer: false,
+      volumeHNL: 14.2,
+      marketSharePct: 14.2,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: '14.20% (Adecuado)',
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: '46.1% CIR · 138% cobertura',
+      rank: 4
+    },
+    {
+      bankId: 'banpais',
+      bankName: 'Banco del País S.A.',
+      shortName: 'Banpaís',
+      isPlayer: false,
+      volumeHNL: 13.8,
+      marketSharePct: 13.8,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: '13.80% (Adecuado)',
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: '51.4% CIR · 130% cobertura',
+      rank: 5
+    },
+    {
+      bankId: 'ficohsa',
+      bankName: 'Banco Ficohsa S.A.',
+      shortName: 'Ficohsa',
+      isPlayer: false,
+      volumeHNL: 13.4,
+      marketSharePct: 13.4,
+      metricLabel: 'Índice de Solvencia CAR',
+      metricValueFormatted: '13.40% (Aceptable)',
+      secondaryMetricLabel: 'Eficiencia CIR / Provisiones',
+      secondaryMetricValue: '53.8% CIR · 128% cobertura',
+      rank: 6
+    }
+  ];
+
+  items.sort((a, b) => b.volumeHNL - a.volumeHNL);
+  items.forEach((item, index) => { item.rank = index + 1; });
+  return items;
+}
+
+// ------------------------------------------------------------------------------------
+// MOTOR DE CAMPAÑA POR ETAPAS, OBJETIVOS & RECOMPENSAS
+// ------------------------------------------------------------------------------------
+
+/**
+ * Evalúa los objetivos de la campaña activa comparándolos con el estado real del banco
+ * Si una misión se cumple, la marca como completada; si todas en un capítulo se completan, desbloquea el siguiente capítulo.
+ */
+export function evaluateCampaignProgress(state: GameState): GameState {
+  const currentCampaign = state.campaignState || INITIAL_CAMPAIGN_STATE;
+  const termDeposits = state.termDeposits || [];
+  const b2bFacilities = state.backToBackFacilities || [];
+  const cardsCount = b2bFacilities.filter(f => f.type === 'tarjeta_garantizada').length;
+  const totalDpfPrincipal = termDeposits.reduce((sum, d) => sum + d.principalHNL, 0);
+  const consumerPortfolio = state.divisions.personas?.totalLoans || 0;
+  const unlockedTechCount = (state.bankTechTree?.nodes || []).filter(n => n.isUnlocked).length;
+  const leadArrangerDealsCount = (state.syndicatedLending?.activeDeals || []).filter(d => d.isPlayerLeadArranger).length;
+  const cortesDept = (state.territoryCompetition?.departments || []).find(d => d.id === 'cortes');
+  const cortesShare = cortesDept ? cortesDept.playerMarketSharePct : 7.8;
+  const payrollEmployees = (state.payrollBatches || []).reduce((sum, b) => sum + b.employeeCount, 0);
+  const cardFacilities = b2bFacilities.filter(f => f.type === 'tarjeta_garantizada' && f.status === 'vigente');
+  const monthlyCardBilling = Math.round((((state.divisions.personas?.totalLoans || 215000000) * 0.35) + cardFacilities.reduce((sum, f) => sum + f.outstandingBalanceHNL, 0)) * 0.42);
+
+  let updatedChapters = currentCampaign.chapters.map(chapter => {
+    const updatedMissions = chapter.missions.map(mission => {
+      let curVal = mission.currentValue;
+
+      if (mission.targetMetric === 'carPct') curVal = state.financials.capitalAdequacyRatioCAR;
+      if (mission.targetMetric === 'totalDpfPrincipal') curVal = totalDpfPrincipal;
+      if (mission.targetMetric === 'guaranteedCardsCount') curVal = cardsCount;
+      if (mission.targetMetric === 'consumerPortfolioHNL') curVal = consumerPortfolio;
+      if (mission.targetMetric === 'cardBillingMonthlyHNL') curVal = monthlyCardBilling;
+      if (mission.targetMetric === 'posMerchantsCount') curVal = state.posMerchants.length;
+      if (mission.targetMetric === 'nplRatioPct') curVal = state.financials.delinquencyRatioNPL;
+      if (mission.targetMetric === 'unlockedTechCount') curVal = unlockedTechCount;
+      if (mission.targetMetric === 'leadArrangerDealsCount') curVal = leadArrangerDealsCount;
+      if (mission.targetMetric === 'cortesMarketSharePct') curVal = cortesShare;
+      if (mission.targetMetric === 'payrollEmployeesDisbursed') curVal = payrollEmployees;
+      if (mission.targetMetric === 'wealthManagementAumHNL') curVal = Math.max(220000000, totalDpfPrincipal + 180000000);
+      if (mission.targetMetric === 'roePct') curVal = state.financials.returnOnEquityROE;
+      if (mission.targetMetric === 'nationalAssetsRank') curVal = 4; // Mock rank calculation
+
+      const isCompleted = mission.targetMetric === 'nplRatioPct'
+        ? curVal <= mission.targetValue
+        : curVal >= mission.targetValue;
+
+      return {
+        ...mission,
+        currentValue: curVal,
+        isCompleted: isCompleted || mission.isCompleted
+      };
+    });
+
+    const allMissionsCompleted = updatedMissions.every(m => m.isCompleted);
+
+    return {
+      ...chapter,
+      missions: updatedMissions,
+      isCompleted: allMissionsCompleted
+    };
+  });
+
+  // Desbloquear siguiente capítulo si el anterior está completado
+  for (let i = 0; i < updatedChapters.length - 1; i++) {
+    if (updatedChapters[i].isCompleted && !updatedChapters[i + 1].isUnlocked) {
+      updatedChapters[i + 1] = {
+        ...updatedChapters[i + 1],
+        isUnlocked: true
+      };
+    }
+  }
+
+  return {
+    ...state,
+    campaignState: {
+      ...currentCampaign,
+      chapters: updatedChapters
+    }
+  };
+}
+
+/**
+ * Reclamar la recompensa en efectivo y reputación de una misión de campaña completada
+ */
+export function claimCampaignReward(
+  state: GameState,
+  missionId: string
+): { updatedState: GameState; successMessage: string } {
+  const currentCampaign = state.campaignState || INITIAL_CAMPAIGN_STATE;
+  let targetMission: CampaignMission | undefined;
+  let chapterIndex = -1;
+
+  for (let cIdx = 0; cIdx < currentCampaign.chapters.length; cIdx++) {
+    const ch = currentCampaign.chapters[cIdx];
+    const m = ch.missions.find(item => item.id === missionId);
+    if (m) {
+      targetMission = m;
+      chapterIndex = cIdx;
+      break;
+    }
+  }
+
+  if (!targetMission) {
+    return { updatedState: state, successMessage: 'Misión no encontrada.' };
+  }
+
+  if (!targetMission.isCompleted) {
+    return { updatedState: state, successMessage: 'Esta misión aún no ha cumplido sus requisitos.' };
+  }
+
+  if (targetMission.isClaimed) {
+    return { updatedState: state, successMessage: 'La recompensa ya fue cobrada previamente.' };
+  }
+
+  const rewardCash = targetMission.rewardHNL;
+  const rewardRep = targetMission.rewardReputation;
+
+  const updatedChapters = currentCampaign.chapters.map((ch, idx) => {
+    if (idx === chapterIndex) {
+      return {
+        ...ch,
+        missions: ch.missions.map(m => m.id === missionId ? { ...m, isClaimed: true } : m)
+      };
+    }
+    return ch;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + rewardCash,
+    currentMonthProfit: state.financials.currentMonthProfit + rewardCash,
+    retainedEarnings: state.financials.retainedEarnings + rewardCash
+  };
+
+  const updatedDilemmas = state.executiveDilemmas ? {
+    ...state.executiveDilemmas,
+    publicReputationScore: Math.min(100, state.executiveDilemmas.publicReputationScore + rewardRep)
+  } : state.executiveDilemmas;
+
+  const newNotification: GameEventNotification = {
+    id: `notif-camp-reward-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'board_decision',
+    title: `¡Hito de Campaña Conquistado: ${targetMission.title}!`,
+    message: `Se acreditaron ${formatHNL(rewardCash)} en las reservas del banco y +${rewardRep} puntos de reputación institucional por completar el objetivo.`,
+    impactSummary: `Perk Activado: ${targetMission.rewardPerkLabel}`
+  };
+
+  const updatedCampaign: CampaignState = {
+    ...currentCampaign,
+    chapters: updatedChapters,
+    totalRewardsClaimedHNL: currentCampaign.totalRewardsClaimedHNL + rewardCash,
+    totalMissionsCompleted: currentCampaign.totalMissionsCompleted + 1
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      campaignState: updatedCampaign,
+      financials: updatedFinancials,
+      executiveDilemmas: updatedDilemmas,
+      notifications: [newNotification, ...state.notifications]
+    },
+    successMessage: `¡Recompensa de ${formatHNL(rewardCash)} acreditada a tesorería! Reconocimiento institucional +${rewardRep} reputación: ${targetMission.rewardPerkLabel}.`
+  };
+}
+
+// ------------------------------------------------------------------------------------
+// MOTOR DE GUERRA TERRITORIAL & COMPETENCIA MULTI-BANCO
+// ------------------------------------------------------------------------------------
+
+/**
+ * Ejecuta una ofensiva de conquista de mercado en un departamento específico de Honduras
+ */
+export function executeMarketWarOffensive(
+  state: GameState,
+  departmentId: string,
+  offensiveType: 'tasas_agresivas' | 'tarjetas_promocionales' | 'captacion_masiva'
+): { updatedState: GameState; successMessage: string } {
+  const currentTerritory = state.territoryCompetition || INITIAL_TERRITORY_STATE;
+  const dept = currentTerritory.departments.find(d => d.id === departmentId);
+
+  if (!dept) {
+    return { updatedState: state, successMessage: 'Departamento o territorio no encontrado.' };
+  }
+
+  let costHNL = 1500000;
+  let shareGain = 0.8;
+  let offensiveName = '';
+
+  if (offensiveType === 'tasas_agresivas') {
+    costHNL = 1800000;
+    shareGain = 1.1;
+    offensiveName = 'Guerra de Tasas Preferenciales para Pymes y Corporativos';
+  } else if (offensiveType === 'tarjetas_promocionales') {
+    costHNL = 2200000;
+    shareGain = 1.4;
+    offensiveName = 'Campaña Masiva de Tarjetas con Devolución en Combustible y Cero Intereses';
+  } else {
+    costHNL = 1400000;
+    shareGain = 0.9;
+    offensiveName = 'Captación Agresiva de DPFs y Cuentas de Ahorro a la Vista';
+  }
+
+  if (state.financials.cashAndBCHReserves < costHNL) {
+    return { updatedState: state, successMessage: `Fondos insuficientes en reservas: Se requieren ${formatHNL(costHNL)} para financiar el despliegue publicitario y de sucursales.` };
+  }
+
+  const newPlayerShare = +(dept.playerMarketSharePct + shareGain).toFixed(2);
+  const newLeadShare = +(Math.max(15, dept.leadingBankSharePct - (shareGain * 0.7))).toFixed(2);
+
+  const updatedDepartments = currentTerritory.departments.map(d => {
+    if (d.id === departmentId) {
+      return {
+        ...d,
+        playerMarketSharePct: newPlayerShare,
+        leadingBankSharePct: newLeadShare,
+        offensiveCampaignActive: true
+      };
+    }
+    return d;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves - costHNL,
+    totalOperatingExpense: state.financials.totalOperatingExpense + costHNL
+  };
+
+  const newNotif: GameEventNotification = {
+    id: `notif-war-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'market_war',
+    title: `Ofensiva Territorial Exitosa: ${dept.name}`,
+    message: `Se lanzó la campaña "${offensiveName}". La cuota de Áureo Bank creció de ${dept.playerMarketSharePct}% a ${newPlayerShare}%, arrebatando clientes a ${dept.leadingBankName}.`,
+    impactSummary: `Inversión publicitaria: ${formatHNL(costHNL)} · Ganancia neta de cuota: +${shareGain}%`
+  };
+
+  const avgShare = +(updatedDepartments.reduce((sum, d) => sum + d.playerMarketSharePct, 0) / updatedDepartments.length).toFixed(2);
+
+  const updatedTerritoryState: TerritoryCompetitionState = {
+    ...currentTerritory,
+    departments: updatedDepartments,
+    totalMarketShareNationalPct: avgShare
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      territoryCompetition: updatedTerritoryState,
+      financials: updatedFinancials,
+      notifications: [newNotif, ...state.notifications]
+    },
+    successMessage: `¡Ofensiva desplegada en ${dept.name}! Tu cuota de mercado aumentó a ${newPlayerShare}% (avance de +${shareGain}% sobre ${dept.leadingBankName}). Inversión: ${formatHNL(costHNL)}.`
+  };
+}
+
+// ------------------------------------------------------------------------------------
+// ÁRBOL TECNOLÓGICO BANCARIO (TECH TREE - CAPEX & OPEX SAVINGS)
+// ------------------------------------------------------------------------------------
+
+/**
+ * Desbloquea una inversión tecnológica en el árbol del banco
+ * Valida prerrequisitos, descuenta CAPEX y aplica el ahorro mensual de OPEX de por vida.
+ */
+export function unlockTechTreeNode(
+  state: GameState,
+  nodeId: string
+): { updatedState: GameState; successMessage?: string; errorMessage?: string } {
+  const currentTech = state.bankTechTree || INITIAL_TECH_TREE_STATE;
+  const node = currentTech.nodes.find(n => n.id === nodeId);
+
+  if (!node) {
+    return { updatedState: state, errorMessage: 'Nodo tecnológico no encontrado.' };
+  }
+
+  if (node.isUnlocked) {
+    return { updatedState: state, errorMessage: `La tecnología "${node.name}" ya se encuentra implementada.` };
+  }
+
+  // Validar si los prerrequisitos están desbloqueados
+  for (const preId of node.prerequisites) {
+    const preNode = currentTech.nodes.find(n => n.id === preId);
+    if (!preNode || !preNode.isUnlocked) {
+      return { updatedState: state, errorMessage: `Requisito previo no cumplido: Debes implementar primero "${preNode?.name || preId}".` };
+    }
+  }
+
+  if (state.financials.cashAndBCHReserves < node.capexCostHNL) {
+    return { updatedState: state, errorMessage: `Tesorería insuficiente: Se requieren ${formatHNL(node.capexCostHNL)} en CAPEX disponible.` };
+  }
+
+  const updatedNodes = currentTech.nodes.map(n => {
+    if (n.id === nodeId) {
+      return {
+        ...n,
+        isUnlocked: true,
+        unlockedAtMonth: state.gameMonth
+      };
+    }
+    return n;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves - node.capexCostHNL,
+    totalOperatingExpense: Math.max(0, state.financials.totalOperatingExpense - node.monthlyOpexSavingsHNL)
+  };
+
+  const newNotif: GameEventNotification = {
+    id: `notif-tech-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'board_decision',
+    title: `Tecnología Implementada: ${node.name}`,
+    message: `Se completó la puesta en producción. Ahorro permanente de OPEX: ${formatHNL(node.monthlyOpexSavingsHNL)} al mes. ${node.unlockedPerkDescription}`,
+    impactSummary: `CAPEX invertido: ${formatHNL(node.capexCostHNL)} · Beneficio activo.`
+  };
+
+  const updatedTechState: BankTechTreeState = {
+    ...currentTech,
+    nodes: updatedNodes,
+    totalCapexInvestedHNL: currentTech.totalCapexInvestedHNL + node.capexCostHNL,
+    totalMonthlyOpexSavingsHNL: currentTech.totalMonthlyOpexSavingsHNL + node.monthlyOpexSavingsHNL
+  };
+
+  const nextState: GameState = {
+    ...state,
+    bankTechTree: updatedTechState,
+    financials: updatedFinancials,
+    digitalTechLevel: Math.min(5, state.digitalTechLevel + 1),
+    notifications: [newNotif, ...state.notifications]
+  };
+
+  // Re-evaluar progreso de misiones tras desbloqueo
+  const evaluatedState = evaluateCampaignProgress(nextState);
+
+  return {
+    updatedState: evaluatedState,
+    successMessage: `¡Innovación "${node.name}" puesta en marcha! Inversión CAPEX: ${formatHNL(node.capexCostHNL)}. Ahorro recurrente en costos: ${formatHNL(node.monthlyOpexSavingsHNL)} mensuales.`
+  };
+}
+
+// ------------------------------------------------------------------------------------
+// CRÉDITOS SINDICADOS CORPORATIVOS MULTILATERALES (J.P. MORGAN LEAD ARRANGER)
+// ------------------------------------------------------------------------------------
+
+/**
+ * Estructura o participa en un crédito sindicado multimillonario
+ * Si el jugador es Lead Arranger, percibe la comisión estructuradora completa (1.5% - 2.5%).
+ */
+export function structureSyndicatedLoanDeal(
+  state: GameState,
+  dealId: string,
+  playerRole: 'Lead Arranger' | 'Participant',
+  commitmentAmountHNL?: number
+): { updatedState: GameState; successMessage: string } {
+  const currentSyndicated = state.syndicatedLending || INITIAL_SYNDICATED_STATE;
+  const deal = currentSyndicated.activeDeals.find(d => d.id === dealId);
+
+  if (!deal) {
+    return { updatedState: state, successMessage: 'Operación de crédito sindicado no encontrada.' };
+  }
+
+  const isLead = playerRole === 'Lead Arranger';
+  const playerCommitment = commitmentAmountHNL || (isLead ? Math.round(deal.totalFacilityAmountHNL * 0.35) : Math.round(deal.totalFacilityAmountHNL * 0.15));
+  const feeEarned = isLead ? Math.round(deal.totalFacilityAmountHNL * (deal.arrangerFeePct / 100)) : 0;
+
+  const updatedDeals = currentSyndicated.activeDeals.map(d => {
+    if (d.id === dealId) {
+      return {
+        ...d,
+        status: 'cerrado_vigente' as const,
+        isPlayerLeadArranger: isLead,
+        leadArrangerBankName: isLead ? state.bankName : d.leadArrangerBankName,
+        playerCommitmentAmountHNL: playerCommitment,
+        arrangerFeeEarnedHNL: feeEarned
+      };
+    }
+    return d;
+  });
+
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + playerCommitment,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves + feeEarned - playerCommitment,
+    totalFeeIncome: state.financials.totalFeeIncome + feeEarned,
+    nonInterestFeeIncomeMonthly: (state.financials.nonInterestFeeIncomeMonthly || 0) + feeEarned
+  };
+
+  const updatedSyndicatedState: SyndicatedLendingState = {
+    ...currentSyndicated,
+    activeDeals: updatedDeals,
+    totalSyndicatedVolumeOriginatedHNL: currentSyndicated.totalSyndicatedVolumeOriginatedHNL + deal.totalFacilityAmountHNL,
+    totalArrangerFeesCollectedHNL: currentSyndicated.totalArrangerFeesCollectedHNL + feeEarned
+  };
+
+  const newNotif: GameEventNotification = {
+    id: `notif-syn-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'board_decision',
+    title: `Sindicación Corporativa Cerrada: ${deal.projectTitle}`,
+    message: isLead
+      ? `Áureo Bank lideró la sindicación de ${formatHNL(deal.totalFacilityAmountHNL)} como Lead Arranger. Comisión estructuradora cobrada: ${formatHNL(feeEarned)} (${deal.arrangerFeePct}%).`
+      : `Áureo Bank suscribió ${formatHNL(playerCommitment)} como banco participante en el sindicato liderado por ${deal.leadArrangerBankName}.`,
+    impactSummary: `Retención crediticia: ${formatHNL(playerCommitment)} · Rendimiento activo: ${deal.interestRateAnnualPct}% anual.`
+  };
+
+  const nextState: GameState = {
+    ...state,
+    syndicatedLending: updatedSyndicatedState,
+    financials: updatedFinancials,
+    notifications: [newNotif, ...state.notifications]
+  };
+
+  const evaluatedState = evaluateCampaignProgress(nextState);
+
+  const msg = isLead
+    ? `¡Operación Sindicada ${deal.id} cerrada con éxito! Como Lead Arranger, tu banco estructuró ${formatHNL(deal.totalFacilityAmountHNL)} para ${deal.borrowerCompany} y cobró una comisión de ${formatHNL(feeEarned)} (${deal.arrangerFeePct}%).`
+    : `Participación de ${formatHNL(playerCommitment)} suscrita en el sindicato ${deal.id}.`;
+
+  return {
+    updatedState: evaluatedState,
+    successMessage: msg
   };
 }
 

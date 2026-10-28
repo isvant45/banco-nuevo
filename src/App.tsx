@@ -33,7 +33,13 @@ import {
   payBackToBackInstallment,
   executePledgedDepositForeclosure,
   processCorporatePayrollDispersion,
-  executeAchTransfer
+  executeAchTransfer,
+  useGuaranteedCreditCard,
+  closeGuaranteedCreditCard,
+  claimCampaignReward,
+  executeMarketWarOffensive,
+  unlockTechTreeNode,
+  structureSyndicatedLoanDeal
 } from './game/economyEngine';
 import { sound } from './game/audioFx';
 import { TopExecutiveHUD } from './components/TopExecutiveHUD';
@@ -42,6 +48,11 @@ import { BankingDivisionsTab } from './components/BankingDivisionsTab';
 import { BackToBackLendingTab } from './components/BackToBackLendingTab';
 import { TermDepositsTab } from './components/TermDepositsTab';
 import { DemandDepositsTab } from './components/DemandDepositsTab';
+import { BankRankingsLeagueTab } from './components/BankRankingsLeagueTab';
+import { CampaignMissionsTab } from './components/CampaignMissionsTab';
+import { CompetitorArenaTab } from './components/CompetitorArenaTab';
+import { BankTechTreeTab } from './components/BankTechTreeTab';
+import { SyndicatedLendingTab } from './components/SyndicatedLendingTab';
 import { TreasuryAndAlmTab } from './components/TreasuryAndAlmTab';
 import { CorporateTradeTab } from './components/CorporateTradeTab';
 import { ClearingAndPayrollTab } from './components/ClearingAndPayrollTab';
@@ -1187,6 +1198,55 @@ export default function App() {
     });
   };
 
+  const handleUseCreditCard = (facilityId: string, amountHNL: number) => {
+    setGameState(prev => {
+      const res = useGuaranteedCreditCard(prev, facilityId, amountHNL);
+      return res.updatedState;
+    });
+  };
+
+  const handleCloseCard = (facilityId: string) => {
+    setGameState(prev => {
+      const res = closeGuaranteedCreditCard(prev, facilityId);
+      return res.updatedState;
+    });
+  };
+
+  const handleClaimCampaignReward = (missionId: string) => {
+    setGameState(prev => {
+      const res = claimCampaignReward(prev, missionId);
+      return res.updatedState;
+    });
+  };
+
+  const handleExecuteMarketOffensive = (
+    departmentId: string, 
+    offensiveType: 'tasas_agresivas' | 'tarjetas_promocionales' | 'captacion_masiva'
+  ) => {
+    setGameState(prev => {
+      const res = executeMarketWarOffensive(prev, departmentId, offensiveType);
+      return res.updatedState;
+    });
+  };
+
+  const handleUnlockTechNode = (nodeId: string) => {
+    setGameState(prev => {
+      const res = unlockTechTreeNode(prev, nodeId);
+      return res.updatedState;
+    });
+  };
+
+  const handleStructureSyndicatedDeal = (
+    dealId: string, 
+    role: 'Lead Arranger' | 'Participant', 
+    commitmentHNL?: number
+  ) => {
+    setGameState(prev => {
+      const res = structureSyndicatedLoanDeal(prev, dealId, role, commitmentHNL);
+      return res.updatedState;
+    });
+  };
+
   const handleIssueTermDeposit = (params: {
     clientName: string;
     clientCif?: string;
@@ -1372,6 +1432,42 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'campaign_missions' && (
+          <CampaignMissionsTab
+            state={gameState}
+            onClaimReward={handleClaimCampaignReward}
+            onNavigateToTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'league_rankings' && (
+          <BankRankingsLeagueTab
+            state={gameState}
+            onNavigateToTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'competitor_arena' && (
+          <CompetitorArenaTab
+            state={gameState}
+            onExecuteOffensive={handleExecuteMarketOffensive}
+          />
+        )}
+
+        {activeTab === 'bank_tech_tree' && (
+          <BankTechTreeTab
+            state={gameState}
+            onUnlockNode={handleUnlockTechNode}
+          />
+        )}
+
+        {activeTab === 'syndicated_lending' && (
+          <SyndicatedLendingTab
+            state={gameState}
+            onStructureDeal={handleStructureSyndicatedDeal}
+          />
+        )}
+
         {activeTab === 'sandbox' && (
           <PolicySandboxPanel
             state={gameState}
@@ -1387,6 +1483,8 @@ export default function App() {
             onPayInstallment={handlePayBackToBack}
             onForecloseCollateral={handleForecloseBackToBack}
             onNavigateToTermDeposits={() => setActiveTab('term_deposits')}
+            onUseCreditCard={handleUseCreditCard}
+            onCloseCard={handleCloseCard}
           />
         )}
 

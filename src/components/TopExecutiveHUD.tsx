@@ -104,21 +104,26 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   const demandCount = (state.demandAccounts || []).length;
 
   const navItems = [
-    { id: 'divisions', label: `1. Bancas & Clientes (${totalRetailClients.toLocaleString()})` },
-    { id: 'back_to_back', label: `2. Back-to-Back & Garantías (${b2bCount})` },
-    { id: 'term_deposits', label: `3. Depósitos DPF (${dpfCount})` },
-    { id: 'demand_accounts', label: `4. Cuentas Vista & ACH (${demandCount})` },
-    { id: 'origination', label: `5. Créditos & Asesores (${state.pendingApplications.length})` },
-    { id: 'treasury_alm', label: '6. Tesorería & ALCO (BCH 12%)' },
-    { id: 'corporate_trade', label: '7. Trade Finance & Fideicomisos' },
-    { id: 'bch_money_desk', label: '8. Mesa de Dinero BCH' },
-    { id: 'aml_compliance', label: `9. Prevención Fraudes & AML (${amlPendingCount})` },
-    { id: 'overview', label: `10. Directorio & Resumen (${pendingDilemmasCount})` },
-    { id: 'advanced_ops', label: '11. Operaciones & Eficiencia' },
-    { id: 'sandbox', label: '12. Sandbox Políticas & Scoring' },
-    { id: 'dividends', label: '13. Ranking Dividendos (10 Años)' },
-    { id: 'pos_acquiring', label: `14. Comercios POS (${state.posMerchants.length})` },
-    { id: 'credit_risk', label: '15. Riesgo Crediticio CNBS' }
+    { id: 'campaign_missions', label: '🎯 Misiones & Campaña' },
+    { id: 'league_rankings', label: '🏆 League Tables & Rankings' },
+    { id: 'competitor_arena', label: '⚔️ Guerra Territorial' },
+    { id: 'bank_tech_tree', label: '⚡ Árbol Tecnológico' },
+    { id: 'syndicated_lending', label: '🏛️ Préstamos Sindicados' },
+    { id: 'divisions', label: `Bancas & Clientes (${totalRetailClients.toLocaleString()})` },
+    { id: 'back_to_back', label: `Back-to-Back & Tarjetas (${b2bCount})` },
+    { id: 'term_deposits', label: `Depósitos DPF (${dpfCount})` },
+    { id: 'demand_accounts', label: `Cuentas Vista & ACH (${demandCount})` },
+    { id: 'origination', label: `Créditos & Asesores (${state.pendingApplications.length})` },
+    { id: 'treasury_alm', label: 'Tesorería & ALCO (BCH 12%)' },
+    { id: 'corporate_trade', label: 'Trade Finance & Fideicomisos' },
+    { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
+    { id: 'aml_compliance', label: `Prevención Fraudes & AML (${amlPendingCount})` },
+    { id: 'overview', label: `Directorio & Resumen (${pendingDilemmasCount})` },
+    { id: 'advanced_ops', label: 'Operaciones & Eficiencia' },
+    { id: 'sandbox', label: 'Sandbox Políticas & Scoring' },
+    { id: 'dividends', label: 'Ranking Dividendos' },
+    { id: 'pos_acquiring', label: `Comercios POS (${state.posMerchants.length})` },
+    { id: 'credit_risk', label: 'Riesgo Crediticio CNBS' }
   ];
 
   return (

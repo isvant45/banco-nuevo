@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan maestro integral de modernización a Core Bancario Institucional de Alta Fidelidad, fundamentado en el análisis tecnológico y tarifario exhaustivo de los 7 bancos líderes de Honduras y la región (Banco Atlántida - SAP, Ficohsa - Temenos T24, BAC Credomatic, Banpaís - Bantotal/IBS, Davivienda, Promerica y Banco de Occidente). Incorpora más de 60 mejoras operativas, financieras e institucionales, matriz de productos pasivos y activos, módulo especializado de Back-to-Back (préstamos y tarjetas garantizadas con DPF pignorado al 0% RWA), ACH Pronto CEPROBAN, dispersión de planillas, fideicomisos y tesorería con encaje legal BCH al 12%.",
-  "updatedAt":  "2026-10-27T23:51:13.207139009Z",
+  "summary":  "Plan maestro revisado que incorpora la corrección de Tarjeta Garantizada Back-to-Back como línea de crédito revolvente sin cuota fija (límite 90%-95% de DPF), el Sistema de Rankings y Tablas de Liga (League Tables) al estilo JPMorgan Chase & BAC para Consumo, Tarjetas y Banca Privada (AUM), Préstamos Sindicados corporativos, Wealth Advisory patrimonial, Modo Campaña por capítulos, Guerra Territorial contra los 5 bancos rivales y Árbol Tecnológico modular.",
+  "updatedAt":  "2026-10-28T15:07:14.424503058Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

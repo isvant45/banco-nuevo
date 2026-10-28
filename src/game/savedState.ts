@@ -65,5 +65,17 @@ export function restoreGameState(saved: unknown): GameState {
   if (!state.lettersOfCredit || state.lettersOfCredit.length === 0) {
     state.lettersOfCredit = structuredClone(INITIAL_GAME_STATE.lettersOfCredit);
   }
+  if (!state.campaignState) {
+    state.campaignState = structuredClone(INITIAL_GAME_STATE.campaignState);
+  }
+  if (!state.territoryCompetition) {
+    state.territoryCompetition = structuredClone(INITIAL_GAME_STATE.territoryCompetition);
+  }
+  if (!state.bankTechTree) {
+    state.bankTechTree = structuredClone(INITIAL_GAME_STATE.bankTechTree);
+  }
+  if (!state.syndicatedLending) {
+    state.syndicatedLending = structuredClone(INITIAL_GAME_STATE.syndicatedLending);
+  }
   return state;
 }

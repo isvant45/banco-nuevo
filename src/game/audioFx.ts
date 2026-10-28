@@ -196,6 +196,11 @@ class SoundEngine {
     this.playRejectBuzzer();
   }
 
+  // Fanfarria de victoria o logro de campaña
+  public playVictoryFanfare() {
+    this.playMonthEndBell();
+  }
+
   // Alias para jingle de mejora técnica
   public playUpgradeJingle() {
     this.playApprovalStamp();

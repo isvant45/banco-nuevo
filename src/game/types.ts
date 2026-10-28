@@ -143,6 +143,7 @@ export interface BankDivisionConfig {
   totalLoans: number; // Lempiras colocados
   avgDepositRate: number; // % tasa pasiva que paga Áureo
   avgLendingRate: number; // % tasa activa que cobra Áureo
+  lendingRate?: number; // Alias
   feeIncomeMonthly: number; // Ingresos por comisiones del mes
   delinquencyRate: number; // % de mora en esta cartera
   satisfactionScore: number; // 0 - 100
@@ -333,6 +334,8 @@ export interface BankFinancialStatements {
   capitalAdequacyRatioCAR: number; // CAR % (Mínimo CNBS: 10.0%)
   liquidityCoverageRatioLCR: number; // ILR % (Mínimo: 100%)
   delinquencyRatioNPL: number; // Cartera en mora / Cartera total (Objetivo < 3%)
+  nonPerformingLoansRatioNPL?: number; // Alias NPL
+  efficiencyRatioCIR?: number; // Ratio de Eficiencia Cost-to-Income (CIR)
   returnOnEquityROE: number; // Utilidad anualizada / Patrimonio
 
   // Estado de Resultados del Mes (Lempiras)
@@ -789,6 +792,11 @@ export interface GameState {
   achTransactions?: AchTransferTransaction[];
   payrollBatches?: CorporatePayrollBatch[];
   lettersOfCredit?: TradeFinanceLetterOfCredit[];
+  // Sistemas Dinámicos de Juego, Rankings y Competencia
+  campaignState?: CampaignState;
+  territoryCompetition?: TerritoryCompetitionState;
+  bankTechTree?: BankTechTreeState;
+  syndicatedLending?: SyndicatedLendingState;
 }
 
 // ------------------------------------------------------------------------------------
@@ -832,7 +840,10 @@ export interface BackToBackFacility {
   spreadRatePct: number; // Margen del banco (+3.0% a +4.0%)
   effectiveInterestRatePct: number; // dpfRate + spreadRate
   termMonths: number;
-  monthlyQuotaHNL: number; // Cuota francesa mensual
+  monthlyQuotaHNL: number; // Cuota francesa mensual para préstamos; 0 para tarjeta revolvente
+  isRevolving?: boolean; // true para tarjeta de crédito garantizada
+  creditCardLimitHNL?: number; // Límite revolvente disponible (90%-95% de DPF)
+  minimumMonthlyPaymentHNL?: number; // 5% del saldo consumido para tarjetas (mínimo L. 500)
   disbursementFeeHNL: number; // 0.5% flat (mínimo L. 500)
   monthlyDebtorInsuranceHNL: number; // L. 6.50 por millar de saldo
   riskWeightingRwaPct: 0; // 0% RWA bajo normativa CNBS
@@ -841,6 +852,154 @@ export interface BackToBackFacility {
   pastDueDays: number;
   originationMonth: number;
   lastPaymentMonth?: number;
+}
+
+// ------------------------------------------------------------------------------------
+// SISTEMAS DE JUEGO DINÁMICO: RANKINGS JPMORGAN, CAMPAÑA, GUERRA TERRITORIAL & TECH TREE
+// ------------------------------------------------------------------------------------
+
+export interface BankLeagueRankingItem {
+  bankId: string;
+  bankName: string;
+  shortName: string;
+  isPlayer: boolean;
+  marketSharePct: number;
+  volumeHNL: number;
+  metricLabel: string;
+  metricValueFormatted: string;
+  secondaryMetricLabel: string;
+  secondaryMetricValue: string;
+  rank: number;
+}
+
+export interface CampaignMission {
+  id: string;
+  title: string;
+  description: string;
+  targetMetric: string;
+  currentValue: number;
+  targetValue: number;
+  unit: string;
+  rewardHNL: number;
+  rewardReputation: number;
+  rewardPerkLabel: string;
+  isCompleted: boolean;
+  isClaimed: boolean;
+}
+
+export interface CampaignChapter {
+  chapterNumber: number;
+  title: string;
+  subtitle: string;
+  objectiveSummary: string;
+  isUnlocked: boolean;
+  isCompleted: boolean;
+  missions: CampaignMission[];
+}
+
+export interface CampaignState {
+  currentChapter: number;
+  chapters: CampaignChapter[];
+  totalRewardsClaimedHNL: number;
+  totalMissionsCompleted: number;
+}
+
+export interface DepartmentTerritoryMarket {
+  id: string; // 'cortes' | 'francisco_morazan' | 'atlantida' | 'islas_bahia' | 'occidente'
+  name: string;
+  capitalCity: string;
+  economicFocus: string;
+  totalMarketDepositsHNL: number;
+  totalMarketLoansHNL: number;
+  playerMarketSharePct: number;
+  leadingBankName: string;
+  leadingBankSharePct: number;
+  branchesPlayerCount: number;
+  atmPlayerCount: number;
+  offensiveCampaignActive?: boolean;
+}
+
+export interface CompetitorCounterattackEvent {
+  id: string;
+  month: number;
+  rivalBankId: CompetitorId;
+  rivalBankName: string;
+  headline: string;
+  impactSummary: string;
+  offensiveType: 'guerra_tasas_pasivas' | 'tarjetas_cashback' | 'dumping_adquirencia' | 'robo_clientes_pyme';
+  playerDefenseRecommended: string;
+  isResolved?: boolean;
+}
+
+export interface TerritoryCompetitionState {
+  departments: DepartmentTerritoryMarket[];
+  recentCounterattacks: CompetitorCounterattackEvent[];
+  totalMarketShareNationalPct: number;
+}
+
+export interface TechTreeNode {
+  id: string;
+  branch: 'canales_digitales' | 'motor_scoring' | 'eficiencia_opex' | 'tesoreria_avanzada';
+  tier: 1 | 2 | 3;
+  name: string;
+  description: string;
+  capexCostHNL: number;
+  monthlyOpexSavingsHNL: number;
+  unlockedPerkDescription: string;
+  prerequisites: string[];
+  isUnlocked: boolean;
+  unlockedAtMonth?: number;
+}
+
+export interface BankTechTreeState {
+  nodes: TechTreeNode[];
+  totalCapexInvestedHNL: number;
+  monthlyOpexSavingsHNL?: number;
+  totalMonthlyOpexSavingsHNL: number;
+}
+
+export interface SyndicatedParticipantBank {
+  bankName: string;
+  allocatedAmountHNL: number;
+  sharePct: number;
+  role: string;
+}
+
+export interface SyndicatedLoanDeal {
+  id: string;
+  projectTitle: string;
+  projectName?: string;
+  borrowerCompany: string;
+  industrySector: string;
+  sector?: string;
+  totalFacilityAmountHNL: number;
+  totalFacilityHNL?: number;
+  currency?: string;
+  interestRateAnnualPct: number;
+  termYears: number;
+  arrangerFeePct: number;
+  leadArrangerBankName: string;
+  isPlayerLeadArranger: boolean;
+  playerRole?: 'Lead Arranger' | 'Co-Arranger' | 'Participante' | 'Participant';
+  playerCommitmentAmountHNL: number;
+  playerCommitmentHNL?: number;
+  arrangerFeeEarnedHNL: number;
+  arrangerFeeCollectedHNL?: number;
+  status: 'cerrado_vigente' | 'en_sindicacion' | 'prospecto_abierto' | 'en_estructuracion' | 'cerrado_activo' | 'liquidado' | string;
+  originationMonth?: number;
+  closedMonth?: number;
+  participatingBanks: SyndicatedParticipantBank[];
+  participantBanks?: string[];
+}
+
+export interface SyndicatedLendingState {
+  deals?: SyndicatedLoanDeal[];
+  activeDeals: SyndicatedLoanDeal[];
+  totalSyndicatedVolumeHNL?: number;
+  totalSyndicatedVolumeOriginatedHNL: number;
+  totalArrangerFeesEarnedHNL?: number;
+  totalArrangerFeesCollectedHNL: number;
+  reputationMultiplier?: number;
 }
 
 export interface DemandDepositAccount {
