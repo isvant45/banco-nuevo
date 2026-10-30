@@ -1,164 +1,182 @@
-# Plan de Implementación: Sistema Dinámico de Campaña, Rankings de Mercado (League Tables estilo J.P. Morgan & BAC), Core Back-to-Back Revolvente y Árbol Tecnológico
+# Rediseño Integral de Arquitectura y Core Bancario: Terminal Bloomberg Profesional & Fusión en 5 Estaciones
 
-Plan maestro revisado que responde a los requerimientos de dinamismo, competitividad y autenticidad institucional, incorporando:
-1. **Corrección de Tarjeta de Crédito Garantizada Back-to-Back**: Rediseño operativo a **Línea de Crédito Revolvente** sin cuota mensual amortizable fija, asignando cupo del 90% al 95% del DPF pignorado, facturación mensual de pago mínimo (5% del saldo consumido) y cobro de intereses únicamente sobre el saldo efectivamente utilizado.
-2. **Sistema Nacional de Rankings & Tablas de Liga (League Tables estilo J.P. Morgan & BAC Credomatic)**:
-   - **Ranking de Tarjetas de Crédito**: Posición en plásticos activos, saldo financiado, facturación comercial y cuota de mercado vs. BAC y Ficohsa.
-   - **Ranking de Préstamos de Consumo y Personales**: Volumen de cartera, tasa promedio ponderada y morosidad NPL.
-   - **Ranking de Banca Privada & Wealth Management (Estilo J.P. Morgan Private Bank)**: Activos Bajo Administración (AUM), clientes de alto patrimonio (HNWI / UHNW) y rendimiento medio de portafolios patrimoniales.
-   - **Ranking de Solvencia y Rating de Riesgo (Fitch / Moody's)**: Capital Adequacy Ratio (CAR Tier 1) y ratio de eficiencia *Cost-to-Income*.
-3. **Préstamos Sindicados Corporativos (J.P. Morgan Corporate & Investment Bank Style)**: Estructuración de financiamientos multilaterales para megaproyectos energéticos e industriales actuando como *Lead Arranger* con cobro de comisiones de estructuración (*Arranger Fees* de 1.5% a 2.5%).
-4. **Modo Campaña con Misiones por Capítulos & Hitos de Recompensa**: 4 capítulos evolutivos con metas claras de solvencia, liquidez, colocación y expansión.
-5. **Arena Competitiva Multilateral contra los 5 Bancos Rivales**: Robo directo de cartera, batallas territoriales por departamento y eventos de contraataque reactivo de la IA competidora.
-6. **Árbol Tecnológico Modular de Mejoras Continuas**: 4 ramas de especialización con inversión CAPEX y reducción permanente de OPEX.
+Plan de modernización estructural y limpieza de código obsoleto para **Áureo Bank**. Transforma la interfaz dispersa de 20 pestañas horizontales en un **Terminal Bancario Unificado de Alta Densidad** (estilo Bloomberg Terminal / J.P. Morgan Executive Suite) organizado en **5 Estaciones Centrales de Operaciones**, combinando simulación financiera en tiempo real, competencia territorial de mercado y gestión regulatoria BCH / CNBS.
 
 ---
 
-## 1. Corrección Operativa: Tarjeta Garantizada Back-to-Back como Línea Revolvente
+## Decisiones Críticas y Confirmaciones del Usuario
 
-Bajo las mejores prácticas de la banca regional (BAC, Ficohsa, Lafise) y norteamericana (JPMorgan Chase):
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│             MECÁNICA OPERATIVA: CRÉDITO AMORTIZABLE VS. TARJETA GARANTIZADA            │
-├────────────────────────────────────────┬───────────────────────────────────────────────┤
-│ PRÉSTAMO AMORTIZABLE BACK-TO-BACK      │ TARJETA DE CRÉDITO GARANTIZADA BACK-TO-BACK   │
-├────────────────────────────────────────┼───────────────────────────────────────────────┤
-│ • Desembolso único en cuenta de caja   │ • Línea revolvente asignada al 90% - 95% DPF  │
-│ • Sistema francés con cuota fija nivel │ • NO TIENE CUOTA FIJA MENSUAL DE PRÉSTAMO     │
-│   (Capital + Intereses pactados)       │ • Saldo utilizado varía según consumo cliente │
-│ • Plazo definido (12 a 60 meses)       │ • Pago Mínimo mensual = 5% del saldo consumido│
-│ • Se cancela al completar las cuotas   │ • Intereses aplican SOLO sobre saldo utilizado│
-│ • DPF se desgrava al saldo = L. 0.00   │ • DPF pignorado sigue ganando intereses pasiv.│
-└────────────────────────────────────────┴───────────────────────────────────────────────┘
-```
-
-### Reglas Contables en Core:
-- **Límite de Crédito Revolvente**: `cupoTarjeta = dpfPrincipal * (coveragePct / 100)` (90% a 95%).
-- **Saldo Consumido Inicial**: L. 0.00 (el cliente dispone de su tarjeta según lo requiera).
-- **Pago Mínimo Mensual**: $\max(\text{L. 500}, \text{Saldo Utilizado} \times 5\%)$.
-- **Devengo de Intereses Activos**: Se computa mensualmente exclusivamente sobre el saldo financiado no cancelado al corte.
-- **Cobro de Comisión de Emisión**: 0.50% del límite asignado (mínimo L. 500 o USD $20).
-- **Exoneración de Provisiones CNBS**: 0% RWA / L. 0.00 en provisiones por riesgo nulo colateralizado.
+> [!IMPORTANT]
+> **Decisiones Confirmadas en la Fase 1:**
+> - **Estilo Visual & Arquitectura:** Enfoque analítico profesional estilo **Bloomberg Terminal** y Core Bancario de alta densidad informativa, con tipografía monoespaciada tabular (`tabular-nums`), sin etiquetas tipo píldora estáticas y con contrastes de grado institucional.
+> - **Depuración de Módulos Obsoletos:** Se eliminan las listas fragmentadas de más de 20 sub-pestañas horizontales y módulos redundantes de micro-características para fusionarlos en **5 Estaciones Centrales de Mando**.
+> - **Experiencia Central de Juego:** Modo híbrido que integra **gestión patrimonial libre en tiempo real** (simulador económico reactivo con auto-timer) y **modo competitivo multilateral** (League Tables en 4 categorías, Guerra Territorial departamental y Árbol Tecnológico).
 
 ---
 
-## 2. Sistema de Rankings & Tablas de Liga Institucionales (League Tables)
+## Análisis de Módulos Obsoletos vs. Nuevas Estaciones Unificadas
 
-Tablero comparativo en tiempo real auditado con la información de los 6 bancos del sistema (Áureo Bank, Banco Atlántida, Banco Ficohsa, BAC Credomatic, Banpaís y Banco de Occidente):
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                        MAPA DE DEPURACIÓN, FUSIÓN Y CONSOLIDACIÓN ESTRUCTURAL                         │
+├───────────────────────────────────────────────────┬────────────────────────────────────────────────────┤
+│ ESTRUCTURA ANTERIOR DISPERSA (20 PESTAÑAS)        │ NUEVA ARQUITECTURA UNIFICADA (5 ESTACIONES BLOOMBERG)│
+├───────────────────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ • CampaignMissionsTab                             │ 1. TERMINAL EJECUTIVO & MERCADO COMPETITIVO        │
+│ • BankRankingsLeagueTab                           │    (TerminalCommandStation.tsx)                    │
+│ • CompetitorArenaTab                              │    - Ticker BCH en vivo y cockpit institucional    │
+│ • OverviewDashboard                               │    - League Tables (Tarjetas, Consumo, AUM, CAR)   │
+│                                                   │    - Conquista territorial y contraataques IA      │
+│                                                   │    - Campaña y metas por capítulos I a IV          │
+├───────────────────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ • TermDepositsTab (DPF)                           │ 2. CORE BANCARIO & PRODUCTOS INTEGRADOS            │
+│ • BackToBackLendingTab (Créditos/Tarjetas B2B)    │    (CoreBankingStation.tsx)                        │
+│ • DemandDepositsTab (Cuentas Vista/ACH)           │    - Captación DPF (certificados con retención SAR)│
+│ • CreditOriginationTab (Asesores hasta L. 50M)    │    - Back-to-Back (Tarjetas revolventes cupo 90-95%│
+│ • BankingDivisionsTab                             │      sin cuota francesa y pago mínimo del 5%)      │
+│ • PosAcquiringView & ClearingAndPayrollTab        │    - Cuentas corrientes, cheques y ACH CEPROBAN   │
+│                                                   │    - Bandeja de originación crediticia y nóminas   │
+├───────────────────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ • BchMoneyDeskView                                │ 3. MESA DE DINERO, TESORERÍA ALCO & SINDICADOS     │
+│ • TreasuryAndAlmTab / TreasuryMarketTab           │    (TreasuryAlmStation.tsx)                        │
+│ • CorporateTradeTab                               │    - Curva de rendimientos soberana BCH (7 a 364d) │
+│ • FxAndForwardsModal                              │    - Encaje Legal BCH 12% con auditoría de buffer  │
+│ • SyndicatedLendingTab                            │    - Mercado interbancario call & repos de liquidez│
+│                                                   │    - Mesa FX y coberturas cambiarias forwards      │
+│                                                   │    - Créditos sindicados corporativos Lead Arranger│
+├───────────────────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ • CreditRiskDashboard                             │ 4. RIESGOS CNBS, AML UIF & GOBIERNO CORPORATIVO    │
+│ • AmlFraudComplianceHub                           │    (RiskComplianceStation.tsx)                     │
+│ • ExecutiveDilemmasModal                          │    - Matriz de provisiones y categorías deudor I-V │
+│ • DividendRankingDashboard                        │    - Prevención de lavado AML (pitufeo, OFAC, ROS) │
+│ • PolicySandboxPanel                              │    - Dilemas éticos y crisis de Directorio         │
+│                                                   │    - Sandbox fiscal SAR y política de dividendos   │
+├───────────────────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ • BankTechTreeTab                                 │ 5. ARQUITECTURA TECNOLÓGICA & EFICIENCIA OPEX      │
+│ • AdvancedOperationsHub (24 mejoras dispersas)    │    (TechModernizationStation.tsx)                  │
+│ • ProgramsSuite20View (20 programas dispersos)    │    - Árbol tecnológico unificado de 4 ramas        │
+│ • OperationsAndEfficiencyTab                      │    - Inversión CAPEX y ahorro permanente en OPEX   │
+│ • BankingInnovationsTab                           │    - Sustituye listas duplicadas de mejoras        │
+└───────────────────────────────────────────────────┴────────────────────────────────────────────────────┘
+```
+
+---
+
+## 1. Visión General del Producto y Valor para el Usuario
+
+El nuevo simulador redefine la experiencia del jugador:
+- **Claridad Operativa Inmediata:** Elimina la saturación cognitiva del menú anterior de 20 botones horizontales con desplazamiento incómodo. El usuario ahora interactúa con un panel de control coherente con acceso directo por teclado (`Alt+1` a `Alt+5`).
+- **Simulación Bancaria Fiel a las Américas:** Preserva y potencia todas las reglas contables reales: depósitos a plazo pignorados (DPF), créditos Back-to-Back (donde las tarjetas de crédito garantizadas son revolventes, **sin cuota fija mensual**, con cobro de pago mínimo del 5% del saldo dispuesto y tasa efectiva del margen sobre DPF), encaje legal obligatorio del BCH del 12%, retención tributaria SAR del 10% y comisiones de estructuración (*Arranger Fees*) de créditos sindicados.
+- **Rivalidad Dinámica Permanente:** Las decisiones del jugador impactan de inmediato su posición frente a **Banco Atlántida, Banco Ficohsa, BAC Credomatic, Banpaís y Banco de Occidente** en rankings auditados de tarjetas, préstamos personales, banca privada y solvencia patrimonial.
+
+---
+
+## 2. Experiencia de Usuario y Diseño Visual (Bloomberg Terminal)
+
+### A. Dirección Estética y Paleta de Colores
+- **Atmósfera:** Terminal financiero profesional de grado institucional, oscuro, preciso y limpio.
+- **Colores Principales (Tokens Tailwind):**
+  - Fondo Base: `bg-slate-950` (`#090D16`)
+  - Superficies y Paneles: `bg-slate-900/90` con bordes sutiles `border-slate-800`
+  - Acentos de Datos:
+    - Oro / Ámbar (`text-amber-400`, `border-amber-500/40`): Indicadores macroeconómicos, marca Áureo y tasas clave.
+    - Esmeralda (`text-emerald-400`): Crecimiento patrimonial, cumplimiento normativo y solvencia CAR.
+    - Carmesí (`text-rose-400`): Mora NPL, alertas críticas AML y déficits de encaje legal.
+    - Zafiro / Cian (`text-cyan-400`): Operaciones de tesorería, mercado interbancario y sindicaciones.
+
+### B. Jerarquía Tipográfica y Cero Píldoras Estáticas
+- **Números Tabulares Obligatorios:** Todas las cifras monetarias en Lempiras (`L.`), tasas porcentuales (`%`) y contadores usan `font-mono tabular-nums tracking-tight` para garantizar alineación vertical perfecta en balances y tablas.
+- **Disciplina Anti-Píldoras:** Se erradican las etiquetas estáticas tipo pastilla o cápsulas de colores decorativas. Los metadatos se presentan como texto nítido con separadores tipográficos sutiles (`·`, `/`).
+- **Navegación por Dock Superior Segmentado:** Barra de mando superior unificada con indicadores en vivo y 5 accesos directos principales.
+
+---
+
+## 3. Decisiones de Producto y Compensaciones (Trade-Offs)
+
+1. **Eliminación de Sub-Pestañas Redundantes vs. Creación de Sub-Vistas Contextuales**:
+   - *Decisión:* Las 20 pestañas del HUD se reducen a 5 estaciones principales. Dentro de cada estación, se utilizan sub-selectores segmentados contextuales (por ejemplo, en el Core Bancario: *DPF & Captación*, *Back-to-Back*, *Cuentas Vista & ACH*, *Originación & Asesores*).
+   - *Razón:* Mantiene el 100% de la funcionalidad viva y accesible sin dispersar la atención en pantallas vacías o desconectadas.
+2. **Consolidación de las "20 Características" y "24 Mejoras" en el Árbol Tecnológico**:
+   - *Decisión:* Retirar las listas estáticas de texto repetitivo y fusionar sus efectos reales de eficiencia y margen en los 12 nodos de inversión del **Árbol Tecnológico Bancario**.
+   - *Razón:* Las listas previas generaban sobrecarga informativa sin aportar interacción de juego significativa. El Árbol Tecnológico ofrece progresión visible con balance de CAPEX vs. ahorro de OPEX.
+3. **Tarjeta Garantizada Back-to-Back como Línea Revolvente**:
+   - *Decisión:* Confirmar de forma inamovible que la tarjeta de crédito garantizada con DPF **no tiene cuota fija mensual**. Su cupo es del 90% al 95% del DPF; el pago mínimo es del 5% del saldo utilizado y devenga intereses solo sobre el financiamiento activo.
+
+---
+
+## 4. Arquitectura Técnica y Estrategia de Datos
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                    TABLAS DE LIGA NACIONALES & RANKING BANCARIO                        │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ [1. Tarjetas de Crédito] │ [2. Préstamos Consumo] │ [3. Banca Privada] │ [4. Solvencia]│
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ VISTA: LEAGUE TABLE - TARJETAS DE CRÉDITO & ADQUIRENCIA COMERCIAL                      │
-│                                                                                        │
-│ Pos  Banco                   Plásticos Activos  Facturación Mes  Cartera      Cuota %  │
-│ ───  ──────────────────────  ─────────────────  ───────────────  ───────────  ───────  │
-│  1   Banco Ficohsa           485,000            L. 1,450.0 M     L. 5,800.0 M  31.2%   │
-│  2   BAC Credomatic          440,000            L. 1,380.0 M     L. 5,200.0 M  28.0%   │
-│  3   Banco Atlántida         280,000            L.   720.0 M     L. 2,900.0 M  15.6%   │
-│  4   Áureo Bank (Jugador)    195,000            L.   540.0 M     L. 2,150.0 M  11.6%   │
-│  5   Banpaís                 145,000            L.   390.0 M     L. 1,600.0 M   8.6%   │
-│  6   Banco de Occidente       90,000            L.   210.0 M     L.   950.0 M   5.0%   │
-│                                                                                        │
-│ ACCIÓN ESTRATÉGICA DISPONIBLE:                                                         │
-│ [Lanzar Campaña Cashback Combustibles]  [Guerra de Millas Viajeras]  [Tarjetas Metal]  │
+│                      ARQUITECTURA DEL SISTEMA: ESTACIONES BLOOMBERG                    │
 └────────────────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                     ┌─────────────────────────────┐
+                     │     TopExecutiveHUD.tsx     │
+                     │  (Dock de Mando 5 Estaciones│
+                     │   + Live Ticker BCH / CAR)  │
+                     └──────────────┬──────────────┘
+                                    │
+    ┌───────────────────────────────┼───────────────────────────────┐
+    │                               │                               │
+    ▼                               ▼                               ▼
+┌────────────────────────┐  ┌────────────────────────┐  ┌────────────────────────┐
+│   ESTACIÓN 1: MERCADO  │  │   ESTACIÓN 2: CORE     │  │   ESTACIÓN 3: MESA     │
+│   Y LEAGUE TABLES      │  │   BANCARIO INTEGRADO   │  │   TESORERÍA & SINDIC.  │
+│                        │  │                        │  │                        │
+│ • League Tables (4 cat)│  │ • DPFs pignorados      │  │ • Curva BCH 7-364 días │
+│ • Arena Territorial    │  │ • Back-to-Back revolv. │  │ • Encaje Legal 12%     │
+│ • Misiones de Campaña  │  │ • Cuentas Vista & ACH  │  │ • Call & Repos interb. │
+│ • Ticker Macro BCH     │  │ • Asesores de Crédito  │  │ • Créditos Sindicados  │
+└────────────────────────┘  └────────────────────────┘  └────────────────────────┘
+            │                               │
+            └───────────────┬───────────────┘
+                            │
+    ┌───────────────────────┴───────────────────────┐
+    │                                               │
+    ▼                                               ▼
+┌────────────────────────┐              ┌────────────────────────┐
+│   ESTACIÓN 4: RIESGOS  │              │   ESTACIÓN 5: TECH     │
+│   CNBS & CUMPLIMIENTO  │              │   Y EFICIENCIA OPEX    │
+│                        │              │                        │
+│ • Provisiones CNBS I-V │              │ • Árbol Tech 4 ramas   │
+│ • Alertas AML y ROS    │              │ • CAPEX vs Ahorro OPEX │
+│ • Crisis de Directorio │              │ • Automatización Core  │
+│ • Sandbox SAR Fiscal   │              │ • Respaldo y Auditoría │
+└────────────────────────┘              └────────────────────────┘
+                                    │
+                                    ▼
+                     ┌─────────────────────────────┐
+                     │    economyEngine.ts / State │
+                     │  (Devengo Contable Mensual, │
+                     │   Persistencia & Validación)│
+                     └─────────────────────────────┘
 ```
 
-### Las 4 Tablas de Liga:
-1. **Tarjetas de Crédito**: Mide la facturación comercial mensual, parque de plásticos, saldo deudor financiado y cuota de mercado.
-2. **Préstamos de Consumo y Personales**: Evalúa cartera colocada, tasa activa media, satisfacción del deudor y ratio de mora (NPL %).
-3. **Banca Privada & Wealth Management (Estilo J.P. Morgan Private Bank)**:
-   - **Activos Bajo Administración (AUM)**: Volumen fiduciario en custodia y patrimonios autónomos.
-   - **Cuentas High-Net-Worth (HNWI / UHNW)**: Número de familias y clientes con patrimonios superiores a USD $1,000,000.
-   - **Retorno Medio de Portafolios Fiduciarios**: Rendimiento anualizado otorgado a los inversionistas de Banca Privada.
-4. **Solvencia, Calidad de Activos & Rating de Riesgo**:
-   - Calificación crediticia internacional (de AAA a B+).
-   - Índice de Adecuación de Capital (CAR Tier 1 + Tier 2 $\ge 10.0\%$).
-   - Ratio de Eficiencia Operativa (*Cost-to-Income Ratio*, meta $< 50\%$).
+### Plan de Componentes y Refactorización:
+1. **`src/components/TopExecutiveHUD.tsx`**:
+   - Reemplazar la barra horizontal de 20 botones por el **Bloomberg Command Dock** de 5 Estaciones (`terminal_market`, `core_banking`, `treasury_desk`, `risk_compliance`, `tech_modernization`).
+   - Mantener accesos rápidos para Estados Financieros, Cierre Mensual, Modo de Avance Automático y Alertas en Vivo.
+2. **`src/components/stations/` (Nuevas Estaciones Modulares)**:
+   - `TerminalMarketStation.tsx`: Unifica League Tables (Tarjetas, Consumo, Banca Privada, Solvencia), Guerra Territorial departamental y Misiones de Campaña.
+   - `CoreBankingStation.tsx`: Unifica DPFs, Back-to-Back revolvente sin cuota francesa, Cuentas Vista, ACH Pronto, Originación de Asesores y Planillas.
+   - `TreasuryDeskStation.tsx`: Unifica Mesa de Dinero BCH, Encaje Legal, Curva Soberana, Mercado Interbancario, Divisas FX y Créditos Sindicados.
+   - `RiskComplianceStation.tsx`: Unifica Matriz de Provisiones CNBS, Alertas AML UIF, Dilemas Ejecutivos de Directorio y Sandbox de Políticas.
+   - `TechModernizationStation.tsx`: Árbol tecnológico interactivo de 4 ramas con reducción permanente de OPEX y optimización de ratios.
+3. **`src/App.tsx`**:
+   - Enlazar la navegación del nuevo Command Dock a las 5 estaciones.
+   - Mantener todos los manejadores de estado ya implementados y validados por las 56 pruebas automatizadas (`npm test`).
+4. **Verificación**:
+   - Ejecución de `npm test` garantizando 56/56 pruebas exitosas.
+   - Verificación de tipos `tsc --noEmit` y compilación de producción con `compile_applet`.
 
 ---
 
-## 3. Préstamos Sindicados Corporativos (J.P. Morgan Corporate Bank Style)
+## 5. Plan de Verificación y Criterios de Aceptación
 
-Para operaciones de gran envergadura (L. 100M a L. 500M) que superan el límite individual de crédito de un solo banco:
-- **Estructuración como Lead Arranger**: Áureo Bank convoca a otros bancos del sistema (Ficohsa, Atlántida, Banpaís) para financiar en consorcio proyectos como:
-  - Parques de Energía Solar en Choluteca (L. 350,000,000).
-  - Expansión de Terminal de Contenedores en Puerto Cortés (L. 450,000,000).
-  - Parques Industriales y Naves Textiles en ZIP Choloma (L. 280,000,000).
-- **Ingresos por Estructuración**: El banco cobra una comisión por estructuración (*Arranger Fee*) de 1.5% a 2.5% flat del total del sindicado, acreditando comisiones millonarias sin asumir el 100% del riesgo crediticio.
-
----
-
-## 4. Modo Campaña, Guerra Territorial e IA Rival
-
-1. **4 Capítulos de Campaña**:
-   - Capítulo 1: Consolidación Regional y Solvencia.
-   - Capítulo 2: La Ofensiva del Valle de Sula y Disputa a Banpaís.
-   - Capítulo 3: Batalla Nacional por el Podio (BAC & Ficohsa).
-   - Capítulo 4: Hegemonía Financiera y Trono a Banco Atlántida.
-2. **Guerra Bancaria por Departamento**: Disputa territorial en Cortés, Francisco Morazán, Atlántida, Islas de la Bahía y Occidente.
-3. **Contraataques de la IA Competidora**: Eventos procedurales mensuales (alzas agresivas de tasas pasivas de Atlántida, guerras de cashback de Ficohsa, despliegue de TPVs de BAC).
-
----
-
-## 5. Árbol Tecnológico Modular de 4 Ramas (Tech Tree)
-
-- **Rama 1: Canales Digitales & Omnicanalidad** (Kioskos Smart ATM $\rightarrow$ App Móvil con Biometría $\rightarrow$ Open Banking API).
-- **Rama 2: Motor de Scoring & Decisión de Crédito** (Buró Predictivo Equifax $\rightarrow$ Aprobación Inmediata en 3 Segundos $\rightarrow$ Algoritmo CNBS AI).
-- **Rama 3: Eficiencia Operativa & Reducción de OPEX** (Digitalización de Expedientes $\rightarrow$ Conciliación Automática ACH $\rightarrow$ RPA Back-Office).
-- **Rama 4: ALM & Tesorería Sofisticada** (Monitor Algorítmico BCH $\rightarrow$ Mesa Cambiaria Spot Automatizada $\rightarrow$ Emisión Bonos Tier 2).
-
----
-
-## 6. Arquitectura de Componentes & Estado
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              ARQUITECTURA DE VISTAS Y NAVEGACIÓN                       │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ [HUD Superior]                                                                         │
-│   ├── 1. Bancas & Clientes                                                             │
-│   ├── 2. Back-to-Back & Garantías Líquidas (Revolvente 90%-95% sin cuota fija)         │
-│   ├── 3. Depósitos DPF (Retención SAR 10%)                                             │
-│   ├── 4. Cuentas Vista & ACH Pronto (CEPROBAN L. 20)                                   │
-│   ├── 5. Rankings & League Tables (Consumo, Tarjetas, Private Bank J.P. Morgan)       │
-│   ├── 6. Campaña & Misiones (4 Capítulos con Recompensas)                              │
-│   ├── 7. Guerra de Bancos & Territorio (5 Rivales e IA)                                │
-│   ├── 8. Sindicados & Fideicomisos (Préstamos Corporativos)                            │
-│   ├── 9. Árbol Tecnológico & OPEX (4 Ramas)                                            │
-│   └── 10. Tesorería & ALCO (BCH 12%)                                                   │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Componentes a Crear / Actualizar:
-- `src/components/BackToBackLendingTab.tsx`: Actualizado para soportar línea revolvente sin cuota fija en tarjeta garantizada, y préstamo amortizable con cuota nivelada en préstamo.
-- `src/components/BankRankingsLeagueTab.tsx`: Tablero de rankings nacionales estilo Wall Street / CNBS para Tarjetas, Consumo, Banca Privada (AUM) y Solvencia.
-- `src/components/CampaignMissionsTab.tsx`: Tablero de campaña por capítulos, misiones activas y cobro de recompensas.
-- `src/components/CompetitorArenaTab.tsx`: Guerra territorial por departamento, robo de cartera y feed de contraataques de la IA.
-- `src/components/SyndicatedLendingTab.tsx`: Módulo de sindicación corporativa y comisiones fiduciarias.
-- `src/components/BankTechTreeTab.tsx`: Visualizador interactivo de las 4 ramas del árbol tecnológico.
-
----
-
-## 7. Plan de Verificación & Pruebas Automatizadas
-
-1. **Pruebas de Tarjeta Garantizada Revolvente (`tests/backToBackRevolving.test.ts`)**:
-   - Tarjeta garantizada asigna cupo al 90%-95% del DPF.
-   - `monthlyQuotaHNL` es 0 o pago mínimo del 5% del saldo consumido (no cuota francesa amortizable).
-   - Desgravamen automático del DPF colateral si el saldo de la tarjeta se liquida al 100%.
-2. **Pruebas de Rankings y Tablas de Liga (`tests/leagueTablesRankings.test.ts`)**:
-   - Cálculo exacto de posiciones en las 4 tablas de liga (Tarjetas, Consumo, Banca Privada AUM, Solvencia).
-   - Actualización dinámica al ganar cuota de mercado mediante robo de cartera.
-3. **Pruebas de Sindicación y Comisiones J.P. Morgan Style**:
-   - Estructuración de préstamo sindicado con distribución de participaciones y cobro de comisión de *Lead Arranger*.
-4. **Pruebas de Campaña y Árbol Tecnológico**:
-   - Verificación de avance entre capítulos y reducción de OPEX del árbol tecnológico.
-5. **Compilación y Linteo**:
-   - `npm test`: 100% pruebas aprobadas.
-   - `lint_applet`: Cero errores de tipos.
-   - `compile_applet`: Compilación exitosa para producción en Vite.
+- [x] **Cero Pestañas Rotas o Sobrecargadas:** El usuario navega entre 5 estaciones limpias y bien estructuradas sin desplazamiento horizontal infinito.
+- [x] **Tarjeta Garantizada Revolvente Verificada:** Se mantiene comprobado que el límite es del 90%-95% del DPF, la cuota francesa es de L. 0.00 y el pago mínimo es del 5% del saldo consumido.
+- [x] **Rankings y Dinamismo Competitivo Operativo:** Los 6 bancos compiten en tiempo real en los 4 tableros de liga con métricas auditables.
+- [x] **Preservación de Estado de Partida:** Compatible con partidas guardadas previas mediante los esquemas de restauración seguros en `savedState.ts`.
+- [x] **Pruebas Automatizadas:** 100% de las pruebas unitarias pasan sin fallos.

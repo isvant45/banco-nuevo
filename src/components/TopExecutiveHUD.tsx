@@ -99,32 +99,41 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
   // Jerarquía Core Bancario Profesional (Honduras & Américas)
   const totalRetailClients = state.divisions.personas.clientCount;
-  const b2bCount = (state.backToBackFacilities || []).length;
-  const dpfCount = (state.termDeposits || []).length;
-  const demandCount = (state.demandAccounts || []).length;
+  const nplRatio = state.financials.delinquencyRatioNPL;
 
-  const navItems = [
-    { id: 'campaign_missions', label: '🎯 Misiones & Campaña' },
-    { id: 'league_rankings', label: '🏆 League Tables & Rankings' },
-    { id: 'competitor_arena', label: '⚔️ Guerra Territorial' },
-    { id: 'bank_tech_tree', label: '⚡ Árbol Tecnológico' },
-    { id: 'syndicated_lending', label: '🏛️ Préstamos Sindicados' },
-    { id: 'divisions', label: `Bancas & Clientes (${totalRetailClients.toLocaleString()})` },
-    { id: 'back_to_back', label: `Back-to-Back & Tarjetas (${b2bCount})` },
-    { id: 'term_deposits', label: `Depósitos DPF (${dpfCount})` },
-    { id: 'demand_accounts', label: `Cuentas Vista & ACH (${demandCount})` },
-    { id: 'origination', label: `Créditos & Asesores (${state.pendingApplications.length})` },
-    { id: 'treasury_alm', label: 'Tesorería & ALCO (BCH 12%)' },
-    { id: 'corporate_trade', label: 'Trade Finance & Fideicomisos' },
-    { id: 'bch_money_desk', label: 'Mesa de Dinero BCH' },
-    { id: 'aml_compliance', label: `Prevención Fraudes & AML (${amlPendingCount})` },
-    { id: 'overview', label: `Directorio & Resumen (${pendingDilemmasCount})` },
-    { id: 'advanced_ops', label: 'Operaciones & Eficiencia' },
-    { id: 'sandbox', label: 'Sandbox Políticas & Scoring' },
-    { id: 'dividends', label: 'Ranking Dividendos' },
-    { id: 'pos_acquiring', label: `Comercios POS (${state.posMerchants.length})` },
-    { id: 'credit_risk', label: 'Riesgo Crediticio CNBS' }
-  ];
+  // Mapa de Estaciones Centrales de Operaciones estilo Bloomberg Terminal
+  const stationItems = [
+    { 
+      id: 'terminal_market', 
+      label: '1. TERMINAL & MERCADO', 
+      subtext: 'Rankings · Arena · Campaña',
+      badge: '4 Tablas'
+    },
+    { 
+      id: 'core_banking', 
+      label: '2. CORE BANCARIO', 
+      subtext: 'DPF · Back-to-Back · Cuentas · Asesores',
+      badge: `${totalRetailClients.toLocaleString()} Clientes`
+    },
+    { 
+      id: 'treasury_desk', 
+      label: '3. MESA & TESORERÍA', 
+      subtext: 'Mesa BCH · Encaje 12% · Sindicados · FX',
+      badge: isReserveCompliant ? 'Encaje OK' : 'Déficit Encaje'
+    },
+    { 
+      id: 'risk_compliance', 
+      label: '4. RIESGO & CUMPLIMIENTO', 
+      subtext: 'Provisiones CNBS · AML UIF · Directorio',
+      badge: `${nplRatio.toFixed(1)}% Mora`
+    },
+    { 
+      id: 'tech_modernization', 
+      label: '5. TECNOLOGÍA & EFICIENCIA', 
+      subtext: 'Árbol Tech 4 Ramas · Ahorro OPEX',
+      badge: `Nivel ${state.digitalTechLevel}/5`
+    }
+  ] as const;
 
   return (
     <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur border-b border-slate-800 text-slate-100 shadow-md">
@@ -324,26 +333,50 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
         </div>
       </div>
 
-      {/* Zona 2: Indicadores Primarios de Caja y Navegación de Pestañas */}
-      <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
-        {/* Navegación por Pestañas (Prioridad Bancas y Créditos Primero) */}
-        <nav className="flex items-center gap-1 overflow-x-auto py-1">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => {
-                sound.playClick();
-                onSelectTab(item.id);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                activeTab === item.id
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+      {/* Zona 2: Command Dock de 5 Estaciones Estilo Bloomberg Terminal */}
+      <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Navegación de 5 Estaciones Centrales */}
+        <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full md:w-auto">
+          {stationItems.map((item, idx) => {
+            const isCurrent = activeTab === item.id || (
+              (item.id === 'terminal_market' && ['league_rankings', 'campaign_missions', 'competitor_arena', 'overview'].includes(activeTab)) ||
+              (item.id === 'core_banking' && ['back_to_back', 'term_deposits', 'demand_accounts', 'origination', 'divisions', 'pos_acquiring', 'clearing'].includes(activeTab)) ||
+              (item.id === 'treasury_desk' && ['bch_money_desk', 'syndicated_lending', 'treasury_alm', 'corporate_trade', 'secondary_securities', 'treasury'].includes(activeTab)) ||
+              (item.id === 'risk_compliance' && ['credit_risk', 'aml_compliance', 'sandbox_sar', 'sandbox', 'dividends'].includes(activeTab)) ||
+              (item.id === 'tech_modernization' && ['bank_tech_tree', 'advanced_ops', 'innovations'].includes(activeTab))
+            );
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  sound.playClick();
+                  onSelectTab(item.id);
+                }}
+                className={`p-2 rounded-lg text-left transition-all border flex flex-col justify-between ${
+                  isCurrent
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 hover:border-slate-700'
+                }`}
+                title={`Acceso a ${item.label} (Alt+${idx + 1})`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <span className={`text-[11px] font-bold tracking-tight ${isCurrent ? 'text-amber-300' : 'text-slate-200'}`}>
+                    {item.label}
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-500 font-bold bg-slate-950 px-1 py-0.2 rounded border border-slate-800">
+                    Alt+{idx + 1}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                  <span className="truncate max-w-[130px]">{item.subtext}</span>
+                  <span className={`ml-1 text-[9px] font-semibold ${isCurrent ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {item.badge}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </nav>
 
         {/* Resumen rápido de liquidez y utilidad */}

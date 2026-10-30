@@ -81,6 +81,11 @@ import { DividendRankingDashboard } from './components/DividendRankingDashboard'
 import { PolicySandboxPanel } from './components/PolicySandboxPanel';
 import { AmlFraudComplianceHub } from './components/AmlFraudComplianceHub';
 import { ExecutiveDilemmasModal } from './components/ExecutiveDilemmasModal';
+import { TerminalMarketStation } from './components/stations/TerminalMarketStation';
+import { CoreBankingStation } from './components/stations/CoreBankingStation';
+import { TreasuryAlmStation } from './components/stations/TreasuryAlmStation';
+import { RiskComplianceStation } from './components/stations/RiskComplianceStation';
+import { TechModernizationStation } from './components/stations/TechModernizationStation';
 import { restoreGameState } from './game/savedState';
 
 const STORAGE_KEY = 'aureo-bank-sim-state-v5';
@@ -100,8 +105,23 @@ export default function App() {
     return INITIAL_GAME_STATE;
   });
 
-  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [activeTab, setActiveTab] = useState<string>('terminal_market');
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+
+  // Atajos de Teclado Bloomberg Terminal (Alt+1 a Alt+5)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        if (e.key === '1') { e.preventDefault(); sound.playClick(); setActiveTab('terminal_market'); }
+        else if (e.key === '2') { e.preventDefault(); sound.playClick(); setActiveTab('core_banking'); }
+        else if (e.key === '3') { e.preventDefault(); sound.playClick(); setActiveTab('treasury_desk'); }
+        else if (e.key === '4') { e.preventDefault(); sound.playClick(); setActiveTab('risk_compliance'); }
+        else if (e.key === '5') { e.preventDefault(); sound.playClick(); setActiveTab('tech_modernization'); }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Modales de Cierre Contable Obligatorio, Mesa de Dinero y Estrés
   const [isMonthlyClosingModalOpen, setIsMonthlyClosingModalOpen] = useState<boolean>(false);
@@ -1407,132 +1427,48 @@ export default function App() {
         onOpenExecutiveDilemmas={() => setIsExecutiveDilemmasModalOpen(true)}
       />
 
-      {/* Contenido Principal según la Pestaña Activa */}
+      {/* Contenido Principal: 5 Estaciones de Operaciones Centrales */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {activeTab === 'overview' && (
-          <OverviewDashboard
+        {(activeTab === 'terminal_market' || ['league_rankings', 'campaign_missions', 'competitor_arena', 'overview'].includes(activeTab)) && (
+          <TerminalMarketStation
             state={gameState}
+            initialSubView={
+              activeTab === 'campaign_missions' ? 'campaign' :
+              activeTab === 'competitor_arena' ? 'territory' :
+              activeTab === 'overview' ? 'overview' : 'rankings'
+            }
+            onClaimCampaignReward={handleClaimCampaignReward}
+            onExecuteMarketOffensive={handleExecuteMarketOffensive}
             onSetMarketing={handleSetMarketing}
-            onNavigateTab={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'aml_compliance' && (
-          <AmlFraudComplianceHub
-            state={gameState}
-            onUpdateState={setGameState}
-          />
-        )}
-
-        {activeTab === 'dividends' && (
-          <DividendRankingDashboard
-            state={gameState}
-            onUpdateState={setGameState}
-            onNavigateTab={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'campaign_missions' && (
-          <CampaignMissionsTab
-            state={gameState}
-            onClaimReward={handleClaimCampaignReward}
             onNavigateToTab={setActiveTab}
           />
         )}
 
-        {activeTab === 'league_rankings' && (
-          <BankRankingsLeagueTab
+        {(activeTab === 'core_banking' || ['back_to_back', 'term_deposits', 'demand_accounts', 'origination', 'divisions', 'pos_acquiring', 'clearing', 'pension_funds'].includes(activeTab)) && (
+          <CoreBankingStation
             state={gameState}
-            onNavigateToTab={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'competitor_arena' && (
-          <CompetitorArenaTab
-            state={gameState}
-            onExecuteOffensive={handleExecuteMarketOffensive}
-          />
-        )}
-
-        {activeTab === 'bank_tech_tree' && (
-          <BankTechTreeTab
-            state={gameState}
-            onUnlockNode={handleUnlockTechNode}
-          />
-        )}
-
-        {activeTab === 'syndicated_lending' && (
-          <SyndicatedLendingTab
-            state={gameState}
-            onStructureDeal={handleStructureSyndicatedDeal}
-          />
-        )}
-
-        {activeTab === 'sandbox' && (
-          <PolicySandboxPanel
-            state={gameState}
-            onUpdateState={setGameState}
-            onNavigateTab={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'back_to_back' && (
-          <BackToBackLendingTab
-            state={gameState}
-            onOriginateFacility={handleOriginateBackToBack}
-            onPayInstallment={handlePayBackToBack}
-            onForecloseCollateral={handleForecloseBackToBack}
-            onNavigateToTermDeposits={() => setActiveTab('term_deposits')}
+            initialSubView={
+              activeTab === 'term_deposits' ? 'term_deposits' :
+              activeTab === 'demand_accounts' ? 'demand_accounts' :
+              activeTab === 'origination' ? 'origination' :
+              activeTab === 'divisions' ? 'divisions' :
+              activeTab === 'pos_acquiring' ? 'pos_acquiring' : 'back_to_back'
+            }
+            onOriginateBackToBack={(p) => handleOriginateBackToBack(p)}
+            onPayBackToBack={handlePayBackToBack}
+            onForecloseBackToBack={handleForecloseBackToBack}
             onUseCreditCard={handleUseCreditCard}
             onCloseCard={handleCloseCard}
-          />
-        )}
-
-        {activeTab === 'term_deposits' && (
-          <TermDepositsTab
-            state={gameState}
-            onIssueCertificate={handleIssueTermDeposit}
-            onNavigateToBackToBack={() => setActiveTab('back_to_back')}
-          />
-        )}
-
-        {activeTab === 'demand_accounts' && (
-          <DemandDepositsTab
-            state={gameState}
+            onIssueTermDeposit={handleIssueTermDeposit}
             onExecuteAch={handleExecuteAch}
             onProcessPayroll={handleProcessPayroll}
-          />
-        )}
-
-        {activeTab === 'treasury_alm' && (
-          <TreasuryAndAlmTab
-            state={gameState}
-            onTradeSpotUSD={handleTradeSpotUSD}
-            onBuyBchBill={handleBuyBchBill}
-          />
-        )}
-
-        {activeTab === 'corporate_trade' && (
-          <CorporateTradeTab
-            state={gameState}
-            onIssueLetterOfCredit={handleIssueLetterOfCredit}
-            onStructureTrust={handleStructureTrust}
-          />
-        )}
-
-        {activeTab === 'bch_money_desk' && (
-          <BchMoneyDeskView
-            state={gameState}
-            onOpenRepo={handleOpenRepo}
-            onExecuteCallDeal={handleExecuteCallDeal}
-            onNavigateTab={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'divisions' && (
-          <BankingDivisionsTab
-            state={gameState}
-            onUpdateRates={handleUpdateDivisionRates}
+            onApproveCredit={handleApproveCredit}
+            onRejectCredit={handleRejectCredit}
+            onUpdateAdvisorLimit={handleUpdateAdvisorLimit}
+            onUpdateAdvisorAmountThreshold={(newThreshold) => {
+              setGameState(prev => setAdvisorCreditLimit(prev, newThreshold));
+            }}
+            onUpdateDivisionRates={handleUpdateDivisionRates}
             onSelectClientToEdit={handleSelectClientToEdit}
             onOpenClient360={handleOpenClient360}
             onToggleClientGuaranteed={handleToggleClientGuaranteed}
@@ -1544,12 +1480,6 @@ export default function App() {
             onApplyBulkAllocation={handleApplyBulkAllocation}
             onBulkDivisionMoraRelief={handleBulkDivisionMoraRelief}
             onWaiveSingleClientMora={handleWaiveClientMora}
-          />
-        )}
-
-        {activeTab === 'pos_acquiring' && (
-          <PosAcquiringView
-            state={gameState}
             onGrantMerchantLoan={handleGrantMerchantLoan}
             onGrantMerchantCard={handleGrantMerchantCard}
             onAffiliateNewMerchant={handleAffiliateNewMerchant}
@@ -1558,92 +1488,52 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'pension_funds' && (
-          <PensionFundsView
+        {(activeTab === 'treasury_desk' || ['bch_money_desk', 'syndicated_lending', 'treasury_alm', 'corporate_trade', 'secondary_securities', 'treasury'].includes(activeTab)) && (
+          <TreasuryAlmStation
             state={gameState}
-            onUpdateFundRates={handleUpdatePensionFundRates}
-          />
-        )}
-
-        {activeTab === 'credit_risk' && (
-          <CreditRiskDashboard
-            state={gameState}
-            onRestructureLoan={handleRestructureLoan}
-            onSellNPLToCompetitor={handleSellNPLToCompetitor}
-            onNegotiateWorkout={handleNegotiateDebtWorkout}
-          />
-        )}
-
-        {activeTab === 'clearing' && (
-          <ClearingAndPayrollTab
-            state={gameState}
-            onUpdateAchFee={handleUpdateAchFee}
-            onSignPayrollAgreement={handleSignPayrollAgreement}
-            onUpdatePayrollAgreement={handleUpdatePayrollAgreement}
-            onSavePayrollAgreement={handleSavePayrollAgreement}
-          />
-        )}
-
-        {activeTab === 'origination' && (
-          <CreditOriginationTab
-            state={gameState}
-            onApproveApplication={handleApproveCredit}
-            onRejectApplication={handleRejectCredit}
-            onUpdateAdvisorLimit={handleUpdateAdvisorLimit}
-            onUpdateAdvisorAmountThreshold={(newThreshold) => {
-              setGameState(prev => setAdvisorCreditLimit(prev, newThreshold));
-            }}
-          />
-        )}
-
-        {activeTab === 'treasury' && (
-          <TreasuryMarketTab
-            state={gameState}
+            initialSubView={
+              activeTab === 'syndicated_lending' ? 'syndicated_lending' :
+              activeTab === 'treasury_alm' ? 'treasury_alm' :
+              activeTab === 'corporate_trade' ? 'corporate_trade' :
+              activeTab === 'secondary_securities' || activeTab === 'treasury' ? 'secondary_securities' : 'bch_money_desk'
+            }
+            onOpenRepo={handleOpenRepo}
+            onExecuteCallDeal={handleExecuteCallDeal}
+            onStructureSyndicatedDeal={handleStructureSyndicatedDeal}
+            onTradeSpotUSD={handleTradeSpotUSD}
+            onBuyBchBill={handleBuyBchBill}
+            onIssueLetterOfCredit={handleIssueLetterOfCredit}
+            onStructureTrust={handleStructureTrust}
             onBuyBCHBond={handleBuyBCHBond}
             onTradeFX={handleTradeFX}
             onSendSwiftTransfer={handleSendSwiftTransfer}
             onBuySecondarySecurity={handleBuySecondarySecurity}
             onSellSecondarySecurity={handleSellSecondarySecurity}
-          />
-        )}
-
-        {activeTab === 'operations' && (
-          <OperationsAndEfficiencyTab
-            gameState={gameState}
-            onUpgradeTech={handleUpgradeTech}
-          />
-        )}
-
-        {activeTab === 'experts' && (
-          <ExpertOpinionsTab
-            opinions={gameState.expertOpinions || []}
-            bch={gameState.bch}
-          />
-        )}
-
-        {activeTab === 'innovations' && (
-          <BankingInnovationsTab
-            gameState={gameState}
-            onRunStressTest={handleRunStressTest}
-            onExecuteFxBid={handleExecuteFxBid}
-            onPlaceInterbankCallMoney={handlePlaceCallMoney}
             onNavigateTab={setActiveTab}
           />
         )}
 
-        {activeTab === 'board_staff' && (
-          <BoardAndStaffTab
+        {(activeTab === 'risk_compliance' || ['credit_risk', 'aml_compliance', 'sandbox_sar', 'sandbox', 'dividends'].includes(activeTab)) && (
+          <RiskComplianceStation
             state={gameState}
-            onModifyStaff={handleModifyStaff}
-            onUpdateBoardBonus={handleUpdateBoardBonus}
+            initialSubView={
+              activeTab === 'aml_compliance' ? 'aml_compliance' :
+              activeTab === 'sandbox' || activeTab === 'sandbox_sar' ? 'sandbox_sar' :
+              activeTab === 'dividends' ? 'dividends' : 'credit_risk'
+            }
+            onRestructureLoan={handleRestructureLoan}
+            onSellNPLToCompetitor={handleSellNPLToCompetitor}
+            onNegotiateDebtWorkout={handleNegotiateDebtWorkout}
+            onUpdateState={setGameState}
+            onOpenExecutiveDilemmas={() => setIsExecutiveDilemmasModalOpen(true)}
+            onNavigateTab={setActiveTab}
           />
         )}
 
-        {activeTab === 'branches' && (
-          <BranchesTab
+        {(activeTab === 'tech_modernization' || ['bank_tech_tree', 'operations', 'innovations', 'advanced_ops', 'branches', 'board_staff', 'experts'].includes(activeTab)) && (
+          <TechModernizationStation
             state={gameState}
-            onOpenBranch={handleOpenBranch}
-            onUpgradeTech={handleUpgradeTech}
+            onUnlockNode={handleUnlockTechNode}
           />
         )}
       </main>
