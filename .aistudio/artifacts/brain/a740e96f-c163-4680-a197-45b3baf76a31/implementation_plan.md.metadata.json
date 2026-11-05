@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación completado al 100%:\n- Rol de Constructora establecido como predeterminado en nueva partida y títulos.\n- Eliminación integral del \"Banco Aliado de la IA / Smart Bank\", unificando toda la operativa en el \"Banco\" oficial.\n- Reemplazo del término \"4 Bancos\" por \"Banco\" o \"Bancos Comerciales\".\n- Sistema de amortización automática de préstamos al avanzar el tiempo y abonos extraordinarios a capital.\n- Cuentas de cheques con depósito de efectivo desde caja registradora, retiros y negociación de rendimiento.\n- Tarjetas de crédito corporativas con evaluación quincenal para aumento automático de límite y cashback.\n- Concesionarias multi-rubro (Supermercado, Comida, Constructora) con auto-financiamiento bancario directo (1-5 años) y negociación de tasa.\n- Score crediticio empresarial (300-850 puntos) con beneficios tangibles.",
+  "updatedAt": "2026-11-05T04:01:16.231855820Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

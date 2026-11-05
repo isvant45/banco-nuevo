@@ -10,10 +10,7 @@ import {
   serveRetailCustomer, 
   orderFromSupplier, 
   advanceRetailDay, 
-  generateDailyStoreCustomers,
-  DEFAULT_SMART_BANK_OFFERS,
-  acceptSmartBankFacility,
-  repaySmartBankFacility
+  generateDailyStoreCustomers
 } from '../../game/retailBusinessEngine';
 import { 
   generateDailyBankApplicants, 
@@ -39,13 +36,23 @@ import {
   releaseBankGuarantee,
   openTermDeposit,
   payCommercialLoan,
-  payCorporateCreditCard
+  payCorporateCreditCard,
+  depositCashToCheckingAccount,
+  withdrawCashFromCheckingAccount,
+  negotiateCheckingAccountRate,
+  negotiateLoanRate,
+  makeExtraordinaryLoanPayment,
+  processDailyLoanAmortization,
+  processBiweeklyCardEvaluation,
+  financeEquipmentLoan,
+  calculateCompanyCreditScore
 } from '../../game/commercialBanksEngine';
 import {
   DEFAULT_MACHINERY_DEALERS,
   DEFAULT_MANUFACTURER_QUOTES,
   buyMachineryUnit,
-  orderFromMaterialManufacturer
+  orderFromMaterialManufacturer,
+  getDealersForSector
 } from '../../game/machineryAndSuppliersEngine';
 import { sound } from '../../game/audioFx';
 import { RetroWindow } from './RetroWindow';
@@ -55,7 +62,6 @@ import { BankVaultWindow } from './BankVaultWindow';
 import { RetailRegisterWindow } from './RetailRegisterWindow';
 import { RetailSupplyWindow } from './RetailSupplyWindow';
 import { RetailStaffWindow } from './RetailStaffWindow';
-import { SmartBankEnterpriseWindow } from './SmartBankEnterpriseWindow';
 import { CommercialBanksWindow } from './CommercialBanksWindow';
 import { MachineryDealerWindow } from './MachineryDealerWindow';
 import { MaterialTenderWindow } from './MaterialTenderWindow';
@@ -76,7 +82,7 @@ interface RetroDesktopProps {
 
 export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   initialRole,
-  initialSector = 'minimarket',
+  initialSector = 'constructora',
   initialName,
   onOpenAuditReport,
   onToggleViewMode,
@@ -90,14 +96,14 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
   // Estado diario central de la simulación
   const [simState, setSimState] = useState<DailySimulationState>(() => {
-    const products = SECTOR_DEFAULT_PRODUCTS[initialSector] || SECTOR_DEFAULT_PRODUCTS.minimarket;
+    const products = SECTOR_DEFAULT_PRODUCTS[initialSector] || SECTOR_DEFAULT_PRODUCTS.constructora || SECTOR_DEFAULT_PRODUCTS.minimarket;
     const isConstructora = initialSector === 'constructora';
     const initialStoreCash = isConstructora ? 120000 : 35000;
     const initialStoreBank = isConstructora ? 1850000 : 120000;
     const initialVaultCash = 850000;
     const initialDeposits = 4500000;
 
-    return {
+    const baseState: DailySimulationState = {
       currentDay: 1,
       currentMonth: 1,
       currentYear: 2026,
@@ -121,8 +127,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       dailyWages: isConstructora ? 4800 : 1200,
       dailyRent: isConstructora ? 1500 : 500,
       monthlySalesAccumulated: 0,
-      smartBankOffers: DEFAULT_SMART_BANK_OFFERS,
-      smartBankCreditRating: 'AA',
 
       // Módulo Específico: Constructora & Obras
       constructionMaterials: DEFAULT_CONSTRUCTION_MATERIALS,
@@ -135,7 +139,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       sarTaxRecord: DEFAULT_INITIAL_SAR_RECORD,
       fiscalSolvenciaActive: true,
 
-      // 4 Bancos Comerciales Competidores & Capacidad
+      // Bancos Comerciales Competidores & Capacidad
       commercialBanks: createDefaultBankRelationships(initialStoreBank),
 
       // Flota Propia & Concesionarias (1-5 estrellas)
@@ -164,6 +168,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
       dailyHistory: []
     };
+
+    return {
+      ...baseState,
+      companyCreditProfile: calculateCompanyCreditScore(baseState)
+    };
   });
 
   // Ventanas activas y estados
@@ -177,7 +186,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     licitacion_materiales: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     sar_audit: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     staff_store: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
-    smart_bank: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     bank_docket: { isOpen: roleMode === 'banquero', isMinimized: false, isMaximized: false, zIndex: 10 },
     bank_vault: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
   });
@@ -465,20 +473,82 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     }));
   };
 
-  // Acciones Empresario (Banco Inteligente)
-  const handleAcceptBankFacility = (facilityId: string) => {
-    const res = acceptSmartBankFacility(simState, facilityId);
+  // Acciones Bancarias Empresariales (Depósitos, Retiros, Negociación y Abonos)
+  const handleDepositCash = (bankId: any, amount: number) => {
+    const res = depositCashToCheckingAccount(simState, bankId, amount);
     setSimState(res.updatedState);
+    if (res.success) {
+      sound.playCashRegister();
+    } else {
+      sound.playRejectBuzzer();
+    }
   };
 
-  const handleRepayBankFacility = (facilityId: string, amount: number) => {
-    const res = repaySmartBankFacility(simState, facilityId, amount);
-    if (res.error) {
-      sound.playRejectBuzzer();
-      alert(res.error);
-      return;
-    }
+  const handleWithdrawCash = (bankId: any, amount: number) => {
+    const res = withdrawCashFromCheckingAccount(simState, bankId, amount);
     setSimState(res.updatedState);
+    if (res.success) {
+      sound.playCashRegister();
+    } else {
+      sound.playRejectBuzzer();
+    }
+  };
+
+  const handleNegotiateCheckingRate = (bankId: any, targetRate: number) => {
+    const res = negotiateCheckingAccountRate(simState, bankId, targetRate);
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+    } else {
+      sound.playRejectBuzzer();
+    }
+  };
+
+  const handleNegotiateLoanRate = (bankId: any, discountPct: number) => {
+    const res = negotiateLoanRate(simState, bankId, discountPct);
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+    } else {
+      sound.playRejectBuzzer();
+    }
+  };
+
+  const handleExtraordinaryLoanPayment = (bankId: any, amount: number) => {
+    const res = makeExtraordinaryLoanPayment(simState, bankId, amount);
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+    } else {
+      sound.playRejectBuzzer();
+    }
+  };
+
+  const handleFinanceEquipment = (
+    bankId: any,
+    equipment: any,
+    dealerId: string,
+    dealerName: string,
+    downPaymentPct: number,
+    termYears: number,
+    negotiatedRatePct?: number
+  ) => {
+    const res = financeEquipmentLoan(
+      simState,
+      bankId,
+      equipment,
+      dealerId,
+      dealerName,
+      downPaymentPct,
+      termYears,
+      negotiatedRatePct
+    );
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+    } else {
+      sound.playRejectBuzzer();
+    }
   };
 
   // Acciones Empresario (Personal)
@@ -605,6 +675,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       } else {
         nextState = advanceRetailDay(simState);
       }
+      const amortized = processDailyLoanAmortization(nextState);
+      nextState = amortized.updatedState;
+      nextState = processBiweeklyCardEvaluation(nextState);
     } else {
       nextState = advanceBankDay(simState);
     }
@@ -619,11 +692,18 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     if (roleMode === 'empresario' && retailSector === 'constructora') {
       const res = advanceConstructionDays(simState, daysCount);
       nextState = res.updatedState;
+      const amortized = processDailyLoanAmortization(nextState);
+      nextState = amortized.updatedState;
+      nextState = processBiweeklyCardEvaluation(nextState);
     } else {
-      // Para otros modos iterar días
       let cur = simState;
       for (let i = 0; i < daysCount; i++) {
         cur = roleMode === 'empresario' ? advanceRetailDay(cur) : advanceBankDay(cur);
+        if (roleMode === 'empresario') {
+          const amortized = processDailyLoanAmortization(cur);
+          cur = amortized.updatedState;
+          cur = processBiweeklyCardEvaluation(cur);
+        }
       }
       nextState = cur;
     }
@@ -644,11 +724,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     setIsNewGameModalOpen(false);
 
     const isConstructora = params.retailSector === 'constructora';
-    const prods = SECTOR_DEFAULT_PRODUCTS[params.retailSector] || SECTOR_DEFAULT_PRODUCTS.minimarket;
+    const prods = SECTOR_DEFAULT_PRODUCTS[params.retailSector] || SECTOR_DEFAULT_PRODUCTS.constructora || SECTOR_DEFAULT_PRODUCTS.minimarket;
     const initialCash = params.roleMode === 'empresario' ? (isConstructora ? 120000 : 45000) : 850000;
     const initialBank = params.roleMode === 'empresario' ? (isConstructora ? 1850000 : 120000) : 120000;
 
-    setSimState({
+    const baseState: DailySimulationState = {
       currentDay: 1,
       currentMonth: 1,
       currentYear: 2026,
@@ -671,8 +751,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       dailyWages: isConstructora ? 4800 : 1200,
       dailyRent: isConstructora ? 1500 : 500,
       monthlySalesAccumulated: 0,
-      smartBankOffers: DEFAULT_SMART_BANK_OFFERS,
-      smartBankCreditRating: 'AA',
 
       constructionMaterials: DEFAULT_CONSTRUCTION_MATERIALS,
       constructionOrders: [],
@@ -705,6 +783,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       rejectedCountToday: 0,
 
       dailyHistory: []
+    };
+
+    setSimState({
+      ...baseState,
+      companyCreditProfile: calculateCompanyCreditScore(baseState)
     });
 
     if (params.roleMode === 'empresario') {
@@ -725,20 +808,19 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     ...(roleMode === 'empresario' ? (
       isConstructora ? [
         { id: 'construction_bids', title: `Licitaciones: ${entityName}`, icon: '🏛️', isOpen: !!openWindows.construction_bids?.isOpen, isMinimized: !!openWindows.construction_bids?.isMinimized },
-        { id: 'bancos_comerciales', title: '4 Bancos Comerciales', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
+        { id: 'bancos_comerciales', title: 'Banco', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
         { id: 'concesionarias', title: 'Concesionarias Maquinaria (1-5★)', icon: '🚜', isOpen: !!openWindows.concesionarias?.isOpen, isMinimized: !!openWindows.concesionarias?.isMinimized },
         { id: 'licitacion_materiales', title: 'Licitación Fabricantes (1-5★)', icon: '📦', isOpen: !!openWindows.licitacion_materiales?.isOpen, isMinimized: !!openWindows.licitacion_materiales?.isMinimized },
         { id: 'construction_supply', title: 'Almacén de Materiales', icon: '🧱', isOpen: !!openWindows.construction_supply?.isOpen, isMinimized: !!openWindows.construction_supply?.isMinimized },
         { id: 'sar_audit', title: 'SAR - Solvencia Fiscal', icon: '📋', isOpen: !!openWindows.sar_audit?.isOpen, isMinimized: !!openWindows.sar_audit?.isMinimized },
-        { id: 'staff_store', title: 'Cuadrilla de Obras', icon: '👥', isOpen: !!openWindows.staff_store?.isOpen, isMinimized: !!openWindows.staff_store?.isMinimized },
-        { id: 'smart_bank', title: 'Banco Aliado (IA)', icon: '💳', isOpen: !!openWindows.smart_bank?.isOpen, isMinimized: !!openWindows.smart_bank?.isMinimized }
+        { id: 'staff_store', title: 'Cuadrilla de Obras', icon: '👥', isOpen: !!openWindows.staff_store?.isOpen, isMinimized: !!openWindows.staff_store?.isMinimized }
       ] : [
         { id: 'pos_register', title: `Caja Registradora: ${entityName}`, icon: '🛒', isOpen: !!openWindows.pos_register?.isOpen, isMinimized: !!openWindows.pos_register?.isMinimized },
-        { id: 'bancos_comerciales', title: '4 Bancos Comerciales', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
+        { id: 'bancos_comerciales', title: 'Banco', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
+        { id: 'concesionarias', title: 'Concesionarias Vehículos & Equipos (1-5★)', icon: '🚚', isOpen: !!openWindows.concesionarias?.isOpen, isMinimized: !!openWindows.concesionarias?.isMinimized },
         { id: 'supply_stock', title: 'Almacén & Proveedores', icon: '📦', isOpen: !!openWindows.supply_stock?.isOpen, isMinimized: !!openWindows.supply_stock?.isMinimized },
         { id: 'sar_audit', title: 'SAR - Auditoría Fiscal', icon: '📋', isOpen: !!openWindows.sar_audit?.isOpen, isMinimized: !!openWindows.sar_audit?.isMinimized },
-        { id: 'staff_store', title: 'Personal & Local', icon: '👥', isOpen: !!openWindows.staff_store?.isOpen, isMinimized: !!openWindows.staff_store?.isMinimized },
-        { id: 'smart_bank', title: 'Banco Aliado (IA)', icon: '💳', isOpen: !!openWindows.smart_bank?.isOpen, isMinimized: !!openWindows.smart_bank?.isMinimized }
+        { id: 'staff_store', title: 'Personal & Local', icon: '👥', isOpen: !!openWindows.staff_store?.isOpen, isMinimized: !!openWindows.staff_store?.isMinimized }
       ]
     ) : []),
     ...(roleMode === 'banquero' ? [
@@ -782,7 +864,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
                   🏦
                 </div>
                 <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-                  4 Bancos
+                  Banco
                 </span>
               </button>
 
@@ -860,24 +942,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
                   Cuadrilla Obra
                 </span>
               </button>
-
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  bringToFront('smart_bank');
-                }}
-                className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
-              >
-                <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
-                  💳
-                </div>
-                <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-                  Banco Aliado (IA)
-                </span>
-              </button>
             </>
           ) : (
-            /* Iconos de Tienda Minorista / Bar */
+            /* Iconos de Tienda Minorista / Bar / Supermercado / Comida */
             <>
               <button
                 onClick={() => {
@@ -891,6 +958,36 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
                 </div>
                 <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
                   Caja Registradora
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  bringToFront('bancos_comerciales');
+                }}
+                className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+              >
+                <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+                  🏦
+                </div>
+                <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+                  Banco
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  bringToFront('concesionarias');
+                }}
+                className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+              >
+                <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+                  🚚
+                </div>
+                <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+                  Vehículos & Flota
                 </span>
               </button>
 
@@ -936,21 +1033,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
                 </div>
                 <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
                   Personal & Local
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  bringToFront('smart_bank');
-                }}
-                className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
-              >
-                <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
-                  💳
-                </div>
-                <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-                  Banco Aliado (IA)
                 </span>
               </button>
             </>
@@ -1214,34 +1296,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         </RetroWindow>
       )}
 
-      {/* Ventana: Banco Aliado IA para la Empresa - Arrastrable */}
-      {roleMode === 'empresario' && (
-        <RetroWindow
-          id="smart_bank"
-          title="Banco Aliado & Financiamiento Empresarial (IA)"
-          icon="💳"
-          initialX={220}
-          initialY={50}
-          isOpen={!!openWindows.smart_bank?.isOpen}
-          isMinimized={!!openWindows.smart_bank?.isMinimized}
-          isMaximized={!!openWindows.smart_bank?.isMaximized}
-          zIndex={openWindows.smart_bank?.zIndex || 5}
-          onFocus={() => bringToFront('smart_bank')}
-          onClose={() => handleCloseWindow('smart_bank')}
-          onMinimize={() => handleMinimizeWindow('smart_bank')}
-          onMaximize={() => handleMaximizeWindow('smart_bank')}
-        >
-          <SmartBankEnterpriseWindow
-            offers={simState.smartBankOffers}
-            monthlySales={simState.monthlySalesAccumulated || 0}
-            storeCash={simState.storeCash}
-            creditRating={simState.smartBankCreditRating}
-            onAcceptFacility={handleAcceptBankFacility}
-            onRepayFacility={handleRepayBankFacility}
-          />
-        </RetroWindow>
-      )}
-
       {/* ------------------------------------------------------------- */}
       {/* VENTANAS DE BANQUERO (BANK 2000)                              */}
       {/* ------------------------------------------------------------- */}
@@ -1322,11 +1376,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onStartNewGame={handleStartNewGame}
       />
 
-      {/* Ventana: 4 Bancos Comerciales Competidores - Arrastrable */}
+      {/* Ventana: Banco · Cuentas, Préstamos y Tarjetas Corporativas */}
       {roleMode === 'empresario' && (
         <RetroWindow
           id="bancos_comerciales"
-          title="Banca Comercial Empresarial: Ficohsa · Atlántida · BAC · Occidente"
+          title="Banco · Cuentas, Préstamos Amortizables y Tarjetas Corporativas"
           icon="🏦"
           initialX={110}
           initialY={40}
@@ -1349,16 +1403,21 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
             onOpenDpf={handleOpenTermDeposit}
             onPayLoan={handlePayLoan}
             onPayCard={handlePayCard}
+            onExtraordinaryLoanPayment={handleExtraordinaryLoanPayment}
+            onDepositCash={handleDepositCash}
+            onWithdrawCash={handleWithdrawCash}
+            onNegotiateCheckingRate={handleNegotiateCheckingRate}
+            onNegotiateLoanRate={handleNegotiateLoanRate}
           />
         </RetroWindow>
       )}
 
-      {/* Ventana: Concesionarias de Maquinaria Pesada & Volquetas (1 a 5 Estrellas) */}
+      {/* Ventana: Concesionarias de Maquinaria y Flota Comercial (1 a 5 Estrellas) */}
       {roleMode === 'empresario' && (
         <RetroWindow
           id="concesionarias"
-          title="Concesionarias de Maquinaria Pesada & Volquetas (1-5★)"
-          icon="🚜"
+          title={isConstructora ? "Concesionarias de Maquinaria Pesada & Volquetas (1-5★)" : "Concesionarias de Vehículos & Equipamiento Comercial (1-5★)"}
+          icon={isConstructora ? "🚜" : "🚚"}
           initialX={150}
           initialY={65}
           isOpen={!!openWindows.concesionarias?.isOpen}
@@ -1371,11 +1430,15 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           onMaximize={() => handleMaximizeWindow('concesionarias')}
         >
           <MachineryDealerWindow
-            dealers={simState.machineryDealers || DEFAULT_MACHINERY_DEALERS}
+            dealers={getDealersForSector(simState.machineryDealers || DEFAULT_MACHINERY_DEALERS, simState.retailSector)}
             ownedMachinery={simState.ownedMachinery || []}
             storeCash={simState.storeCash}
             storeBankBalance={simState.storeBankBalance}
+            retailSector={simState.retailSector}
+            creditProfile={simState.companyCreditProfile || calculateCompanyCreditScore(simState)}
+            commercialBanks={simState.commercialBanks}
             onBuyMachinery={handleBuyMachinery}
+            onFinanceEquipment={handleFinanceEquipment}
           />
         </RetroWindow>
       )}

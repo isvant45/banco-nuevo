@@ -28,17 +28,17 @@ export const RetroTitleScreen: React.FC<RetroTitleScreenProps> = ({
 }) => {
   const [isNewGameWizardOpen, setIsNewGameWizardOpen] = useState(false);
   const [roleMode, setRoleMode] = useState<'empresario' | 'banquero'>('empresario');
-  const [retailSector, setRetailSector] = useState<RetailSectorId>('minimarket');
-  const [entityName, setEntityName] = useState('Minimarket San Pedro');
+  const [retailSector, setRetailSector] = useState<RetailSectorId>('constructora');
+  const [entityName, setEntityName] = useState('Constructora Metropolitana');
   const [city, setCity] = useState('San Pedro Sula');
 
   const handleSelectRole = (mode: 'empresario' | 'banquero') => {
     sound.playClick();
     setRoleMode(mode);
     if (mode === 'empresario') {
-      if (retailSector === 'minimarket') setEntityName('Minimarket San Pedro');
+      if (retailSector === 'constructora') setEntityName('Constructora Metropolitana');
       else if (retailSector === 'bar_restaurante') setEntityName('Taberna & Café El Portal');
-      else setEntityName('Constructora Metropolitana');
+      else setEntityName('Minimarket San Pedro');
     } else {
       setEntityName('Banco Mercantil Áureo');
     }
@@ -183,13 +183,13 @@ export const RetroTitleScreen: React.FC<RetroTitleScreenProps> = ({
                       100% EMPRESARIO
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-sm">Dueño de Comercio</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">Empresario / Negocio Comercial</h3>
                   <p className="text-[11px] text-slate-600 mt-1">
-                    Vende en mostrador con caja registradora, ordena stock a proveedores y fija precios. Cero finanzas aburridas: el <strong>Banco Inteligente (IA)</strong> te ofrece préstamos y tarjetas corporativas automáticamente según tus ventas.
+                    Gestiona obras, licitaciones o ventas minoristas con caja registradora, personal y proveedores. Accede a tu <strong>Banco</strong> para solicitar préstamos amortizables, tarjetas de crédito corporativas con aumentos quincenales, cuentas corrientes negociables y financiamiento vehicular de flota.
                   </p>
                 </div>
                 <div className="mt-3 text-[10px] text-amber-900 font-semibold bg-amber-100/70 p-1 border border-amber-200">
-                  ✓ Incluye: POS, Almacén, Nómina y Banco IA
+                  ✓ Incluye: Banco, Crédito Amortizable, Concesionarias, Score Crediticio y SAR
                 </div>
               </div>
 

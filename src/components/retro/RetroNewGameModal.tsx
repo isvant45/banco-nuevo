@@ -105,9 +105,9 @@ export const RetroNewGameModal: React.FC<RetroNewGameModalProps> = ({
                       100% EMPRESARIO
                     </span>
                   </div>
-                  <span className="font-bold text-slate-900 block text-xs">Comercio & Ventas de Mostrador</span>
+                  <span className="font-bold text-slate-900 block text-xs">Empresario (Obras, Supermercado o Comida)</span>
                   <span className="text-[10px] text-slate-600 block mt-1">
-                    Cero finanzas bancarias: vendes en mostrador, pides inventario y el <strong>Banco Inteligente (IA)</strong> te financia automáticamente.
+                    Administra tus operaciones y accede a tu <strong>Banco</strong> para préstamos a cuotas, abonos a capital, tarjetas de crédito quincenales, cuentas corrientes con tasas negociables y concesionarias con financiamiento.
                   </span>
                 </div>
               </button>

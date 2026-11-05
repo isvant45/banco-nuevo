@@ -37,9 +37,8 @@ export default function App() {
       // fallback
     }
     const firstEnterprise = gameState.enterprises?.[0];
-    if (firstEnterprise?.sector === 'construccion') return 'constructora';
-    if (firstEnterprise?.sector === 'agroindustria_cafe') return 'bar_restaurante';
-    return 'minimarket';
+    if (firstEnterprise?.sector === 'supermercado' || firstEnterprise?.sector === 'tienda_retail') return 'minimarket';
+    return 'constructora';
   });
 
   // Persistir en cada cambio

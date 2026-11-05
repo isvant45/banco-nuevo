@@ -336,11 +336,11 @@ describe('Retail Business Engine: Gestión de Inventario, Ventas y Proveedores',
     // Aceptar facilidad de capital de trabajo (L 50,000)
     const accepted = acceptSmartBankFacility(mockState, 'fac-working-capital-1');
     assert.equal(accepted.updatedState.storeCash, 60000); // 10,000 + 50,000
-    assert.equal(accepted.updatedState.smartBankOffers.find(o => o.id === 'fac-working-capital-1')?.status, 'activo');
+    assert.equal(accepted.updatedState.smartBankOffers!.find(o => o.id === 'fac-working-capital-1')?.status, 'activo');
 
     // Amortizar cuota de L 4,500
     const repaid = repaySmartBankFacility(accepted.updatedState, 'fac-working-capital-1', 4500);
     assert.equal(repaid.updatedState.storeCash, 55500);
-    assert.equal(repaid.updatedState.smartBankOffers.find(o => o.id === 'fac-working-capital-1')?.balanceRemaining, 45500);
+    assert.equal(repaid.updatedState.smartBankOffers!.find(o => o.id === 'fac-working-capital-1')?.balanceRemaining, 45500);
   });
 });

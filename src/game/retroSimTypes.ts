@@ -237,6 +237,19 @@ export interface CommercialBankProfile {
   minMonthlySalesForCredit: number;
 }
 
+export interface CompanyCreditProfile {
+  score: number; // 300 - 850
+  tier: 'AAA_EXCELENTE' | 'AA_MUY_BUENO' | 'A_BUENO' | 'B_ACEPTABLE' | 'C_EN_RIESGO';
+  tierLabel: string;
+  onTimePaymentsStreak: number;
+  lastBiweeklyReviewDay: number;
+  totalCreditLimit: number;
+  creditUtilizationPct: number;
+  autoLimitIncreaseUnlocked: boolean;
+  rateDiscountPct: number;
+  dtiRatioPct: number;
+}
+
 export interface BankCommercialLoan {
   id: string;
   bankId: CommercialBankId;
@@ -246,6 +259,9 @@ export interface BankCommercialLoan {
   interestRateAnnual: number;
   termMonthsRemaining: number;
   purpose: string;
+  loanType?: 'capital_trabajo' | 'vehicular_equipo';
+  equipmentModel?: string;
+  amortizedPrincipalTotal?: number;
 }
 
 export interface BankCorporateCreditCard {
@@ -256,6 +272,9 @@ export interface BankCorporateCreditCard {
   currentBalance: number;
   interestRateAnnual: number;
   minPaymentMonthly: number;
+  lastLimitIncreaseDay?: number;
+  limitIncreasesCount?: number;
+  cashbackPct?: number;
 }
 
 export interface BankCheckingAccount {
@@ -264,6 +283,7 @@ export interface BankCheckingAccount {
   overdraftLimit: number;
   overdraftUsed: number;
   checksUsedCount: number;
+  interestRateAnnual?: number; // Tasa pasiva de rendimiento anual negociada
 }
 
 export interface BankGuaranteeDeposit {
@@ -293,18 +313,30 @@ export interface CommercialBankRelationship {
   corporateCard?: BankCorporateCreditCard;
   guaranteeDeposits: BankGuaranteeDeposit[];
   termDeposits: BankTermDeposit[];
+  negotiatedRateDiscount?: number;
 }
 
 // ----------------------------------------------------
-// Módulo de Maquinaria Pesada & Volquetas (1 a 5 Estrellas)
+// Módulo de Maquinaria, Vehículos Comerciales & Flota (1 a 5 Estrellas)
 // ----------------------------------------------------
 
 export type MachineryCategory = 
+  // Constructora
   | 'volqueta_14m3'
   | 'retroexcavadora_4x4'
   | 'camion_mixer'
   | 'grua_torre'
-  | 'motoniveladora';
+  | 'motoniveladora'
+  // Supermercado / Minimarket
+  | 'camion_refrigerado_3t'
+  | 'furgon_reparto'
+  | 'camara_frigorifica_industrial'
+  | 'montacargas_electrico'
+  // Bar / Restaurante / Comida
+  | 'flota_motos_delivery'
+  | 'van_utilitaria_reparto'
+  | 'horno_convector_industrial'
+  | 'linea_refrigeracion_acero';
 
 export interface MachineryDealer {
   id: string;
@@ -313,6 +345,7 @@ export interface MachineryDealer {
   ratingStars: 1 | 2 | 3 | 4 | 5;
   tagline: string;
   reputationDiscountPct: number;
+  applicableSectors?: RetailSectorId[];
   catalog: {
     id: string;
     modelName: string;
@@ -320,8 +353,9 @@ export interface MachineryDealer {
     icon: string;
     ratingStars: 1 | 2 | 3 | 4 | 5;
     priceHNL: number;
-    hourlyFuelCost: number; // Costo por hora operativa siendo dueño (L 150 vs L 950 alquilada)
+    hourlyFuelCost: number; // Costo por hora operativa siendo dueño vs alquilado
     description: string;
+    applicableSectors?: RetailSectorId[];
   }[];
 }
 
@@ -337,6 +371,7 @@ export interface OwnedMachineryUnit {
   conditionPct: number;
   totalHoursWorked: number;
   hourlyFuelCost: number;
+  financedWithBank?: CommercialBankId;
 }
 
 // ----------------------------------------------------
@@ -406,9 +441,9 @@ export interface DailySimulationState {
   dailyRent: number;
   monthlySalesAccumulated: number;
 
-  // Banco Inteligente Externo para la Empresa
-  smartBankOffers: SmartBankFacility[];
-  smartBankCreditRating: 'AAA' | 'AA' | 'A' | 'BBB' | 'B';
+  // Banco Inteligente Externo para la Empresa (Opcional / Legado)
+  smartBankOffers?: SmartBankFacility[];
+  smartBankCreditRating?: 'AAA' | 'AA' | 'A' | 'BBB' | 'B';
 
   // Modalidad Específica: Constructora & Obras de Infraestructura
   constructionMaterials: ConstructionMaterial[];
@@ -425,8 +460,16 @@ export interface DailySimulationState {
     penaltiesDeducted: number;
   }[];
 
-  // Ecosistema de 4 Bancos Comerciales Competidores
+  // Ecosistema de Bancos Comerciales & Servicios Financieros
   commercialBanks: Record<CommercialBankId, CommercialBankRelationship>;
+  companyCreditProfile?: CompanyCreditProfile;
+  creditNotifications?: {
+    id: string;
+    day: number;
+    message: string;
+    type: 'aumento_limite' | 'cuota_pagada' | 'alerta_mora' | 'descuento_tasa';
+    date: string;
+  }[];
   
   // Flota de Maquinaria Pesada & Concesionarias (1 a 5 Estrellas)
   ownedMachinery: OwnedMachineryUnit[];

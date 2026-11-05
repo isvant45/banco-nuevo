@@ -3,11 +3,12 @@ import {
   MachineryDealer, 
   OwnedMachineryUnit, 
   MaterialManufacturerQuote,
-  ConstructionMaterialOrder
+  ConstructionMaterialOrder,
+  RetailSectorId
 } from './retroSimTypes';
 
 /**
- * Catálogo Oficial de 5 Concesionarias de Maquinaria Pesada y Volquetas (1 a 5 Estrellas)
+ * Catálogo Oficial de Concesionarias de Maquinaria, Flota Comercial y Equipamiento (1 a 5 Estrellas)
  */
 export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
   {
@@ -17,6 +18,7 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
     ratingStars: 5,
     tagline: 'Distribuidor exclusivo Caterpillar: Máxima potencia, confiabilidad y durabilidad de obra',
     reputationDiscountPct: 0.05,
+    applicableSectors: ['constructora'],
     catalog: [
       {
         id: 'cat_volqueta_770',
@@ -26,7 +28,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 2350000,
         hourlyFuelCost: 220,
-        description: 'Capacidad 14m3 cúbicos con tolva para roca pesada y motor diésel de alta eficiencia.'
+        description: 'Capacidad 14m3 cúbicos con tolva para roca pesada y motor diésel de alta eficiencia.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'cat_retro_420',
@@ -36,7 +39,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 1850000,
         hourlyFuelCost: 180,
-        description: 'Brazo extensible de excavación con balde frontal de 1.0 m3 y tracción integral.'
+        description: 'Brazo extensible de excavación con balde frontal de 1.0 m3 y tracción integral.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'cat_mixer_ct660',
@@ -46,7 +50,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 2150000,
         hourlyFuelCost: 210,
-        description: 'Tambor mezclador hidráulico de alto rendimiento para concreto premezclado en obra.'
+        description: 'Tambor mezclador hidráulico de alto rendimiento para concreto premezclado en obra.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'cat_grua_potain',
@@ -56,7 +61,118 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 3100000,
         hourlyFuelCost: 260,
-        description: 'Alcance de pluma de 50 metros y capacidad de elevación de hasta 5 toneladas.'
+        description: 'Alcance de pluma de 50 metros y capacidad de elevación de hasta 5 toneladas.',
+        applicableSectors: ['constructora']
+      }
+    ]
+  },
+  {
+    id: 'hino_toyota_comercial',
+    name: 'HINO & Toyota Comercial Honduras',
+    city: 'San Pedro Sula (Bulevar del Norte)',
+    ratingStars: 5,
+    tagline: 'Líder en camiones de reparto, logística de frío y montacargas para supermercados',
+    reputationDiscountPct: 0.04,
+    applicableSectors: ['minimarket', 'constructora'],
+    catalog: [
+      {
+        id: 'hino_camion_refrigerado_300',
+        modelName: 'Camión Hino 300 Series Refrigerado (3.5T)',
+        category: 'camion_refrigerado_3t',
+        icon: '🚛',
+        ratingStars: 5,
+        priceHNL: 980000,
+        hourlyFuelCost: 120,
+        description: 'Furgón isotérmico con equipo Thermo King V-500. Conserva cadena de frío para lácteos y carnes.',
+        applicableSectors: ['minimarket']
+      },
+      {
+        id: 'toyota_montacargas_7fbe',
+        modelName: 'Montacargas Eléctrico Toyota 7FBE 2.5T',
+        category: 'montacargas_electrico',
+        icon: '🚜',
+        ratingStars: 5,
+        priceHNL: 420000,
+        hourlyFuelCost: 65,
+        description: 'Batería de litio para estiba rápida de tarimas en bodegas y pasillos de supermercado.',
+        applicableSectors: ['minimarket']
+      },
+      {
+        id: 'hyundai_furgon_h350',
+        modelName: 'Furgón Comercial Hyundai H350 Gran Capacidad',
+        category: 'furgon_reparto',
+        icon: '🚐',
+        ratingStars: 4,
+        priceHNL: 640000,
+        hourlyFuelCost: 95,
+        description: 'Capacidad de 12.9 m³ para abastecimiento diario desde mercados mayoristas.',
+        applicableSectors: ['minimarket', 'bar_restaurante']
+      },
+      {
+        id: 'camara_frigorifica_bitzer',
+        modelName: 'Cámara Frigorífica Industrial Modular 40m³',
+        category: 'camara_frigorifica_industrial',
+        icon: '❄️',
+        ratingStars: 5,
+        priceHNL: 490000,
+        hourlyFuelCost: 75,
+        description: 'Compresor semihermético Bitzer para almacenamiento prolongado sin mermas de stock.',
+        applicableSectors: ['minimarket', 'bar_restaurante']
+      }
+    ]
+  },
+  {
+    id: 'frio_movil_gastronomia',
+    name: 'Equipamiento Gastronómico & Logística Restaurantera',
+    city: 'Tegucigalpa / San Pedro Sula',
+    ratingStars: 5,
+    tagline: 'Flotas de delivery exprés, hornos combinados y estaciones frías para restaurantes',
+    reputationDiscountPct: 0.05,
+    applicableSectors: ['bar_restaurante', 'minimarket'],
+    catalog: [
+      {
+        id: 'honda_flota_motos_cargo',
+        modelName: 'Flota de 3 Motocicletas Honda Cargo 150cc',
+        category: 'flota_motos_delivery',
+        icon: '🛵',
+        ratingStars: 5,
+        priceHNL: 1650000 * 0.1, // L 165,000
+        hourlyFuelCost: 35,
+        description: 'Equipadas con baúles térmicos sellados para despachar 40 órdenes de comida por hora.',
+        applicableSectors: ['bar_restaurante']
+      },
+      {
+        id: 'peugeot_partner_refrigerada',
+        modelName: 'Van Refrigerada Peugeot Partner HDi',
+        category: 'van_utilitaria_reparto',
+        icon: '🚐',
+        ratingStars: 5,
+        priceHNL: 480000,
+        hourlyFuelCost: 80,
+        description: 'Transporte refrigerado urbano para abastecimiento de insumos frescos y catering.',
+        applicableSectors: ['bar_restaurante', 'minimarket']
+      },
+      {
+        id: 'rational_icombi_pro',
+        modelName: 'Horno Mixto Profesional Rational iCombi Pro 10',
+        category: 'horno_convector_industrial',
+        icon: '🍳',
+        ratingStars: 5,
+        priceHNL: 380000,
+        hourlyFuelCost: 60,
+        description: 'Cocción inteligente automatizada. Duplica la velocidad de preparación en horas pico.',
+        applicableSectors: ['bar_restaurante']
+      },
+      {
+        id: 'true_refrigeracion_linea',
+        modelName: 'Línea de Enfriamiento en Acero Inoxidable True',
+        category: 'linea_refrigeracion_acero',
+        icon: '🧊',
+        ratingStars: 4,
+        priceHNL: 290000,
+        hourlyFuelCost: 45,
+        description: 'Mesa de preparación con ensaladera y refrigerador bajo mostrador 100% acero grado alimenticio.',
+        applicableSectors: ['bar_restaurante']
       }
     ]
   },
@@ -67,6 +183,7 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
     ratingStars: 5,
     tagline: 'Ingeniería japonesa y estadounidense de alto rendimiento para infraestructura pesada',
     reputationDiscountPct: 0.04,
+    applicableSectors: ['constructora'],
     catalog: [
       {
         id: 'komatsu_retro_wb97',
@@ -76,7 +193,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 1750000,
         hourlyFuelCost: 175,
-        description: 'Sistema hidráulico HydrauMind con control sensible a la carga y bajo consumo.'
+        description: 'Sistema hidráulico HydrauMind con control sensible a la carga y bajo consumo.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'komatsu_volqueta_hd325',
@@ -86,7 +204,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 2280000,
         hourlyFuelCost: 215,
-        description: 'Chasis robusto con transmisión automática K-Atomics para acarreo continuo.'
+        description: 'Chasis robusto con transmisión automática K-Atomics para acarreo continuo.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'jd_motoniveladora_670g',
@@ -96,7 +215,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 5,
         priceHNL: 2550000,
         hourlyFuelCost: 195,
-        description: 'Cuchilla de 14 pies con transmisión Powershift para nivelación vial milimétrica.'
+        description: 'Cuchilla de 14 pies con transmisión Powershift para nivelación vial milimétrica.',
+        applicableSectors: ['constructora']
       }
     ]
   },
@@ -107,6 +227,7 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
     ratingStars: 4,
     tagline: 'Líder en excavación y acarreo con marcas británicas y americanas JCB y Case',
     reputationDiscountPct: 0.03,
+    applicableSectors: ['constructora'],
     catalog: [
       {
         id: 'jcb_retro_3cx',
@@ -116,7 +237,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 4,
         priceHNL: 1480000,
         hourlyFuelCost: 160,
-        description: 'Motor diésel EcoMax sin filtro de partículas. Fácil mantenimiento y repuestos.'
+        description: 'Motor diésel EcoMax sin filtro de partículas. Fácil mantenimiento y repuestos.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'intl_volqueta_workstar',
@@ -126,7 +248,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 4,
         priceHNL: 1820000,
         hourlyFuelCost: 190,
-        description: 'Ejes tándem de 46,000 lbs con motor Navistar de alto torque.'
+        description: 'Ejes tándem de 46,000 lbs con motor Navistar de alto torque.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'mack_mixer_granite',
@@ -136,7 +259,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 4,
         priceHNL: 1780000,
         hourlyFuelCost: 200,
-        description: 'Chasis CornerCap reforzado ideal para vaciados de concreto masivo.'
+        description: 'Chasis CornerCap reforzado ideal para vaciados de concreto masivo.',
+        applicableSectors: ['constructora']
       }
     ]
   },
@@ -147,6 +271,7 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
     ratingStars: 3,
     tagline: 'Equipos nuevos con excelente relación precio-calidad y entrega inmediata',
     reputationDiscountPct: 0.02,
+    applicableSectors: ['constructora', 'minimarket'],
     catalog: [
       {
         id: 'dongfeng_volqueta_kingrun',
@@ -156,7 +281,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 3,
         priceHNL: 1280000,
         hourlyFuelCost: 180,
-        description: 'Motor Cummins ISDe 270 con caja Eaton de 9 velocidades. Económica y fiable.'
+        description: 'Motor Cummins ISDe 270 con caja Eaton de 9 velocidades. Económica y fiable.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'sany_retro_bhl75',
@@ -166,7 +292,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 3,
         priceHNL: 1180000,
         hourlyFuelCost: 155,
-        description: 'Estructura ROPS/FOPS certificada con joystick electrohidráulico.'
+        description: 'Estructura ROPS/FOPS certificada con joystick electrohidráulico.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'sany_mixer_sy306',
@@ -176,7 +303,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 3,
         priceHNL: 1390000,
         hourlyFuelCost: 170,
-        description: 'Tambor de acero especial antidesgaste para obras comerciales y pavimentación.'
+        description: 'Tambor de acero especial antidesgaste para obras comerciales y pavimentación.',
+        applicableSectors: ['constructora']
       }
     ]
   },
@@ -187,6 +315,7 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
     ratingStars: 2,
     tagline: 'Maquinaria seminueva y reconstruida para contratistas que inician',
     reputationDiscountPct: 0.0,
+    applicableSectors: ['constructora', 'minimarket', 'bar_restaurante'],
     catalog: [
       {
         id: 'fl_volqueta_columbia_used',
@@ -196,7 +325,8 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 2,
         priceHNL: 780000,
         hourlyFuelCost: 240,
-        description: 'Motor Detroit DD13 reconstruido en taller local con tolva reacondicionada.'
+        description: 'Motor Detroit DD13 reconstruido en taller local con tolva reacondicionada.',
+        applicableSectors: ['constructora']
       },
       {
         id: 'case_retro_580m_used',
@@ -206,11 +336,31 @@ export const DEFAULT_MACHINERY_DEALERS: MachineryDealer[] = [
         ratingStars: 2,
         priceHNL: 690000,
         hourlyFuelCost: 210,
-        description: 'Bomba hidráulica nueva con pasadores y bujes reemplazados.'
+        description: 'Bomba hidráulica nueva con pasadores y bujes reemplazados.',
+        applicableSectors: ['constructora']
       }
     ]
   }
 ];
+
+/**
+ * Obtener Concesionarias y Equipamiento filtrado por sector
+ */
+export function getDealersForSector(dealers: MachineryDealer[] = DEFAULT_MACHINERY_DEALERS, sector: RetailSectorId): MachineryDealer[] {
+  return dealers
+    .map(dealer => {
+      const filteredCatalog = dealer.catalog.filter(item => {
+        if (!item.applicableSectors || item.applicableSectors.length === 0) return true;
+        return item.applicableSectors.includes(sector);
+      });
+
+      return {
+        ...dealer,
+        catalog: filteredCatalog
+      };
+    })
+    .filter(dealer => dealer.catalog.length > 0);
+}
 
 /**
  * Catálogo de Fabricantes para Licitación Mayorista de Materiales (1 a 5 Estrellas)

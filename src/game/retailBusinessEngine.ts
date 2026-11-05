@@ -606,12 +606,13 @@ export function acceptSmartBankFacility(
   state: DailySimulationState,
   facilityId: string
 ): { updatedState: DailySimulationState; message: string } {
-  const offer = state.smartBankOffers.find(o => o.id === facilityId);
+  const offers = state.smartBankOffers || DEFAULT_SMART_BANK_OFFERS;
+  const offer = offers.find(o => o.id === facilityId);
   if (!offer || offer.status !== 'disponible') {
     return { updatedState: state, message: 'Producto bancario no disponible.' };
   }
 
-  const updatedOffers = state.smartBankOffers.map(o => 
+  const updatedOffers = offers.map(o => 
     o.id === facilityId ? { ...o, status: 'activo' as const } : o
   );
 
@@ -632,7 +633,8 @@ export function repaySmartBankFacility(
   facilityId: string,
   paymentAmount: number
 ): { updatedState: DailySimulationState; message: string; error?: string } {
-  const offer = state.smartBankOffers.find(o => o.id === facilityId);
+  const offers = state.smartBankOffers || DEFAULT_SMART_BANK_OFFERS;
+  const offer = offers.find(o => o.id === facilityId);
   if (!offer || offer.status !== 'activo') {
     return { updatedState: state, message: '', error: 'Este crédito no se encuentra activo.' };
   }
@@ -648,7 +650,7 @@ export function repaySmartBankFacility(
   const newBalance = Math.max(0, offer.balanceRemaining - paymentAmount);
   const isPaid = newBalance === 0;
 
-  const updatedOffers = state.smartBankOffers.map(o =>
+  const updatedOffers = offers.map(o =>
     o.id === facilityId ? { ...o, balanceRemaining: newBalance, status: isPaid ? ('pagado' as const) : ('activo' as const) } : o
   );
 
