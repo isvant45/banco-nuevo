@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan integral de rediseño arquitectónico del simulador bancario Áureo Bank: depuración de 20 pestañas dispersas y módulos redundantes, consolidación en 5 Estaciones Centrales de Operaciones estilo Bloomberg Terminal, preservación de mecánicas financieras avanzadas (DPF, Back-to-Back revolvente sin cuota francesa, Sindicados y Rankings) y optimización de la experiencia de juego libre y competitivo.",
-  "updatedAt":  "2026-10-29T23:45:42.135765811Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Plan de implementación para la simulación avanzada de Constructora:\n- 4 Bancos Comerciales competidores (Ficohsa, Atlántida, BAC, Occidente) ofreciendo préstamos según capacidad, tarjetas de crédito corporativas, cuentas corrientes de cheques, depósitos en garantía y DPF a plazo fijo.\n- Licitación de materiales con empresas fabricantes de 1 a 5 estrellas con impacto en precio, calidad y durabilidad de obra.\n- Compra y licitación privada de maquinaria pesada y volquetas con 5 concesionarias nacionales (Camosa, Covesa, TMH, Dongfeng, Central).\n- Cálculo explícito de hombres/día por obra con impacto en cronograma si la cuadrilla es insuficiente.\n- Controles de avance temporal flexible: 1 día, 15 días (quincena) y 1 mes (30 días), con refresco dinámico de licitaciones y ofertas de crédito.\n- Optimización de física y arrastre fluido de todas las ventanas retro.",
+  "updatedAt": "2026-11-05T01:44:46.373991521Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

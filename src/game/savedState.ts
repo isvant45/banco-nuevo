@@ -77,5 +77,29 @@ export function restoreGameState(saved: unknown): GameState {
   if (!state.syndicatedLending) {
     state.syndicatedLending = structuredClone(INITIAL_GAME_STATE.syndicatedLending);
   }
+  if (!state.maDeals || state.maDeals.length === 0) {
+    state.maDeals = structuredClone(INITIAL_GAME_STATE.maDeals || []);
+  }
+  if (!state.macroNewsFeed || state.macroNewsFeed.length === 0) {
+    state.macroNewsFeed = structuredClone(INITIAL_GAME_STATE.macroNewsFeed || []);
+  }
+  if (!state.roleMode) {
+    state.roleMode = INITIAL_GAME_STATE.roleMode || 'grupo_empresarial';
+  }
+  if (!state.enterprises || state.enterprises.length === 0) {
+    state.enterprises = structuredClone(INITIAL_GAME_STATE.enterprises || []);
+  }
+  if (!state.selectedEnterpriseId) {
+    state.selectedEnterpriseId = state.enterprises[0]?.id || 'ent-001';
+  }
+  if (!state.lastCashFlowReport) {
+    state.lastCashFlowReport = structuredClone(INITIAL_GAME_STATE.lastCashFlowReport);
+  }
+  if (!state.lastCausalAudit) {
+    state.lastCausalAudit = structuredClone(INITIAL_GAME_STATE.lastCausalAudit);
+  }
+  if (!state.gameSetup) {
+    state.gameSetup = structuredClone(INITIAL_GAME_STATE.gameSetup);
+  }
   return state;
 }

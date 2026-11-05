@@ -1,0 +1,468 @@
+/**
+ * Tipos de datos para la simulación retro inspirada en Bank 2000 y el módulo de gestión empresarial aislada.
+ */
+
+export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora';
+
+export interface RetailProduct {
+  id: string;
+  name: string;
+  category: string;
+  icon: string;
+  stock: number;
+  unitCost: number; // Costo de compra al mayorista
+  sellingPrice: number; // Precio de venta al público en estantería
+  supplierDeliveryDays: number; // Días que tarda un pedido
+  minOrderUnits: number;
+  dailyDemandBase: number;
+  spoilageRatePct: number; // Merma
+}
+
+export interface SupplierOrder {
+  id: string;
+  productId: string;
+  productName: string;
+  units: number;
+  unitCost: number;
+  totalCost: number;
+  daysRemaining: number;
+  orderDate: string;
+}
+
+export interface RetailCustomerWalkIn {
+  id: string;
+  name: string;
+  avatar: string;
+  customerType: 'Estudiante' | 'Trabajador' | 'Familia' | 'Empresario' | 'Turista';
+  patience: number; // 0 a 100
+  budget: number;
+  cart: {
+    productId: string;
+    productName: string;
+    units: number;
+    unitPrice: number;
+    inStock: boolean;
+  }[];
+  isServed: boolean;
+  leftWithoutBuying: boolean;
+  leaveReason?: string;
+}
+
+export interface SalesReceipt {
+  id: string;
+  time: string;
+  day: number;
+  customerName: string;
+  itemsCount: number;
+  subtotal: number;
+  tax: number;
+  total: number;
+  costOfGoods: number;
+  paymentMethod: 'efectivo' | 'tarjeta';
+}
+
+export interface RealEstateAsset {
+  type: 'Casa de Habitación' | 'Apartamento' | 'Terreno Comercial' | 'Local / Bodega';
+  description: string;
+  location: string;
+  appraisedValue: number;
+}
+
+export interface VehicleAsset {
+  makeModel: string;
+  year: number;
+  plateNumber: string;
+  commercialValue: number;
+}
+
+export interface BankerDocketApplicant {
+  id: string;
+  dossierNumber: string;
+  applicantName: string;
+  avatar: string;
+  age: number;
+  city: string;
+  occupation: string;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  existingDebts: number;
+  creditScore: number; // 300 - 850 (Equifax)
+  cnbsCategory: 'I - Normal' | 'II - Especial' | 'III - Subnormal' | 'IV - Dudoso Recaudo' | 'V - Pérdida';
+  requestType: 'Prestamo Personal' | 'Credito Vehiculo' | 'Hipoteca Vivienda' | 'Credito Comercial Pyme' | 'Tarjeta Oro' | 'Cuenta Corriente';
+  requestedAmount: number;
+  proposedInterestRate: number; // % anual
+  termMonths: number;
+  purpose: string;
+  decisionStatus: 'pendiente' | 'aprobado' | 'rechazado';
+  stampedAt?: string;
+  adjustedAmount?: number;
+  adjustedRate?: number;
+  
+  // Patrimonio Real y Garantías para elevar monto o mejorar tasa
+  realEstateAssets: RealEstateAsset[];
+  vehicleAssets: VehicleAsset[];
+  totalCollateralValue: number;
+  collateralCoveragePct: number; // (totalCollateral / requestedAmount) * 100
+  rateDiscountApplied: number;
+  amountBonusApplied: number;
+
+  riskEvaluation: {
+    dtiRatioPct: number; // Ratio cuota / ingreso
+    lossProbabilityPct: number;
+    recommendedDecision: 'aprobar' | 'revisar' | 'rechazar';
+  };
+}
+
+export interface SmartBankFacility {
+  id: string;
+  title: string;
+  productType: 'prestamo_capital' | 'tarjeta_corporativa' | 'linea_sobregiro';
+  amount: number;
+  interestRateAnnual: number;
+  monthlyPayment: number;
+  termMonths: number;
+  status: 'disponible' | 'activo' | 'pagado';
+  balanceRemaining: number;
+  minMonthlySalesRequired: number;
+  description: string;
+}
+
+// ----------------------------------------------------
+// Módulo de Construcción & Licitaciones
+// ----------------------------------------------------
+
+export type ConstructionMaterialId = 
+  | 'cemento_gris'
+  | 'varilla_acero'
+  | 'bloque_concreto'
+  | 'tabla_encofrado'
+  | 'arena_grava'
+  | 'maquinaria_pesada';
+
+export interface ConstructionMaterial {
+  id: ConstructionMaterialId;
+  name: string;
+  unit: string; // 'Bolsa (42.5kg)', 'Quintal (100 lbs)', 'Millar (1,000 uds)', 'Docena (12 uds)', 'Metro Cúbico (m³)', 'Hora Máquina'
+  icon: string;
+  stock: number;
+  unitCost: number; // Costo por unidad HNL
+  minStockWarning: number;
+  supplierLeadDays: number;
+}
+
+export interface ConstructionMaterialOrder {
+  id: string;
+  materialId: ConstructionMaterialId;
+  materialName: string;
+  units: number;
+  unitCost: number;
+  totalCost: number;
+  daysRemaining: number;
+  orderDate: string;
+}
+
+export interface ConstructionRivalBid {
+  contractorName: string;
+  offeredPrice: number;
+  offeredDays: number;
+  reputationScore: number;
+}
+
+export interface ConstructionTender {
+  id: string;
+  title: string;
+  category: 'obra_publica' | 'obra_privada';
+  projectType: 'casa_residencial' | 'edificio_corporativo' | 'puente_vial' | 'nave_industrial' | 'pavimentacion_urbana';
+  clientName: string; // ej: "SIT - Secretaría de Infraestructura", "Inversiones del Valle S.A.", "Alcaldía del Distrito Central"
+  location: string;
+  referenceBudget: number; // Presupuesto oficial base HNL
+  durationDays: number; // Plazo oficial
+  requiredWorkersPerDay: number; // Hombres / Cuadrilla diaria requerida para cumplir el plazo
+  requiredMaterials: Record<ConstructionMaterialId, number>;
+  requiresSarSolvencia: boolean; // Requisito legal obligatorio en obras públicas
+  technicalReputationReq: number; // Mínimo 0-100
+  advancePaymentPct: number; // Anticipo (ej: 20%)
+  
+  status: 'convocatoria_abierta' | 'adjudicada_jugador' | 'adjudicada_rival' | 'desierta';
+  playerBid?: {
+    offeredPrice: number;
+    offeredDays: number;
+    submittedDay: number;
+  };
+  rivalBids: ConstructionRivalBid[];
+  winningBidder?: string;
+  awardedPrice?: number;
+}
+
+export interface ActiveConstructionWork {
+  id: string;
+  tenderId: string;
+  title: string;
+  clientName: string;
+  category: 'obra_publica' | 'obra_privada';
+  totalContractPrice: number;
+  advancePaymentReceived: number;
+  billedMilestonesAmount: number;
+  progressPct: number; // 0 - 100%
+  daysRemaining: number;
+  totalDaysEstimated: number;
+  requiredWorkersPerDay: number; // Hombres / Cuadrilla mínima diaria
+  laborEfficiencyPct: number; // Eficiencia según cuadrilla activa (0 - 150%)
+  requiredMaterialsTotal: Record<ConstructionMaterialId, number>;
+  materialsConsumed: Record<ConstructionMaterialId, number>;
+  dailyMaterialNeeds: Record<ConstructionMaterialId, number>;
+  isHaltedForMissingMaterials: boolean;
+  missingMaterialsList: string[];
+  delayFinesAccumulated: number;
+  status: 'en_ejecucion' | 'completada' | 'penalizada';
+  milestonesPaid: number; // 1, 2, 3 o 4
+}
+
+// ----------------------------------------------------
+// Módulo de 4 Bancos Comerciales Competidores
+// ----------------------------------------------------
+
+export type CommercialBankId = 'ficohsa' | 'atlantida' | 'bac' | 'occidente';
+
+export interface CommercialBankProfile {
+  id: CommercialBankId;
+  name: string;
+  shortName: string;
+  logo: string;
+  tagline: string;
+  colorHex: string;
+  baseInterestRateLoan: number; // % anual
+  baseDpfRate: number; // % pasiva
+  creditCardFeeAnnual: number;
+  minMonthlySalesForCredit: number;
+}
+
+export interface BankCommercialLoan {
+  id: string;
+  bankId: CommercialBankId;
+  principalAmount: number;
+  balanceRemaining: number;
+  monthlyPayment: number;
+  interestRateAnnual: number;
+  termMonthsRemaining: number;
+  purpose: string;
+}
+
+export interface BankCorporateCreditCard {
+  cardId: string;
+  bankId: CommercialBankId;
+  brand: string; // ej: "Visa Signature Corporativa"
+  creditLimit: number;
+  currentBalance: number;
+  interestRateAnnual: number;
+  minPaymentMonthly: number;
+}
+
+export interface BankCheckingAccount {
+  accountNumber: string;
+  balance: number;
+  overdraftLimit: number;
+  overdraftUsed: number;
+  checksUsedCount: number;
+}
+
+export interface BankGuaranteeDeposit {
+  id: string;
+  bankId: CommercialBankId;
+  amountPledged: number; // Monto inmovilizado
+  tenderIdRef?: string;
+  purpose: string; // "Fianza de Cumplimiento de Contrato"
+  status: 'activo' | 'liberado';
+}
+
+export interface BankTermDeposit {
+  id: string;
+  bankId: CommercialBankId;
+  principalAmount: number;
+  annualRatePct: number;
+  termDays: number;
+  daysRemaining: number;
+  accruedInterest: number;
+}
+
+export interface CommercialBankRelationship {
+  bankId: CommercialBankId;
+  relationshipScore: number; // 0 - 100
+  checkingAccount?: BankCheckingAccount;
+  activeLoan?: BankCommercialLoan;
+  corporateCard?: BankCorporateCreditCard;
+  guaranteeDeposits: BankGuaranteeDeposit[];
+  termDeposits: BankTermDeposit[];
+}
+
+// ----------------------------------------------------
+// Módulo de Maquinaria Pesada & Volquetas (1 a 5 Estrellas)
+// ----------------------------------------------------
+
+export type MachineryCategory = 
+  | 'volqueta_14m3'
+  | 'retroexcavadora_4x4'
+  | 'camion_mixer'
+  | 'grua_torre'
+  | 'motoniveladora';
+
+export interface MachineryDealer {
+  id: string;
+  name: string;
+  city: string;
+  ratingStars: 1 | 2 | 3 | 4 | 5;
+  tagline: string;
+  reputationDiscountPct: number;
+  catalog: {
+    id: string;
+    modelName: string;
+    category: MachineryCategory;
+    icon: string;
+    ratingStars: 1 | 2 | 3 | 4 | 5;
+    priceHNL: number;
+    hourlyFuelCost: number; // Costo por hora operativa siendo dueño (L 150 vs L 950 alquilada)
+    description: string;
+  }[];
+}
+
+export interface OwnedMachineryUnit {
+  id: string;
+  dealerId: string;
+  dealerName: string;
+  modelName: string;
+  category: MachineryCategory;
+  icon: string;
+  ratingStars: 1 | 2 | 3 | 4 | 5;
+  purchasePrice: number;
+  conditionPct: number;
+  totalHoursWorked: number;
+  hourlyFuelCost: number;
+}
+
+// ----------------------------------------------------
+// Módulo de Licitación de Materiales con Fabricantes (1 a 5 Estrellas)
+// ----------------------------------------------------
+
+export interface MaterialManufacturerQuote {
+  id: string;
+  manufacturerName: string;
+  materialId: ConstructionMaterialId;
+  ratingStars: 1 | 2 | 3 | 4 | 5;
+  unitCost: number;
+  discountPct: number; // Descuento por licitación
+  minBatchUnits: number;
+  deliveryDays: number;
+  qualityBadge: string;
+}
+
+// ----------------------------------------------------
+// Módulo de Auditoría Tributaria Anual SAR (Honduras)
+// ----------------------------------------------------
+
+export interface SarTaxAuditRecord {
+  taxYear: number;
+  grossRevenues: number; // Ingresos brutos por cobro de estimaciones de obra y ventas
+  deductibleMaterialsExpenses: number; // Facturas con CAI de compra de materiales
+  deductiblePayrollExpenses: number; // Planilla laboral con retenciones
+  deductibleOtherCosts: number; // Alquileres, combustible y depreciación
+  netTaxableIncome: number; // Base Imponible (Renta Neta Gravable)
+  taxRatePct: number; // 25% ISR en Honduras
+  isrTaxAmount: number; // Impuesto Sobre la Renta calculado
+  isPaid: boolean;
+  auditStatus: 'pendiente' | 'aprobada_conforme' | 'reparos_auditados';
+  solvenciaFiscalIssued: boolean;
+  solvenciaExpirationYear: number;
+  auditNotes: string[];
+}
+
+export interface DailySimulationState {
+  currentDay: number; // 1 - 30
+  currentMonth: number;
+  currentYear: number;
+  dailyHour: number; // 9 a 18
+  isDayClosed: boolean;
+  roleMode: 'empresario' | 'banquero'; // Estricto y binario
+  lastClosingSummary: {
+    revenue: number;
+    cogs: number;
+    operatingCosts: number;
+    netProfit: number;
+    events: string[];
+  } | null;
+
+  // Modalidad Empresario (100% Tienda / Bar / Construcción)
+  retailSector: RetailSectorId;
+  storeName: string;
+  storeCash: number; // Dinero físico en caja / tesorería
+  storeBankBalance: number; // En cuenta comercial externa
+  storeReputation: number; // 0 - 100
+  storeCleanliness: number;
+  products: RetailProduct[];
+  supplierOrders: SupplierOrder[];
+  walkInQueue: RetailCustomerWalkIn[];
+  dailyReceipts: SalesReceipt[];
+  staffCount: number;
+  dailyWages: number;
+  dailyRent: number;
+  monthlySalesAccumulated: number;
+
+  // Banco Inteligente Externo para la Empresa
+  smartBankOffers: SmartBankFacility[];
+  smartBankCreditRating: 'AAA' | 'AA' | 'A' | 'BBB' | 'B';
+
+  // Modalidad Específica: Constructora & Obras de Infraestructura
+  constructionMaterials: ConstructionMaterial[];
+  constructionOrders: ConstructionMaterialOrder[];
+  availableTenders: ConstructionTender[];
+  activeWorks: ActiveConstructionWork[];
+  completedWorksHistory: {
+    id: string;
+    title: string;
+    clientName: string;
+    contractPrice: number;
+    completionDay: number;
+    profitEarned: number;
+    penaltiesDeducted: number;
+  }[];
+
+  // Ecosistema de 4 Bancos Comerciales Competidores
+  commercialBanks: Record<CommercialBankId, CommercialBankRelationship>;
+  
+  // Flota de Maquinaria Pesada & Concesionarias (1 a 5 Estrellas)
+  ownedMachinery: OwnedMachineryUnit[];
+  machineryDealers: MachineryDealer[];
+
+  // Licitaciones de Materiales con Fabricantes (1 a 5 Estrellas)
+  materialManufacturerQuotes: MaterialManufacturerQuote[];
+
+  // Cumplimiento Tributario Anual del SAR (25% ISR y Solvencia Fiscal)
+  sarTaxRecord: SarTaxAuditRecord;
+  fiscalSolvenciaActive: boolean;
+
+  // Modalidad Banquero (100% Estilo Bank 2000)
+  bankerVaultCash: number; // Dinero físico en la bóveda
+  bankerBchReserve: number; // Encaje legal en BCH
+  bankerTotalDeposits: number; // Total depósitos del público
+  bankerDepositRatePct: number; // Tasa pasiva (%)
+  bankerMonthlyFee: number; // Comisión mantenimiento
+  bankerAtmFee: number; // Comisión cajero
+  bankerReputation: number; // Confianza pública (0-100)
+  bankerRunRiskPct: number; // Riesgo corrida (0-100)
+  docketQueue: BankerDocketApplicant[];
+  activeLoansCount: number;
+  totalLoanPortfolio: number;
+  delinquentLoansCount: number;
+  processedDocketsToday: number;
+  approvedAmountToday: number;
+  rejectedCountToday: number;
+
+  // Historial de auditoría
+  dailyHistory: {
+    day: number;
+    month: number;
+    revenue: number;
+    expenses: number;
+    netProfit: number;
+    summary: string;
+  }[];
+}

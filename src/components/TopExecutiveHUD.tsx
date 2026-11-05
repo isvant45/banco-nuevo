@@ -31,6 +31,8 @@ interface TopExecutiveHUDProps {
   onOpenFxForwards?: () => void;
   onOpenStressTesting?: () => void;
   onOpenExecutiveDilemmas?: () => void;
+  onOpenCausalAudit?: () => void;
+  onOpenNewGameSetup?: () => void;
 }
 
 export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
@@ -44,7 +46,9 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
   onOpenMonthlySummary,
   onOpenFxForwards,
   onOpenStressTesting,
-  onOpenExecutiveDilemmas
+  onOpenExecutiveDilemmas,
+  onOpenCausalAudit,
+  onOpenNewGameSetup
 }) => {
   const [isMuted, setIsMuted] = useState(sound.getMuted());
   const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
@@ -132,6 +136,12 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
       label: '5. TECNOLOGÍA & EFICIENCIA', 
       subtext: 'Árbol Tech 4 Ramas · Ahorro OPEX',
       badge: `Nivel ${state.digitalTechLevel}/5`
+    },
+    { 
+      id: 'enterprise_hub', 
+      label: '6. EMPRESAS & FILIALES', 
+      subtext: 'Supermercado · Café · Moda · Obras',
+      badge: `${(state.enterprises || []).length} Filiales`
     }
   ] as const;
 
@@ -146,12 +156,19 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm tracking-tight text-white">ÁUREO BANK</span>
+              <span className="font-extrabold text-sm tracking-tight text-white">{state.bankName || 'ÁUREO BANK'}</span>
               <span className="text-slate-400">·</span>
               <span className="text-amber-400 font-semibold">{fullLabel}</span>
-              <span className="text-slate-500 font-mono text-[11px]">(Turno {state.gameMonth})</span>
+              <span className="text-slate-500 font-mono text-[11px]">(Mes {state.gameMonth})</span>
             </div>
-            <p className="text-[11px] text-slate-400">Sistema Financiero de Honduras</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded font-semibold bg-amber-950/80 border border-amber-600/60 text-amber-300">
+                {state.roleMode === 'empresario' ? 'Modo: Empresario' : state.roleMode === 'banquero' ? 'Modo: Banquero' : 'Modo: Grupo Empresarial'}
+              </span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                {state.gameSetup?.startingCity ? `Sede: ${state.gameSetup.startingCity}` : 'Sistema Financiero de Honduras'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -186,6 +203,36 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
 
         {/* Acciones Rápidas, Auto-Timer y Cierre Mensual */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Botón Auditoría Causal */}
+          {onOpenCausalAudit && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenCausalAudit();
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Abrir Auditoría Causal de Flujo: ¿Por qué gané o perdí dinero?"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Auditoría Causal</span>
+            </button>
+          )}
+
+          {/* Botón Nueva Partida */}
+          {onOpenNewGameSetup && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenNewGameSetup();
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Iniciar nueva partida eligiendo rol (Empresario, Banquero, Grupo), capital y dificultad"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Nueva Partida</span>
+            </button>
+          )}
+
           {/* Botón Acceso a Dilemas de Junta Directiva */}
           {onOpenExecutiveDilemmas && (
             <button
@@ -333,17 +380,18 @@ export const TopExecutiveHUD: React.FC<TopExecutiveHUDProps> = ({
         </div>
       </div>
 
-      {/* Zona 2: Command Dock de 5 Estaciones Estilo Bloomberg Terminal */}
+      {/* Zona 2: Command Dock de Estaciones Centrales Estilo Bloomberg Terminal */}
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Navegación de 5 Estaciones Centrales */}
-        <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full md:w-auto">
+        {/* Navegación de Estaciones Centrales */}
+        <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full md:w-auto">
           {stationItems.map((item, idx) => {
             const isCurrent = activeTab === item.id || (
               (item.id === 'terminal_market' && ['league_rankings', 'campaign_missions', 'competitor_arena', 'overview'].includes(activeTab)) ||
               (item.id === 'core_banking' && ['back_to_back', 'term_deposits', 'demand_accounts', 'origination', 'divisions', 'pos_acquiring', 'clearing'].includes(activeTab)) ||
               (item.id === 'treasury_desk' && ['bch_money_desk', 'syndicated_lending', 'treasury_alm', 'corporate_trade', 'secondary_securities', 'treasury'].includes(activeTab)) ||
               (item.id === 'risk_compliance' && ['credit_risk', 'aml_compliance', 'sandbox_sar', 'sandbox', 'dividends'].includes(activeTab)) ||
-              (item.id === 'tech_modernization' && ['bank_tech_tree', 'advanced_ops', 'innovations'].includes(activeTab))
+              (item.id === 'tech_modernization' && ['bank_tech_tree', 'advanced_ops', 'innovations'].includes(activeTab)) ||
+              (item.id === 'enterprise_hub' && ['enterprises', 'enterprise_operations'].includes(activeTab))
             );
 
             return (

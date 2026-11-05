@@ -4,12 +4,13 @@ import { BankRankingsLeagueTab } from '../BankRankingsLeagueTab';
 import { CampaignMissionsTab } from '../CampaignMissionsTab';
 import { CompetitorArenaTab } from '../CompetitorArenaTab';
 import { OverviewDashboard } from '../OverviewDashboard';
+import { FinancialChartsView } from '../analytics/FinancialChartsView';
 import { sound } from '../../game/audioFx';
-import { Trophy, Target, Swords, LayoutDashboard } from 'lucide-react';
+import { Trophy, Target, Swords, LayoutDashboard, BarChart3 } from 'lucide-react';
 
 interface TerminalMarketStationProps {
   state: GameState;
-  initialSubView?: 'rankings' | 'campaign' | 'territory' | 'overview';
+  initialSubView?: 'rankings' | 'campaign' | 'territory' | 'overview' | 'analytics';
   onClaimCampaignReward: (missionId: string) => void;
   onExecuteMarketOffensive: (
     departmentId: string, 
@@ -17,6 +18,7 @@ interface TerminalMarketStationProps {
   ) => void;
   onSetMarketing: (marketing: GameState['marketingAggressiveness']) => void;
   onNavigateToTab: (tabId: string) => void;
+  onOpenAuditReportModal?: () => void;
 }
 
 export const TerminalMarketStation: React.FC<TerminalMarketStationProps> = ({
@@ -25,12 +27,14 @@ export const TerminalMarketStation: React.FC<TerminalMarketStationProps> = ({
   onClaimCampaignReward,
   onExecuteMarketOffensive,
   onSetMarketing,
-  onNavigateToTab
+  onNavigateToTab,
+  onOpenAuditReportModal
 }) => {
-  const [subView, setSubView] = useState<'rankings' | 'campaign' | 'territory' | 'overview'>(initialSubView);
+  const [subView, setSubView] = useState<'rankings' | 'campaign' | 'territory' | 'overview' | 'analytics'>(initialSubView);
 
   const subViews = [
     { id: 'rankings', label: 'League Tables & Rankings', icon: Trophy, count: '4 Tableros' },
+    { id: 'analytics', label: 'Analítica Financiera & Curva BCH', icon: BarChart3, count: '12 Meses' },
     { id: 'campaign', label: 'Campaña & Misiones', icon: Target, count: `Cap. ${state.campaignState?.currentChapter || 1}` },
     { id: 'territory', label: 'Arena Territorial', icon: Swords, count: '5 Deptos' },
     { id: 'overview', label: 'Resumen Ejecutivo', icon: LayoutDashboard, count: 'Cockpit' }
@@ -81,6 +85,13 @@ export const TerminalMarketStation: React.FC<TerminalMarketStationProps> = ({
         <BankRankingsLeagueTab
           state={state}
           onNavigateToTab={onNavigateToTab}
+        />
+      )}
+
+      {subView === 'analytics' && (
+        <FinancialChartsView
+          state={state}
+          onOpenAuditReportModal={onOpenAuditReportModal}
         />
       )}
 

@@ -5,23 +5,26 @@ import { SyndicatedLendingTab } from '../SyndicatedLendingTab';
 import { TreasuryAndAlmTab } from '../TreasuryAndAlmTab';
 import { CorporateTradeTab } from '../CorporateTradeTab';
 import { TreasuryMarketTab } from '../TreasuryMarketTab';
+import { BankMergersAcquisitionsTab } from '../ma/BankMergersAcquisitionsTab';
 import { sound } from '../../game/audioFx';
 import { 
   Building2, 
   Layers, 
   DollarSign, 
   Briefcase, 
-  TrendingUp 
+  TrendingUp,
+  Handshake
 } from 'lucide-react';
 
 interface TreasuryAlmStationProps {
   state: GameState;
-  initialSubView?: 'bch_money_desk' | 'syndicated_lending' | 'treasury_alm' | 'corporate_trade' | 'secondary_securities';
+  initialSubView?: 'bch_money_desk' | 'ma_deals' | 'syndicated_lending' | 'treasury_alm' | 'corporate_trade' | 'secondary_securities';
   onOpenRepo: (amountHNL: number, termDays: 7 | 14 | 28, ratePct: number) => void;
   onExecuteCallDeal: (bankId: CompetitorId, amountHNL: number, direction: 'prestar' | 'pedir_prestado') => void;
   onStructureSyndicatedDeal: (dealId: string, playerRole: 'Lead Arranger' | 'Participant', commitmentHNL?: number) => void;
   onTradeSpotUSD: (amountUSD: number, direction: 'comprar' | 'vender') => void;
   onBuyBchBill: (amountHNL: number, termMonths: number, yieldPct: number) => void;
+  onExecuteMaDeal?: (dealId: string) => void;
   onIssueLetterOfCredit: (params: {
     applicantName: string;
     beneficiaryName: string;
@@ -50,6 +53,7 @@ export const TreasuryAlmStation: React.FC<TreasuryAlmStationProps> = ({
   onStructureSyndicatedDeal,
   onTradeSpotUSD,
   onBuyBchBill,
+  onExecuteMaDeal,
   onIssueLetterOfCredit,
   onStructureTrust,
   onBuyBCHBond,
@@ -59,11 +63,12 @@ export const TreasuryAlmStation: React.FC<TreasuryAlmStationProps> = ({
   onSellSecondarySecurity,
   onNavigateTab
 }) => {
-  const [subView, setSubView] = useState<'bch_money_desk' | 'syndicated_lending' | 'treasury_alm' | 'corporate_trade' | 'secondary_securities'>(initialSubView);
+  const [subView, setSubView] = useState<'bch_money_desk' | 'ma_deals' | 'syndicated_lending' | 'treasury_alm' | 'corporate_trade' | 'secondary_securities'>(initialSubView);
 
   const activeSyndicatedDeals = (state.syndicatedLending?.activeDeals || []).length;
   const isReserveCompliant = state.financials.cashAndBCHReserves >= state.financials.requiredReserveAmount;
   const activeLcCount = (state.lettersOfCredit || []).length;
+  const availableMaDealsCount = (state.maDeals || []).filter(d => d.status === 'disponible').length;
 
   const subViews = [
     { 
@@ -71,6 +76,12 @@ export const TreasuryAlmStation: React.FC<TreasuryAlmStationProps> = ({
       label: 'Mesa de Dinero BCH', 
       icon: Building2, 
       count: isReserveCompliant ? 'Encaje 12% OK' : 'Déficit Encaje' 
+    },
+    { 
+      id: 'ma_deals', 
+      label: 'Fusiones & M&A', 
+      icon: Handshake, 
+      count: `${availableMaDealsCount} Oportunidades` 
     },
     { 
       id: 'syndicated_lending', 
@@ -145,6 +156,13 @@ export const TreasuryAlmStation: React.FC<TreasuryAlmStationProps> = ({
           onOpenRepo={onOpenRepo}
           onExecuteCallDeal={onExecuteCallDeal}
           onNavigateTab={onNavigateTab}
+        />
+      )}
+
+      {subView === 'ma_deals' && (
+        <BankMergersAcquisitionsTab
+          state={state}
+          onExecuteDeal={onExecuteMaDeal || (() => {})}
         />
       )}
 

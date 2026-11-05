@@ -44,7 +44,14 @@ import {
   CampaignState,
   TerritoryCompetitionState,
   BankTechTreeState,
-  SyndicatedLendingState
+  SyndicatedLendingState,
+  MergersAcquisitionsDeal,
+  MacroNewsItem,
+  RoleMode,
+  EnterpriseProfile,
+  CashFlowStatementReport,
+  MonthlyCausalAudit,
+  GameSetupProfile
 } from './types';
 
 export const INITIAL_COMPETITORS: CompetitorBank[] = [
@@ -5396,6 +5403,269 @@ export const INITIAL_SYNDICATED_STATE: SyndicatedLendingState = {
   reputationMultiplier: 1.25
 };
 
+export const INITIAL_MA_DEALS: MergersAcquisitionsDeal[] = [
+  {
+    id: 'MA-2026-001',
+    targetBankId: 'occidente',
+    targetBankName: 'Banco de Occidente',
+    dealType: 'cartera_pyme',
+    title: 'Adquisición de Cartera Cafetalera & Agroindustrial de Occidente',
+    description: 'Paquete de 140 créditos garantizados con fincas y warrants de café en Copán y Lempira. Excelente rendimiento activo con descuento por rebalanceo de liquidez de Occidente.',
+    faceValueHNL: 85000000,
+    purchasePriceHNL: 68000000,
+    discountPct: 20.0,
+    assetsAcquiredHNL: 85000000,
+    expectedAnnualYieldPct: 14.5,
+    status: 'disponible',
+    regulatoryHhiImpact: '+42 pts HHI (Bajo impacto competitivo)',
+    minimumCarRequiredPct: 11.5
+  },
+  {
+    id: 'MA-2026-002',
+    targetBankId: 'banpais',
+    targetBankName: 'Banpaís',
+    dealType: 'red_sucursales',
+    title: 'Absorción de 4 Agencias Comerciales en el Valle de Sula',
+    description: 'Traspaso de contratos de arrendamiento, infraestructura operativa y cartera de clientes en Choloma, Villanueva y El Progreso. Aumenta cuota de mercado en Cortés de inmediato.',
+    faceValueHNL: 45000000,
+    purchasePriceHNL: 36000000,
+    discountPct: 20.0,
+    assetsAcquiredHNL: 45000000,
+    expectedAnnualYieldPct: 12.0,
+    status: 'disponible',
+    regulatoryHhiImpact: '+65 pts HHI (Dictamen CNBS favorable)',
+    minimumCarRequiredPct: 12.0
+  },
+  {
+    id: 'MA-2026-003',
+    targetBankId: 'bac',
+    targetBankName: 'BAC Credomatic',
+    dealType: 'cartera_consumo',
+    title: 'Compra de Cartera de Tarjetas Oro & Platinum Premium',
+    description: 'Bloque de 2,200 tarjetahabientes de alto consumo con historial impecable en Equifax (Score > 740). Genera facturación recurrente e ingresos por comisiones de adquirencia.',
+    faceValueHNL: 120000000,
+    purchasePriceHNL: 98000000,
+    discountPct: 18.33,
+    assetsAcquiredHNL: 120000000,
+    expectedAnnualYieldPct: 24.0,
+    status: 'disponible',
+    regulatoryHhiImpact: '+88 pts HHI (Aprobación especial CNBS)',
+    minimumCarRequiredPct: 12.5
+  }
+];
+
+export const INITIAL_MACRO_NEWS: MacroNewsItem[] = [
+  {
+    id: 'news-001',
+    month: 1,
+    year: 2026,
+    category: 'bch_politica',
+    headline: 'BCH mantiene Tasa de Política Monetaria en 5.75% para contener inflación',
+    source: 'Boletín Oficial Banco Central de Honduras',
+    summary: 'La Comisión de Operaciones de Mercado Abierto ratificó la postura monetaria ante la estabilidad cambiaria del Lempira.',
+    impactLabel: 'Tasas activas y pasivas estables en el sistema',
+    tpmRateDelta: 0,
+    urgency: 'moderada'
+  },
+  {
+    id: 'news-002',
+    month: 1,
+    year: 2026,
+    category: 'mercado_cafe',
+    headline: 'Precios internacionales del café arábica suben +12% en Nueva York',
+    source: 'Reuters Commodities & IHCAFE',
+    summary: 'La cosecha hondureña 2025/2026 reporta alta demanda en Europa y Norteamérica, fortaleciendo el flujo de divisas exportadoras.',
+    impactLabel: 'Impulso a depósitos agroindustriales y liquidez en divisas',
+    exchangeRateDelta: -0.05,
+    urgency: 'alta'
+  },
+  {
+    id: 'news-003',
+    month: 1,
+    year: 2026,
+    category: 'divisas_remesas',
+    headline: 'Flujo de Remesas Familiares supera los $850M en el primer trimestre',
+    source: 'Sistema Monetario BCH',
+    summary: 'Comportamiento dinámico de transferencias desde Estados Unidos y España impulsa la captación en cuentas a la vista.',
+    impactLabel: 'Excedente de liquidez en ventanillas bancarias',
+    urgency: 'moderada'
+  }
+];
+
+export const INITIAL_ENTERPRISES: EnterpriseProfile[] = [
+  {
+    id: 'ent-001',
+    name: 'Supermercado Los Próceres',
+    sector: 'supermercado',
+    city: 'Tegucigalpa (Distrito Central)',
+    cashHNL: 650000,
+    rawMaterialsStockUnits: 18000,
+    finishedGoodsStockUnits: 14500,
+    unitCostHNL: 42,
+    sellingPriceHNL: 68,
+    monthlyProductionCapacityUnits: 25000,
+    employeeCount: 16,
+    averageMonthlySalaryHNL: 16500,
+    activeBankLoanHNL: 800000,
+    bankMonthlyPaymentHNL: 28000,
+    monthlyUnitsSold: 12800,
+    monthlyRevenueHNL: 870400,
+    monthlyCostOfGoodsHNL: 537600,
+    monthlyOpexHNL: 264000,
+    monthlyNetProfitHNL: 40800,
+    storageCapacityUnits: 30000,
+    supplierQuality: 'estandar',
+    description: 'Cadena de abarrotes y víveres de consumo masivo con alta rotación y flujo constante de caja.'
+  },
+  {
+    id: 'ent-002',
+    name: 'Café Export Copán & Especiales',
+    sector: 'agroindustria_cafe',
+    city: 'Santa Rosa de Copán',
+    cashHNL: 1250000,
+    rawMaterialsStockUnits: 9200,
+    finishedGoodsStockUnits: 7800,
+    unitCostHNL: 1350,
+    sellingPriceHNL: 2150,
+    monthlyProductionCapacityUnits: 10000,
+    employeeCount: 32,
+    averageMonthlySalaryHNL: 15200,
+    activeBankLoanHNL: 2500000,
+    bankMonthlyPaymentHNL: 85000,
+    monthlyUnitsSold: 2100,
+    monthlyRevenueHNL: 4515000,
+    monthlyCostOfGoodsHNL: 2835000,
+    monthlyOpexHNL: 486400,
+    monthlyNetProfitHNL: 1108600,
+    storageCapacityUnits: 15000,
+    supplierQuality: 'premium',
+    description: 'Beneficio ecológico y exportadora de café arábica con destino a mercados gourmet en EE.UU. y Europa.'
+  },
+  {
+    id: 'ent-003',
+    name: 'Tiendas Éxito Moda & Calzado',
+    sector: 'tienda_retail',
+    city: 'San Pedro Sula (Cortés)',
+    cashHNL: 480000,
+    rawMaterialsStockUnits: 6500,
+    finishedGoodsStockUnits: 5800,
+    unitCostHNL: 165,
+    sellingPriceHNL: 310,
+    monthlyProductionCapacityUnits: 8000,
+    employeeCount: 10,
+    averageMonthlySalaryHNL: 17000,
+    activeBankLoanHNL: 450000,
+    bankMonthlyPaymentHNL: 16500,
+    monthlyUnitsSold: 3200,
+    monthlyRevenueHNL: 992000,
+    monthlyCostOfGoodsHNL: 528000,
+    monthlyOpexHNL: 170000,
+    monthlyNetProfitHNL: 277500,
+    storageCapacityUnits: 10000,
+    supplierQuality: 'estandar',
+    description: 'Comercializadora de ropa, calzado y accesorios en el centro comercial metropolitano de SPS.'
+  },
+  {
+    id: 'ent-004',
+    name: 'Constructora & Prefabricados del Valle',
+    sector: 'construccion',
+    city: 'Choloma (Valle de Sula)',
+    cashHNL: 920000,
+    rawMaterialsStockUnits: 3400,
+    finishedGoodsStockUnits: 2800,
+    unitCostHNL: 720,
+    sellingPriceHNL: 1250,
+    monthlyProductionCapacityUnits: 5000,
+    employeeCount: 26,
+    averageMonthlySalaryHNL: 18500,
+    activeBankLoanHNL: 1800000,
+    bankMonthlyPaymentHNL: 62000,
+    monthlyUnitsSold: 1400,
+    monthlyRevenueHNL: 1750000,
+    monthlyCostOfGoodsHNL: 1008000,
+    monthlyOpexHNL: 481000,
+    monthlyNetProfitHNL: 199000,
+    storageCapacityUnits: 6000,
+    supplierQuality: 'premium',
+    description: 'Planta de bloques, adoquines y estructuras prefabricadas para proyectos de vivienda y naves industriales.'
+  }
+];
+
+export const INITIAL_CASH_FLOW_REPORT: CashFlowStatementReport = {
+  month: 1,
+  year: 2026,
+  beginningCashHNL: 310000000,
+  endingCashHNL: 345000000,
+  netCashChangeHNL: 35000000,
+  operatingCashFlowHNL: 28500000,
+  investingCashFlowHNL: -4200000,
+  financingCashFlowHNL: 10700000,
+  breakdown: {
+    collectionsFromSalesHNL: 42000000,
+    paymentsToSuppliersHNL: 12500000,
+    payrollPaidHNL: 7200000,
+    interestPaidHNL: 3800000,
+    interestReceivedHNL: 14800000,
+    taxesPaidHNL: 2100000,
+    newLoansReceivedHNL: 15000000,
+    debtRepaymentsHNL: 4300000,
+    capexOrPurchasesHNL: 4200000
+  }
+};
+
+export const INITIAL_CAUSAL_AUDIT: MonthlyCausalAudit = {
+  month: 1,
+  year: 2026,
+  roleMode: 'grupo_empresarial',
+  summaryTitle: 'Resumen Causal Mes 1: Margen Operativo Sólido y Expansión Controlada',
+  netProfitOrLossHNL: 48500000,
+  cashChangeHNL: 35000000,
+  factors: [
+    {
+      title: 'Margen Financiero y Comercial Favorable',
+      deltaHNL: 32000000,
+      impact: 'positivo',
+      category: 'ingresos_ventas',
+      explanation: 'La captación neta a tasas pasivas competitivas y la venta de inventarios comerciales generaron ingresos por encima de los costos directos.'
+    },
+    {
+      title: 'Cobranza Efectiva de Cuotas y Cuentas por Cobrar',
+      deltaHNL: 14800000,
+      impact: 'positivo',
+      category: 'intereses_fondos',
+      explanation: 'Los clientes pagaron puntualmente sus cuotas amortizando principal e intereses sin requerir ejecuciones forzosas.'
+    },
+    {
+      title: 'Gasto Operativo y Nóminas del Personal',
+      deltaHNL: -7200000,
+      impact: 'negativo',
+      category: 'gastos_fijos',
+      explanation: 'Compromiso contractual recurrente por sueldos de asesores, cajeros y personal de planta en tiendas y sucursales.'
+    },
+    {
+      title: 'Reposición de Inventario y Materia Prima',
+      deltaHNL: -12500000,
+      impact: 'negativo',
+      category: 'costo_mercancia',
+      explanation: 'Compra de inventario comercial y fertilizantes para mantener nivel óptimo de existencias ante pedidos proyectados.'
+    }
+  ],
+  projectedObligations30DaysHNL: 22000000,
+  projectedCashSurplusOrDeficitHNL: 123000000,
+  liquidityAlertText: 'Posición de liquidez robusta: las reservas de efectivo exceden los compromisos inmediatos a 30 días.',
+  recommendedAction: 'Mantener la disciplina de cobranza y evaluar reinversión en expansión de capacidad o préstamos sindicados.'
+};
+
+export const INITIAL_GAME_SETUP: GameSetupProfile = {
+  founderName: 'Director Ejecutivo',
+  entityName: 'Grupo Financiero & Empresarial Áureo',
+  roleMode: 'grupo_empresarial',
+  startingCity: 'San Pedro Sula',
+  difficulty: 'estandar',
+  initialCapitalHNL: 5000000,
+  isCustomGame: false
+};
+
 export const INITIAL_GAME_STATE: GameState = {
   bankName: 'Áureo Bank Honduras S.A.',
   gameMonth: 1,
@@ -5481,7 +5751,16 @@ export const INITIAL_GAME_STATE: GameState = {
   campaignState: INITIAL_CAMPAIGN_STATE,
   territoryCompetition: INITIAL_TERRITORY_STATE,
   bankTechTree: INITIAL_TECH_TREE_STATE,
-  syndicatedLending: INITIAL_SYNDICATED_STATE
+  syndicatedLending: INITIAL_SYNDICATED_STATE,
+  maDeals: INITIAL_MA_DEALS,
+  macroNewsFeed: INITIAL_MACRO_NEWS,
+  // Multimodal Role & Corporate Operations
+  roleMode: 'grupo_empresarial',
+  enterprises: INITIAL_ENTERPRISES,
+  selectedEnterpriseId: 'ent-001',
+  lastCashFlowReport: INITIAL_CASH_FLOW_REPORT,
+  lastCausalAudit: INITIAL_CAUSAL_AUDIT,
+  gameSetup: INITIAL_GAME_SETUP
 };
 
 

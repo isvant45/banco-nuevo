@@ -70,7 +70,16 @@ import {
   TechTreeNode,
   BankTechTreeState,
   SyndicatedLoanDeal,
-  SyndicatedLendingState
+  SyndicatedLendingState,
+  MacroNewsItem,
+  MergersAcquisitionsDeal,
+  RoleMode,
+  EnterpriseSector,
+  EnterpriseProfile,
+  CashFlowStatementReport,
+  CausalFactor,
+  MonthlyCausalAudit,
+  GameSetupProfile
 } from './types';
 import { 
   INITIAL_BANKING_PROGRAMS_20, 
@@ -83,7 +92,12 @@ import {
   INITIAL_CAMPAIGN_STATE,
   INITIAL_TERRITORY_STATE,
   INITIAL_TECH_TREE_STATE,
-  INITIAL_SYNDICATED_STATE
+  INITIAL_SYNDICATED_STATE,
+  INITIAL_ENTERPRISES,
+  INITIAL_CASH_FLOW_REPORT,
+  INITIAL_CAUSAL_AUDIT,
+  INITIAL_GAME_SETUP,
+  INITIAL_GAME_STATE
 } from './initialState';
 
 // Nombres y apellidos hondureños realistas para generación de expedientes y prospectos
@@ -1123,6 +1137,189 @@ export function advanceGameMonth(state: GameState): GameState {
   // 18. Motor de Dilemas Ejecutivos, Éticos y Crisis de Junta Directiva
   const newExecutiveDilemmas = advanceExecutiveDilemmasMonth(state, nextMonth);
 
+  // 19. Simulación Operativa Corporativa (Empresas: Supermercado, Café Export, Confección Moda, Constructora)
+  const currentEnterprises = state.enterprises && state.enterprises.length > 0 ? state.enterprises : INITIAL_ENTERPRISES;
+  let totalEnterpriseSales = 0;
+  let totalEnterpriseCogs = 0;
+  let totalEnterprisePayroll = 0;
+  let totalEnterpriseOverhead = 0;
+  let totalEnterpriseInterestPaidToBank = 0;
+  let totalEnterprisePrincipalPaidToBank = 0;
+
+  const updatedEnterprises: EnterpriseProfile[] = currentEnterprises.map(ent => {
+    // a. Producción y consumo de insumos
+    const capacity = ent.monthlyProductionCapacityUnits;
+    const availableRaw = ent.rawMaterialsStockUnits;
+    const unitsProduced = Math.min(capacity, availableRaw);
+    const newRawStock = Math.max(0, availableRaw - unitsProduced);
+    const availableFinished = ent.finishedGoodsStockUnits + unitsProduced;
+
+    // b. Demanda y ventas según elasticidad precio y ciclo económico
+    const sentimentMultiplier = (sentiment === 'Crecimiento Sólido') ? 1.15 : (sentiment === 'Crisis de Liquidez' || sentiment === 'Desaceleración') ? 0.85 : 1.0;
+    const targetDemand = ent.monthlyUnitsSold > 0 ? ent.monthlyUnitsSold : Math.round(capacity * 0.75);
+    const calculatedDemand = Math.round(targetDemand * sentimentMultiplier);
+    const unitsSold = Math.min(availableFinished, calculatedDemand);
+    const remainingFinished = Math.max(0, availableFinished - unitsSold);
+
+    // c. Ingresos y costos
+    const salesRevenue = unitsSold * ent.sellingPriceHNL;
+    const cogs = unitsSold * ent.unitCostHNL;
+    const payroll = ent.employeeCount * ent.averageMonthlySalaryHNL;
+    const monthlyInterest = Math.round(ent.activeBankLoanHNL * 0.012);
+    const principalAmortization = ent.activeBankLoanHNL > 0 ? Math.min(ent.activeBankLoanHNL, Math.round(ent.bankMonthlyPaymentHNL * 0.7)) : 0;
+    const opex = ent.monthlyOpexHNL;
+
+    // d. Flujo de caja empresarial y balances
+    const operatingInflow = salesRevenue;
+    const operatingOutflow = cogs + payroll + opex + monthlyInterest + principalAmortization;
+    const netCashDelta = operatingInflow - operatingOutflow;
+    const newCash = Math.max(0, ent.cashHNL + netCashDelta);
+    const newDebt = Math.max(0, ent.activeBankLoanHNL - principalAmortization);
+    const monthlyProfit = salesRevenue - (cogs + payroll + opex + monthlyInterest);
+
+    totalEnterpriseSales += salesRevenue;
+    totalEnterpriseCogs += cogs;
+    totalEnterprisePayroll += payroll;
+    totalEnterpriseOverhead += opex;
+    totalEnterpriseInterestPaidToBank += monthlyInterest;
+    totalEnterprisePrincipalPaidToBank += principalAmortization;
+
+    return {
+      ...ent,
+      rawMaterialsStockUnits: newRawStock,
+      finishedGoodsStockUnits: remainingFinished,
+      cashHNL: newCash,
+      activeBankLoanHNL: newDebt,
+      monthlyUnitsSold: unitsSold,
+      monthlyRevenueHNL: salesRevenue,
+      monthlyCostOfGoodsHNL: cogs,
+      monthlyOpexHNL: opex,
+      monthlyNetProfitHNL: monthlyProfit
+    };
+  });
+
+  // 20. Generación Dinámica del Estado de Flujo de Efectivo (Cash Flow Statement)
+  const isConglomerate = (state.roleMode || 'grupo_empresarial') === 'grupo_empresarial';
+  const isEnterpriseOnly = (state.roleMode || 'grupo_empresarial') === 'empresario';
+
+  const bankInterestReceived = totalInterestCollectedHNL || 14800000;
+  const bankInterestPaid = totalDepositInterestCapitalizedHNL || 3800000;
+
+  const collectionsFromSales = isEnterpriseOnly || isConglomerate ? totalEnterpriseSales : 0;
+  const paymentsToSuppliers = isEnterpriseOnly || isConglomerate ? totalEnterpriseCogs : 0;
+  const payrollPaid = isEnterpriseOnly ? totalEnterprisePayroll : (isConglomerate ? totalEnterprisePayroll + (state.financials.totalOperatingExpense * 0.45) : (state.financials.totalOperatingExpense * 0.45));
+  const interestReceived = isEnterpriseOnly ? 0 : bankInterestReceived + (isConglomerate ? totalEnterpriseInterestPaidToBank : 0);
+  const interestPaid = isEnterpriseOnly ? totalEnterpriseInterestPaidToBank : bankInterestPaid;
+  const taxesPaid = Math.max(0, Math.round(netIncome * 0.15));
+
+  const operatingCashFlow = (collectionsFromSales + interestReceived) - (paymentsToSuppliers + payrollPaid + interestPaid + taxesPaid);
+  const investingCashFlow = -Math.round(4200000 + (Math.random() * 800000));
+  const financingCashFlow = isEnterpriseOnly 
+    ? -totalEnterprisePrincipalPaidToBank 
+    : Math.round(totalAmortizationCollectedHNL * 0.2 + (depositDelta * 0.4));
+  const netCashFlow = operatingCashFlow + investingCashFlow + financingCashFlow;
+
+  const currentCash = isEnterpriseOnly 
+    ? updatedEnterprises.reduce((acc, e) => acc + e.cashHNL, 0)
+    : updatedFinancials.cashAndBCHReserves;
+
+  const monthlyCashFlowReport: CashFlowStatementReport = {
+    month: nextMonth,
+    year: currentYear,
+    beginningCashHNL: Math.max(0, currentCash - netCashFlow),
+    endingCashHNL: currentCash,
+    netCashChangeHNL: netCashFlow,
+    operatingCashFlowHNL: operatingCashFlow,
+    investingCashFlowHNL: investingCashFlow,
+    financingCashFlowHNL: financingCashFlow,
+    breakdown: {
+      collectionsFromSalesHNL: Math.round(collectionsFromSales),
+      paymentsToSuppliersHNL: Math.round(paymentsToSuppliers),
+      payrollPaidHNL: Math.round(payrollPaid),
+      interestPaidHNL: Math.round(interestPaid),
+      interestReceivedHNL: Math.round(interestReceived),
+      taxesPaidHNL: Math.round(taxesPaid),
+      newLoansReceivedHNL: isConglomerate ? 8000000 : 0,
+      debtRepaymentsHNL: Math.round(totalEnterprisePrincipalPaidToBank + (isEnterpriseOnly ? 0 : 2500000)),
+      capexOrPurchasesHNL: Math.abs(investingCashFlow)
+    }
+  };
+
+  // 21. Auditoría Causal Mensual ("¿Por qué gané o perdí dinero?")
+  const causalFactors: CausalFactor[] = [];
+
+  if (collectionsFromSales > 0) {
+    causalFactors.push({
+      title: 'Facturación Comercial de Filiales',
+      deltaHNL: Math.round(collectionsFromSales),
+      impact: 'positivo',
+      category: 'ingresos_ventas',
+      explanation: `Las filiales comercializaron productos (supermercados, café, moda, construcción) con un volumen total de ${formatHNL(collectionsFromSales)}.`
+    });
+  }
+
+  if (interestReceived > 0) {
+    causalFactors.push({
+      title: 'Margen de Intereses de Cartera Bancaria',
+      deltaHNL: Math.round(interestReceived),
+      impact: 'positivo',
+      category: 'intereses_fondos',
+      explanation: `Cobranza de intereses sobre préstamos vigentes e inversiones de tesorería, rindiendo ${formatHNL(interestReceived)}.`
+    });
+  }
+
+  if (paymentsToSuppliers > 0) {
+    causalFactors.push({
+      title: 'Costo Directo de Mercaderías y Materia Prima',
+      deltaHNL: -Math.round(paymentsToSuppliers),
+      impact: 'negativo',
+      category: 'costo_mercancia',
+      explanation: `Insumos agrícolas, alimentos y telas adquiridos para abastecer los pedidos y mantener inventarios seguros.`
+    });
+  }
+
+  causalFactors.push({
+    title: 'Compromiso de Planilla y Recursos Humanos',
+    deltaHNL: -Math.round(payrollPaid),
+    impact: 'negativo',
+    category: 'gastos_fijos',
+    explanation: `Sueldos contractuales, cargas sociales y honorarios devengados en agencias y plantas productivas.`
+  });
+
+  if (interestPaid > 0) {
+    causalFactors.push({
+      title: 'Costo Financiero de Fondeo y Depósitos',
+      deltaHNL: -Math.round(interestPaid),
+      impact: 'negativo',
+      category: 'intereses_fondos',
+      explanation: `Rendimientos capitalizados a depositantes de plazo fijo y ahorrantes según la tasa pasiva ofrecida.`
+    });
+  }
+
+  const projectedObligations30Days = Math.round(payrollPaid + (interestPaid * 1.1) + totalEnterpriseOverhead + 5000000);
+  const projectedSurplus = currentCash - projectedObligations30Days;
+  const isHealthyLiquidity = projectedSurplus > 0;
+
+  const monthlyCausalAudit: MonthlyCausalAudit = {
+    month: nextMonth,
+    year: currentYear,
+    roleMode: state.roleMode || 'grupo_empresarial',
+    summaryTitle: netIncome >= 0 
+      ? `Auditoría Causal Mes ${nextMonth}: Utilidad de ${formatHNL(netIncome)} impulsada por márgenes operativos y disciplina de cobro`
+      : `Auditoría Causal Mes ${nextMonth}: Pérdida de ${formatHNL(Math.abs(netIncome))} por presión de costos de fondeo y reposición de stock`,
+    netProfitOrLossHNL: netIncome,
+    cashChangeHNL: netCashFlow,
+    factors: causalFactors,
+    projectedObligations30DaysHNL: projectedObligations30Days,
+    projectedCashSurplusOrDeficitHNL: projectedSurplus,
+    liquidityAlertText: isHealthyLiquidity
+      ? `Posición de liquidez robusta: la tesorería proyecta cubrir ampliamente los egresos a 30 días (${formatHNL(projectedSurplus)} de excedente).`
+      : `¡Alerta de Liquidez!: Los compromisos a 30 días superan la caja proyectada por ${formatHNL(Math.abs(projectedSurplus))}. Se recomienda captar depósitos o reducir compras de stock.`,
+    recommendedAction: isHealthyLiquidity
+      ? 'Acelerar colocación en crédito productivo de bajo riesgo y optimizar precios en tiendas con alta demanda.'
+      : 'Suspender compras de inventario no esenciales y abrir líneas interbancarias BCH de liquidez.'
+  };
+
   const closingState: GameState = {
     ...state,
     gameMonth: nextMonth,
@@ -1176,7 +1373,30 @@ export function advanceGameMonth(state: GameState): GameState {
     campaignState: state.campaignState,
     territoryCompetition: state.territoryCompetition,
     bankTechTree: state.bankTechTree,
-    syndicatedLending: state.syndicatedLending
+    syndicatedLending: state.syndicatedLending,
+    maDeals: state.maDeals,
+    roleMode: state.roleMode || 'grupo_empresarial',
+    enterprises: updatedEnterprises,
+    selectedEnterpriseId: state.selectedEnterpriseId || (updatedEnterprises[0]?.id ?? 'ent-001'),
+    lastCashFlowReport: monthlyCashFlowReport,
+    lastCausalAudit: monthlyCausalAudit,
+    gameSetup: state.gameSetup,
+    macroNewsFeed: [
+      {
+        id: `news-m${nextMonth}-${Date.now()}`,
+        month: nextMonth,
+        year: currentYear,
+        category: (newInflation > 5.2 ? 'crisis_global' : 'bch_politica') as MacroNewsItem['category'],
+        headline: newInflation > 5.2
+          ? `Presión Macroeconómica: Inflación interanual se ubica en ${newInflation}%`
+          : `BCH reafirma disciplina monetaria con TPM en ${newTPM}%`,
+        source: 'Dirección de Estudios Económicos BCH',
+        summary: `Evaluación macroeconómica para el ciclo ${fullLabel}: se registran variaciones en el mercado cambiario con tipo de cambio en L. ${newExchangeRate} por USD.`,
+        impactLabel: newInflation > 5.2 ? 'Monitorear spread y costo de depósitos a plazo' : 'Condiciones crediticias e interbancarias estables',
+        urgency: (newInflation > 5.2 ? 'alta' : 'moderada') as MacroNewsItem['urgency']
+      },
+      ...(state.macroNewsFeed || [])
+    ].slice(0, 8)
   };
 
   return evaluateCampaignProgress(closingState);
@@ -6899,6 +7119,531 @@ export function structureSyndicatedLoanDeal(
   return {
     updatedState: evaluatedState,
     successMessage: msg
+  };
+}
+
+/**
+ * Ejecuta una operación de Fusiones y Adquisiciones (M&A) interbancaria.
+ * Permite comprar carteras de crédito de bancos rivales (consumo, pyme, agro)
+ * o adquirir redes de sucursales con validación antimonopolio y CAR regulatorio de CNBS.
+ */
+export function executeMergersAcquisitionDeal(
+  state: GameState,
+  dealId: string
+): { updatedState: GameState; successMessage?: string; errorMessage?: string } {
+  const deals = state.maDeals || [];
+  const deal = deals.find(d => d.id === dealId);
+  if (!deal) {
+    return { updatedState: state, errorMessage: `No se encontró la transacción de M&A ${dealId}.` };
+  }
+
+  if (deal.status === 'ejecutado') {
+    return { updatedState: state, errorMessage: `La transacción de M&A ${deal.title} ya fue ejecutada con anterioridad.` };
+  }
+
+  if (state.financials.cashAndBCHReserves < deal.purchasePriceHNL) {
+    return {
+      updatedState: state,
+      errorMessage: `Fondos de tesorería insuficientes. Áureo Bank dispone de ${formatHNL(state.financials.cashAndBCHReserves)} en caja y reservas BCH, pero la transacción requiere ${formatHNL(deal.purchasePriceHNL)}.`
+    };
+  }
+
+  const currentCAR = state.financials.capitalAdequacyRatioCAR;
+  if (currentCAR < deal.minimumCarRequiredPct) {
+    return {
+      updatedState: state,
+      errorMessage: `Objeción Regulatoria CNBS: El Índice de Adecuación de Capital (CAR) actual de Áureo Bank es ${currentCAR.toFixed(2)}%, inferior al mínimo regulatorio exigido para esta adquisición (${deal.minimumCarRequiredPct.toFixed(2)}%).`
+    };
+  }
+
+  // Actualizar banco vendedor rival
+  const updatedCompetitors = state.competitors.map(comp => {
+    if (comp.id === deal.targetBankId) {
+      const newAssets = Math.max(1000000000, comp.assets - deal.assetsAcquiredHNL);
+      return {
+        ...comp,
+        assets: newAssets
+      };
+    }
+    return comp;
+  });
+
+  const playerAssetsAfter = state.financials.totalAssets + (deal.assetsAcquiredHNL - deal.purchasePriceHNL);
+  const totalSystemAssets = updatedCompetitors.reduce((acc, c) => acc + c.assets, 0) + playerAssetsAfter;
+  const competitorsWithShares = updatedCompetitors.map(c => ({
+    ...c,
+    marketShare: +((c.assets / totalSystemAssets) * 100).toFixed(2)
+  }));
+
+  let divisionToCredit: BankingDivisionId = 'corporativa';
+  if (deal.dealType === 'cartera_consumo') {
+    divisionToCredit = 'personas';
+  } else if (deal.dealType === 'cartera_pyme') {
+    divisionToCredit = 'pyme';
+  }
+
+  const updatedDivisions = { ...state.divisions };
+  if (updatedDivisions[divisionToCredit]) {
+    updatedDivisions[divisionToCredit] = {
+      ...updatedDivisions[divisionToCredit],
+      totalLoans: updatedDivisions[divisionToCredit].totalLoans + deal.assetsAcquiredHNL,
+      clientCount: updatedDivisions[divisionToCredit].clientCount + (deal.dealType === 'cartera_consumo' ? 2200 : deal.dealType === 'cartera_pyme' ? 450 : 25)
+    };
+  }
+
+  const updatedBranches = [...state.branches];
+  if (deal.dealType === 'red_sucursales') {
+    for (let i = 1; i <= 4; i++) {
+      updatedBranches.push({
+        id: `branch-ma-${Date.now()}-${i}`,
+        cityName: i % 2 === 0 ? 'San Pedro Sula' : 'Choloma',
+        zone: 'Valle de Sula (Cortés)',
+        tier: 'Agencia Completa',
+        isOpen: true,
+        costToOpen: 0,
+        monthlyOpex: 140000,
+        capturedDepositsM: 45,
+        loansDisbursedM: 38,
+        staffAssigned: 6
+      });
+    }
+  }
+
+  const bargainGain = Math.max(0, deal.faceValueHNL - deal.purchasePriceHNL);
+  const updatedFinancials: BankFinancialStatements = {
+    ...state.financials,
+    cashAndBCHReserves: state.financials.cashAndBCHReserves - deal.purchasePriceHNL,
+    loanPortfolioCurrent: state.financials.loanPortfolioCurrent + deal.assetsAcquiredHNL,
+    totalAssets: state.financials.totalAssets + (deal.assetsAcquiredHNL - deal.purchasePriceHNL),
+    retainedEarnings: state.financials.retainedEarnings + bargainGain,
+    totalEquity: state.financials.totalEquity + bargainGain
+  };
+
+  const updatedDeals = deals.map(d => {
+    if (d.id === dealId) {
+      return { ...d, status: 'ejecutado' as const };
+    }
+    return d;
+  });
+
+  const notif: GameEventNotification = {
+    id: `notif-ma-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    type: 'corporate_deal',
+    title: `M&A Cerrado: ${deal.title}`,
+    message: `Áureo Bank adquirió la cartera de ${deal.targetBankName} por ${formatHNL(deal.purchasePriceHNL)} (${deal.discountPct}% de descuento).`,
+    impactSummary: `Activos incorporados: +${formatHNL(deal.assetsAcquiredHNL)} · Dictamen CNBS: ${deal.regulatoryHhiImpact}.`
+  };
+
+  const newNews: MacroNewsItem = {
+    id: `news-ma-${Date.now()}`,
+    month: state.gameMonth,
+    year: state.bch.year,
+    category: 'regulacion_cnbs',
+    headline: `CNBS autoriza adquisición de ${deal.title} por Áureo Bank`,
+    source: 'Superintendencia de Bancos CNBS',
+    summary: `La operación con ${deal.targetBankName} fue ratificada con dictamen de competencia favorable (${deal.regulatoryHhiImpact}).`,
+    impactLabel: `Consolidación de cuota de mercado en el sistema financiero hondureño`,
+    urgency: 'alta'
+  };
+
+  const nextState: GameState = {
+    ...state,
+    competitors: competitorsWithShares,
+    divisions: updatedDivisions,
+    branches: updatedBranches,
+    financials: updatedFinancials,
+    maDeals: updatedDeals,
+    macroNewsFeed: [newNews, ...(state.macroNewsFeed || [])],
+    notifications: [notif, ...state.notifications]
+  };
+
+  const evaluatedState = evaluateCampaignProgress(nextState);
+
+  return {
+    updatedState: evaluatedState,
+    successMessage: `¡Operación de Fusiones y Adquisiciones ${deal.id} ejecutada con éxito! Se han transferido los activos por ${formatHNL(deal.assetsAcquiredHNL)} a Áureo Bank.`
+  };
+}
+
+/**
+ * Compra de materia prima o inventario para una empresa operativa
+ */
+export function purchaseRawMaterials(
+  state: GameState,
+  enterpriseId: string,
+  units: number
+): { updatedState: GameState; successMessage: string } {
+  if (units <= 0) return { updatedState: state, successMessage: 'La cantidad debe ser mayor a 0.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  const totalCost = Math.round(units * enterprise.unitCostHNL);
+  if (enterprise.cashHNL < totalCost) {
+    return {
+      updatedState: state,
+      successMessage: `Fondos insuficientes: ${enterprise.name} requiere ${formatHNL(totalCost)} pero solo dispone de ${formatHNL(enterprise.cashHNL)} en caja.`
+    };
+  }
+
+  const updatedEnterprises = enterpriseList.map(e => {
+    if (e.id !== enterpriseId) return e;
+    return {
+      ...e,
+      cashHNL: e.cashHNL - totalCost,
+      rawMaterialsStockUnits: e.rawMaterialsStockUnits + units
+    };
+  });
+
+  const rawLabel = enterprise.sector === 'agroindustria_cafe' ? 'Café pergamino' : enterprise.sector === 'construccion' ? 'Insumos y áridos' : enterprise.sector === 'supermercado' ? 'Mercadería y perecederos' : 'Telas y mercería';
+
+  return {
+    updatedState: {
+      ...state,
+      enterprises: updatedEnterprises
+    },
+    successMessage: `Orden de compra completada: +${units.toLocaleString()} unidades de ${rawLabel} adquiridas por ${formatHNL(totalCost)} para ${enterprise.name}.`
+  };
+}
+
+/**
+ * Ajuste de precio unitario de venta con cálculo de elasticidad
+ */
+export function adjustEnterprisePricing(
+  state: GameState,
+  enterpriseId: string,
+  newPriceHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (newPriceHNL <= 0) return { updatedState: state, successMessage: 'El precio debe ser superior a L. 0.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  const oldPrice = enterprise.sellingPriceHNL;
+  const updatedEnterprises = enterpriseList.map(e => {
+    if (e.id !== enterpriseId) return e;
+    return {
+      ...e,
+      sellingPriceHNL: newPriceHNL
+    };
+  });
+
+  const priceDiffPct = (((newPriceHNL - oldPrice) / oldPrice) * 100).toFixed(1);
+  const diffSign = newPriceHNL > oldPrice ? '+' : '';
+
+  return {
+    updatedState: {
+      ...state,
+      enterprises: updatedEnterprises
+    },
+    successMessage: `Política de precios actualizada en ${enterprise.name}: nuevo precio ${formatHNL(newPriceHNL)} (${diffSign}${priceDiffPct}% vs precio anterior de ${formatHNL(oldPrice)}).`
+  };
+}
+
+/**
+ * Contratación de personal operativo en empresa filial
+ */
+export function hireEnterpriseStaff(
+  state: GameState,
+  enterpriseId: string,
+  count: number
+): { updatedState: GameState; successMessage: string } {
+  if (count <= 0) return { updatedState: state, successMessage: 'Cantidad de contratación inválida.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  const onboardingCost = Math.round(count * enterprise.averageMonthlySalaryHNL * 0.3);
+  if (enterprise.cashHNL < onboardingCost) {
+    return {
+      updatedState: state,
+      successMessage: `Caja insuficiente para inducción y alta laboral. Se requieren ${formatHNL(onboardingCost)}.`
+    };
+  }
+
+  const updatedEnterprises = enterpriseList.map(e => {
+    if (e.id !== enterpriseId) return e;
+    const newHeadcount = e.employeeCount + count;
+    const capacityPerWorker = e.monthlyProductionCapacityUnits / Math.max(1, e.employeeCount);
+    const addedCapacity = Math.round(count * capacityPerWorker);
+    return {
+      ...e,
+      employeeCount: newHeadcount,
+      cashHNL: e.cashHNL - onboardingCost,
+      monthlyProductionCapacityUnits: e.monthlyProductionCapacityUnits + addedCapacity
+    };
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      enterprises: updatedEnterprises
+    },
+    successMessage: `Contratación exitosa: +${count} colaboradores incorporados a la plantilla de ${enterprise.name}. Costo de inducción: ${formatHNL(onboardingCost)}.`
+  };
+}
+
+/**
+ * Reducción de personal operativo en empresa filial
+ */
+export function fireEnterpriseStaff(
+  state: GameState,
+  enterpriseId: string,
+  count: number
+): { updatedState: GameState; successMessage: string } {
+  if (count <= 0) return { updatedState: state, successMessage: 'Cantidad inválida.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  if (enterprise.employeeCount <= count) {
+    return {
+      updatedState: state,
+      successMessage: `No se puede despedir a todo el personal. Se debe conservar al menos 1 colaborador clave.`
+    };
+  }
+
+  // Indemnización laboral legal según Código de Trabajo (1.5 meses de salario)
+  const severanceCost = Math.round(count * enterprise.averageMonthlySalaryHNL * 1.5);
+  if (enterprise.cashHNL < severanceCost) {
+    return {
+      updatedState: state,
+      successMessage: `Caja insuficiente para cubrir las prestaciones legales por despido (${formatHNL(severanceCost)} requeridos).`
+    };
+  }
+
+  const updatedEnterprises = enterpriseList.map(e => {
+    if (e.id !== enterpriseId) return e;
+    const newHeadcount = e.employeeCount - count;
+    const capacityPerWorker = e.monthlyProductionCapacityUnits / Math.max(1, e.employeeCount);
+    const reducedCapacity = Math.round(count * capacityPerWorker);
+    return {
+      ...e,
+      employeeCount: newHeadcount,
+      cashHNL: e.cashHNL - severanceCost,
+      monthlyProductionCapacityUnits: Math.max(100, e.monthlyProductionCapacityUnits - reducedCapacity)
+    };
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      enterprises: updatedEnterprises
+    },
+    successMessage: `Ajuste de plantilla en ${enterprise.name}: -${count} plazas liquidadas con pago de prestaciones de ${formatHNL(severanceCost)}.`
+  };
+}
+
+/**
+ * Solicitud de crédito bancario para la empresa
+ */
+export function requestEnterpriseBankLoan(
+  state: GameState,
+  enterpriseId: string,
+  amountHNL: number,
+  termMonths: number = 24
+): { updatedState: GameState; successMessage: string } {
+  if (amountHNL <= 0) return { updatedState: state, successMessage: 'El monto debe ser superior a L. 0.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  const isConglomerate = (state.roleMode || 'grupo_empresarial') === 'grupo_empresarial';
+  const monthlyAmort = Math.round((amountHNL / termMonths) + (amountHNL * 0.012));
+
+  if (isConglomerate) {
+    // Préstamo otorgado directamente por Áureo Bank a su subsidiaria
+    if (state.financials.cashAndBCHReserves < amountHNL) {
+      return {
+        updatedState: state,
+        successMessage: `Áureo Bank no dispone de suficiente liquidez en reservas (${formatHNL(state.financials.cashAndBCHReserves)}) para desembolsar este préstamo corporativo.`
+      };
+    }
+
+    const updatedFinancials = {
+      ...state.financials,
+      cashAndBCHReserves: state.financials.cashAndBCHReserves - amountHNL,
+      loanPortfolioCurrent: state.financials.loanPortfolioCurrent + amountHNL
+    };
+
+    const updatedEnterprises = enterpriseList.map(e => {
+      if (e.id !== enterpriseId) return e;
+      return {
+        ...e,
+        cashHNL: e.cashHNL + amountHNL,
+        activeBankLoanHNL: e.activeBankLoanHNL + amountHNL,
+        bankMonthlyPaymentHNL: e.bankMonthlyPaymentHNL + monthlyAmort
+      };
+    });
+
+    return {
+      updatedState: {
+        ...state,
+        financials: updatedFinancials,
+        enterprises: updatedEnterprises
+      },
+      successMessage: `Línea de crédito intragrupo aprobada: Áureo Bank transfirió ${formatHNL(amountHNL)} a ${enterprise.name} a tasa preferencial.`
+    };
+  } else {
+    // Préstamo tomado de la banca comercial externa
+    const updatedEnterprises = enterpriseList.map(e => {
+      if (e.id !== enterpriseId) return e;
+      return {
+        ...e,
+        cashHNL: e.cashHNL + amountHNL,
+        activeBankLoanHNL: e.activeBankLoanHNL + amountHNL,
+        bankMonthlyPaymentHNL: e.bankMonthlyPaymentHNL + monthlyAmort
+      };
+    });
+
+    return {
+      updatedState: {
+        ...state,
+        enterprises: updatedEnterprises
+      },
+      successMessage: `Préstamo bancario comercial aprobado: ${formatHNL(amountHNL)} acreditados en la cuenta de ${enterprise.name}.`
+    };
+  }
+}
+
+/**
+ * Amortización anticipada de deuda bancaria de la filial
+ */
+export function repayEnterpriseBankLoan(
+  state: GameState,
+  enterpriseId: string,
+  amountHNL: number
+): { updatedState: GameState; successMessage: string } {
+  if (amountHNL <= 0) return { updatedState: state, successMessage: 'El monto debe ser superior a L. 0.' };
+  const enterpriseList = state.enterprises || [];
+  const enterprise = enterpriseList.find(e => e.id === enterpriseId);
+  if (!enterprise) return { updatedState: state, successMessage: 'Empresa no encontrada.' };
+
+  const actualAmount = Math.min(amountHNL, enterprise.activeBankLoanHNL);
+  if (actualAmount <= 0) {
+    return { updatedState: state, successMessage: `${enterprise.name} no tiene saldo deudor bancario pendiente.` };
+  }
+
+  if (enterprise.cashHNL < actualAmount) {
+    return {
+      updatedState: state,
+      successMessage: `Caja insuficiente: ${enterprise.name} tiene ${formatHNL(enterprise.cashHNL)} pero se requiere ${formatHNL(actualAmount)}.`
+    };
+  }
+
+  const isConglomerate = (state.roleMode || 'grupo_empresarial') === 'grupo_empresarial';
+  let updatedFinancials = state.financials;
+
+  if (isConglomerate) {
+    updatedFinancials = {
+      ...state.financials,
+      cashAndBCHReserves: state.financials.cashAndBCHReserves + actualAmount,
+      loanPortfolioCurrent: Math.max(0, state.financials.loanPortfolioCurrent - actualAmount)
+    };
+  }
+
+  const updatedEnterprises = enterpriseList.map(e => {
+    if (e.id !== enterpriseId) return e;
+    const remainingLoan = e.activeBankLoanHNL - actualAmount;
+    const remainingRatio = remainingLoan / Math.max(1, e.activeBankLoanHNL);
+    return {
+      ...e,
+      cashHNL: e.cashHNL - actualAmount,
+      activeBankLoanHNL: remainingLoan,
+      bankMonthlyPaymentHNL: Math.round(e.bankMonthlyPaymentHNL * remainingRatio)
+    };
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      financials: updatedFinancials,
+      enterprises: updatedEnterprises
+    },
+    successMessage: `Amortización de deuda procesada: ${formatHNL(actualAmount)} liquidados por ${enterprise.name}. Deuda remanente: ${formatHNL(enterprise.activeBankLoanHNL - actualAmount)}.`
+  };
+}
+
+/**
+ * Selecciona una empresa para gestionar en la estación operativa
+ */
+export function selectEnterprise(state: GameState, enterpriseId: string): GameState {
+  return {
+    ...state,
+    selectedEnterpriseId: enterpriseId
+  };
+}
+
+/**
+ * Cambia el rol de juego del usuario (Empresario, Banquero, Grupo Empresarial)
+ */
+export function setRoleMode(state: GameState, role: RoleMode): GameState {
+  return {
+    ...state,
+    roleMode: role
+  };
+}
+
+/**
+ * Inicializa una nueva partida personalizada con rol, capital y dificultad elegidos
+ */
+export function startNewGame(setup: GameSetupProfile): GameState {
+  const base = structuredClone(INITIAL_GAME_STATE);
+  const diffMultiplier = setup.difficulty === 'crisis' ? 0.7 : setup.difficulty === 'principiante' ? 1.5 : 1.0;
+  const initialCap = Math.round(setup.initialCapitalHNL * diffMultiplier);
+
+  // Ajuste según el rol elegido
+  let startingEnterprises = structuredClone(INITIAL_ENTERPRISES);
+  let startingFinancials = structuredClone(INITIAL_GAME_STATE.financials);
+
+  if (setup.roleMode === 'empresario') {
+    // El capital inicial va a las empresas operativas
+    const perEnterpriseCash = Math.round(initialCap / startingEnterprises.length);
+    startingEnterprises = startingEnterprises.map(e => ({
+      ...e,
+      cashHNL: Math.max(200000, perEnterpriseCash),
+      activeBankLoanHNL: setup.difficulty === 'crisis' ? Math.round(e.activeBankLoanHNL * 1.3) : e.activeBankLoanHNL
+    }));
+  } else if (setup.roleMode === 'banquero') {
+    // El capital inicial va a la solvencia y caja de Áureo Bank
+    startingFinancials = {
+      ...startingFinancials,
+      cashAndBCHReserves: Math.max(150000000, Math.round(startingFinancials.cashAndBCHReserves * diffMultiplier)),
+      totalEquity: Math.max(250000000, Math.round(startingFinancials.totalEquity * diffMultiplier))
+    };
+  } else {
+    // Grupo empresarial: balance balanceado entre banco y subsidiarias
+    startingFinancials = {
+      ...startingFinancials,
+      cashAndBCHReserves: Math.round(startingFinancials.cashAndBCHReserves * (setup.difficulty === 'crisis' ? 0.85 : 1.0))
+    };
+  }
+
+  const welcomeNotif: GameEventNotification = {
+    id: `notif-welcome-${Date.now()}`,
+    month: 1,
+    year: 2026,
+    type: 'bch_policy',
+    title: `Partida Iniciada: Modo ${setup.roleMode.toUpperCase().replace('_', ' ')}`,
+    message: `Bienvenido(a) ${setup.founderName}. Has tomado el liderazgo de ${setup.entityName} en la plaza de ${setup.startingCity}. Dificultad: ${setup.difficulty}.`,
+    impactSummary: `Capital inicial asignado: ${formatHNL(initialCap)}.`
+  };
+
+  return {
+    ...base,
+    bankName: setup.roleMode === 'empresario' ? 'Banco Corporativo Aliado' : setup.entityName,
+    gameMonth: 1,
+    roleMode: setup.roleMode,
+    enterprises: startingEnterprises,
+    selectedEnterpriseId: startingEnterprises[0]?.id || 'ent-001',
+    financials: startingFinancials,
+    gameSetup: {
+      ...setup,
+      isCustomGame: true
+    },
+    notifications: [welcomeNotif, ...base.notifications]
   };
 }
 

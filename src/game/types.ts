@@ -797,6 +797,48 @@ export interface GameState {
   territoryCompetition?: TerritoryCompetitionState;
   bankTechTree?: BankTechTreeState;
   syndicatedLending?: SyndicatedLendingState;
+  // Fusiones & Adquisiciones (M&A) y Noticias Macroeconómicas en Tiempo Real
+  maDeals?: MergersAcquisitionsDeal[];
+  macroNewsFeed?: MacroNewsItem[];
+  // Simulación Multimodal: Empresario, Banquero y Grupo Empresarial Conglomerado
+  roleMode?: RoleMode;
+  enterprises?: EnterpriseProfile[];
+  selectedEnterpriseId?: string;
+  lastCashFlowReport?: CashFlowStatementReport;
+  lastCausalAudit?: MonthlyCausalAudit;
+  gameSetup?: GameSetupProfile;
+}
+
+export interface MergersAcquisitionsDeal {
+  id: string; // e.g. MA-2026-001
+  targetBankId: CompetitorId;
+  targetBankName: string;
+  dealType: 'cartera_consumo' | 'cartera_pyme' | 'cartera_corporativa' | 'red_sucursales';
+  title: string;
+  description: string;
+  faceValueHNL: number;
+  purchasePriceHNL: number;
+  discountPct: number;
+  assetsAcquiredHNL: number;
+  expectedAnnualYieldPct: number;
+  status: 'disponible' | 'en_due_diligence' | 'aprobado_cnbs' | 'ejecutado' | 'rechazado';
+  regulatoryHhiImpact: string;
+  minimumCarRequiredPct: number;
+}
+
+export interface MacroNewsItem {
+  id: string;
+  month: number;
+  year: number;
+  category: 'bch_politica' | 'crisis_global' | 'mercado_cafe' | 'divisas_remesas' | 'regulacion_cnbs';
+  headline: string;
+  source: string;
+  summary: string;
+  impactLabel: string;
+  tpmRateDelta?: number;
+  inflationDelta?: number;
+  exchangeRateDelta?: number;
+  urgency: 'critica' | 'alta' | 'moderada';
 }
 
 // ------------------------------------------------------------------------------------
@@ -1564,3 +1606,96 @@ export interface ExecutiveDilemmasState {
   crisisScenarioTitle?: string;
   crisisDetails?: string;
 }
+
+// ------------------------------------------------------------------------------------
+// SIMULACIÓN MULTIMODAL: EMPRESARIO, BANQUERO Y GRUPO EMPRESARIAL CONGLOMERADO
+// ------------------------------------------------------------------------------------
+
+export type RoleMode = 'empresario' | 'banquero' | 'grupo_empresarial';
+
+export type EnterpriseSector = 
+  | 'supermercado' 
+  | 'tienda_retail' 
+  | 'agroindustria_cafe' 
+  | 'construccion' 
+  | 'logistica_transporte';
+
+export interface EnterpriseProfile {
+  id: string;
+  name: string;
+  sector: EnterpriseSector;
+  city: string;
+  cashHNL: number;
+  rawMaterialsStockUnits: number;
+  finishedGoodsStockUnits: number;
+  unitCostHNL: number;
+  sellingPriceHNL: number;
+  monthlyProductionCapacityUnits: number;
+  employeeCount: number;
+  averageMonthlySalaryHNL: number;
+  activeBankLoanHNL: number;
+  bankMonthlyPaymentHNL: number;
+  monthlyUnitsSold: number;
+  monthlyRevenueHNL: number;
+  monthlyCostOfGoodsHNL: number;
+  monthlyOpexHNL: number;
+  monthlyNetProfitHNL: number;
+  storageCapacityUnits: number;
+  supplierQuality: 'estandar' | 'premium' | 'economico';
+  description: string;
+}
+
+export interface CashFlowStatementReport {
+  month: number;
+  year: number;
+  beginningCashHNL: number;
+  endingCashHNL: number;
+  netCashChangeHNL: number;
+  operatingCashFlowHNL: number;
+  investingCashFlowHNL: number;
+  financingCashFlowHNL: number;
+  breakdown: {
+    collectionsFromSalesHNL: number;
+    paymentsToSuppliersHNL: number;
+    payrollPaidHNL: number;
+    interestPaidHNL: number;
+    interestReceivedHNL: number;
+    taxesPaidHNL: number;
+    newLoansReceivedHNL: number;
+    debtRepaymentsHNL: number;
+    capexOrPurchasesHNL: number;
+  };
+}
+
+export interface CausalFactor {
+  title: string;
+  deltaHNL: number;
+  impact: 'positivo' | 'negativo';
+  category: 'ingresos_ventas' | 'costo_mercancia' | 'gastos_fijos' | 'intereses_fondos' | 'creditos_morosidad' | 'inventario_merma';
+  explanation: string;
+}
+
+export interface MonthlyCausalAudit {
+  month: number;
+  year: number;
+  roleMode: RoleMode;
+  summaryTitle: string;
+  netProfitOrLossHNL: number;
+  cashChangeHNL: number;
+  factors: CausalFactor[];
+  projectedObligations30DaysHNL: number;
+  projectedCashSurplusOrDeficitHNL: number;
+  liquidityAlertText?: string;
+  recommendedAction: string;
+}
+
+export interface GameSetupProfile {
+  founderName: string;
+  entityName: string;
+  roleMode: RoleMode;
+  startingCity: string;
+  difficulty: 'principiante' | 'estandar' | 'crisis';
+  initialCapitalHNL: number;
+  isCustomGame: boolean;
+}
+
