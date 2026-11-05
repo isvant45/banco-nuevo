@@ -68,6 +68,117 @@ export const COMMERCIAL_BANKS_PROFILES: Record<CommercialBankId, CommercialBankP
 };
 
 /**
+ * Categorías y Niveles de Tarjetas de Crédito Corporativas
+ */
+export const CORPORATE_CARD_TIERS: Record<string, {
+  tierId: 'business_standard' | 'corporate_gold' | 'infinite_black';
+  name: string;
+  badge: string;
+  colorHex: string;
+  cashbackPct: number;
+  interestRateAnnual: number;
+  minMonthlySales: number;
+  annualFeeHNL: number;
+  pointsMultiplier: number;
+  perks: string[];
+}> = {
+  business_standard: {
+    tierId: 'business_standard',
+    name: 'Business Standard',
+    badge: '💳 CLÁSICA',
+    colorHex: '#334155',
+    cashbackPct: 1.5,
+    interestRateAnnual: 22.0,
+    minMonthlySales: 50000,
+    annualFeeHNL: 1200,
+    pointsMultiplier: 1, // 1 punto por cada L 100 gastados
+    perks: ['Compras de materiales y suministros', 'Corte mensual a 30 días', 'Acceso a cajeros automáticos']
+  },
+  corporate_gold: {
+    tierId: 'corporate_gold',
+    name: 'Corporate Gold Executive',
+    badge: '🥇 GOLD EJECUTIVA',
+    colorHex: '#b45309',
+    cashbackPct: 2.8,
+    interestRateAnnual: 18.5,
+    minMonthlySales: 250000,
+    annualFeeHNL: 2800,
+    pointsMultiplier: 2, // 2 puntos por cada L 100 gastados
+    perks: ['Cashback preferencial 2.8%', 'Sobregiro de emergencia 15%', 'Tasa reducida al 18.5% anual', 'Asistencia vial 24/7 de flota']
+  },
+  infinite_black: {
+    tierId: 'infinite_black',
+    name: 'Infinite Black Metal',
+    badge: '💎 BLACK INFINITE',
+    colorHex: '#09090b',
+    cashbackPct: 4.5,
+    interestRateAnnual: 14.5,
+    minMonthlySales: 600000,
+    annualFeeHNL: 5500,
+    pointsMultiplier: 3, // 3 puntos por cada L 100 gastados
+    perks: ['Super cashback 4.5% corporativo', 'Multiplicador x3 de puntos de recompensa', 'Tasa súper preferencial 14.5%', 'Línea de crédito prioritaria sin trámites']
+  }
+};
+
+/**
+ * Catálogo Oficial de Recompensas Corporativas (Canjeables con Puntos)
+ */
+export const CORPORATE_REWARDS_CATALOG = [
+  {
+    id: 'reward_gas_voucher',
+    title: 'Bono de Combustible Diésel / Gasolina L 10,000',
+    pointsCost: 500,
+    category: 'combustible' as const,
+    benefitValueHNL: 10000,
+    description: 'Vales canjeables en estaciones Puma, Texaco y Uno para abastecimiento de maquinaria pesada o flota de reparto.'
+  },
+  {
+    id: 'reward_fleet_maintenance',
+    title: 'Kit Mantenimiento Preventivo de Flota L 25,000',
+    pointsCost: 1100,
+    category: 'mantenimiento' as const,
+    benefitValueHNL: 25000,
+    description: 'Filtros, lubricantes y revisión técnica certificada para 2 unidades de maquinaria pesada o vehículos comerciales.'
+  },
+  {
+    id: 'reward_tax_deduction',
+    title: 'Escudo Fiscal y Certificado SAR L 40,000',
+    pointsCost: 1600,
+    category: 'impuestos' as const,
+    benefitValueHNL: 40000,
+    description: 'Crédito tributario aplicable directo a la liquidación fiscal del SAR, optimizando la solvencia tributaria empresarial.'
+  },
+  {
+    id: 'reward_cash_rebate',
+    title: 'Cashback Directo en Cuenta Comercial L 60,000',
+    pointsCost: 2200,
+    category: 'cashback_directo' as const,
+    benefitValueHNL: 60000,
+    description: 'Acreditación líquida inmediata a tu cuenta de cheques bancaria con disponibilidad total para capital de trabajo.'
+  }
+];
+
+/**
+ * Cálculo de Bonificación por Tramo de Capital para DPF
+ */
+export function calculateDpfTierBonus(amountHNL: number): {
+  tierName: 'Estándar' | 'Plata' | 'Oro' | 'Diamante Institucional';
+  bonusPct: number;
+  badge: string;
+} {
+  if (amountHNL >= 2000000) {
+    return { tierName: 'Diamante Institucional', bonusPct: 2.2, badge: '💎 TRAMO DIAMANTE (+2.2% APR)' };
+  }
+  if (amountHNL >= 1000000) {
+    return { tierName: 'Oro', bonusPct: 1.5, badge: '🥇 TRAMO ORO (+1.5% APR)' };
+  }
+  if (amountHNL >= 400000) {
+    return { tierName: 'Plata', bonusPct: 0.8, badge: '🥈 TRAMO PLATA (+0.8% APR)' };
+  }
+  return { tierName: 'Estándar', bonusPct: 0, badge: '🥉 TRAMO ESTÁNDAR' };
+}
+
+/**
  * Cálculo del Score Crediticio Empresarial (300 a 850 puntos)
  * Evalúa puntualidad en pagos, liquidez, facturación, solvencia fiscal y nivel de endeudamiento.
  */
@@ -202,12 +313,15 @@ export function createDefaultBankRelationships(initialBankBalance: number = 1850
       corporateCard: {
         cardId: 'card-atl-01',
         bankId: 'atlantida',
-        brand: 'Visa Signature Corporativa Atlántida',
+        brand: 'Visa Signature Corporativa Atlántida (Business Standard)',
+        tier: 'business_standard',
         creditLimit: 300000,
         currentBalance: 0,
-        interestRateAnnual: 24.0,
+        interestRateAnnual: 22.0,
         minPaymentMonthly: 0,
-        cashbackPct: 1.5
+        cashbackPct: 1.5,
+        rewardPoints: 350,
+        pointsAccumulatedTotal: 350
       },
       guaranteeDeposits: [],
       termDeposits: []
@@ -442,10 +556,12 @@ export function requestCommercialBankLoan(
 export function requestCorporateCard(
   state: DailySimulationState,
   bankId: CommercialBankId,
-  requestedLimit: number
+  requestedLimit: number,
+  tierId: 'business_standard' | 'corporate_gold' | 'infinite_black' = 'business_standard'
 ): { updatedState: DailySimulationState; success: boolean; message: string } {
   const capacity = evaluateContractorEconomicCapacity(state);
   const bankOffer = capacity.offersByBank[bankId];
+  const tierConfig = CORPORATE_CARD_TIERS[tierId] || CORPORATE_CARD_TIERS.business_standard;
 
   if (requestedLimit > bankOffer.maxCardHNL) {
     return {
@@ -464,22 +580,28 @@ export function requestCorporateCard(
     };
   }
 
-  const cardBrand = bankId === 'bac' 
-    ? 'Mastercard Black Corporativa BAC'
+  const baseBrand = bankId === 'bac' 
+    ? 'Mastercard BAC'
     : bankId === 'ficohsa'
-    ? 'Visa Infinite Empresarial Ficohsa'
+    ? 'Visa Ficohsa'
     : bankId === 'atlantida'
-    ? 'Visa Signature Corporativa Atlántida'
-    : 'Visa Business Occidente';
+    ? 'Visa Atlántida'
+    : 'Visa Occidente';
+
+  const cardBrand = `${baseBrand} ${tierConfig.name}`;
 
   const newCard: BankCorporateCreditCard = {
     cardId: `card-${bankId}-${Date.now().toString().slice(-4)}`,
     bankId,
     brand: cardBrand,
+    tier: tierId,
     creditLimit: requestedLimit,
     currentBalance: 0,
-    interestRateAnnual: 22.0,
-    minPaymentMonthly: 0
+    interestRateAnnual: tierConfig.interestRateAnnual,
+    minPaymentMonthly: 0,
+    cashbackPct: tierConfig.cashbackPct,
+    rewardPoints: 100, // Bono de bienvenida en puntos
+    pointsAccumulatedTotal: 100
   };
 
   const updatedBanks = {
@@ -497,18 +619,234 @@ export function requestCorporateCard(
       commercialBanks: updatedBanks
     },
     success: true,
-    message: `¡Tarjeta Corporativa emitida por ${COMMERCIAL_BANKS_PROFILES[bankId].name}! Límite asignado: L ${requestedLimit.toLocaleString()}. Utilízala para compras imprevistas de materiales o repuestos.`
+    message: `¡Tarjeta Corporativa ${tierConfig.name} emitida por ${COMMERCIAL_BANKS_PROFILES[bankId].name}! Límite: L ${requestedLimit.toLocaleString()}. Bono de bienvenida: 100 pts de recompensa. Cashback: ${tierConfig.cashbackPct}%.`
   };
 }
 
 /**
- * Constitución de Depósito en Garantía (Fianza de Licitación o Cumplimiento de Contrato)
+ * Ascenso de Nivel / Upgrading de Tarjeta Corporativa
+ */
+export function upgradeCorporateCardTier(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  targetTierId: 'business_standard' | 'corporate_gold' | 'infinite_black'
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const currentRel = state.commercialBanks[bankId];
+  const card = currentRel?.corporateCard;
+  if (!card) {
+    return { updatedState: state, success: false, message: 'No tienes una tarjeta corporativa emitida con este banco.' };
+  }
+
+  const targetTier = CORPORATE_CARD_TIERS[targetTierId];
+  if (!targetTier) {
+    return { updatedState: state, success: false, message: 'Nivel de tarjeta no válido.' };
+  }
+
+  if (card.tier === targetTierId) {
+    return { updatedState: state, success: false, message: `Tu tarjeta ya se encuentra en el nivel ${targetTier.name}.` };
+  }
+
+  const monthlySales = Math.max(state.monthlySalesAccumulated || 0, 0);
+  if (monthlySales < targetTier.minMonthlySales) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Para ascender a ${targetTier.name} se requiere una facturación mensual mínima de L ${targetTier.minMonthlySales.toLocaleString()}. Facturación actual: L ${monthlySales.toLocaleString()}.`
+    };
+  }
+
+  // Costo anual del upgrade si aplica
+  if (state.storeBankBalance < targetTier.annualFeeHNL) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Fondos insuficientes en banco para la membresía de la tarjeta ${targetTier.name} (L ${targetTier.annualFeeHNL.toLocaleString()}).`
+    };
+  }
+
+  const baseBrand = bankId === 'bac' ? 'Mastercard BAC' : bankId === 'ficohsa' ? 'Visa Ficohsa' : bankId === 'atlantida' ? 'Visa Atlántida' : 'Visa Occidente';
+  const updatedCard: BankCorporateCreditCard = {
+    ...card,
+    tier: targetTierId,
+    brand: `${baseBrand} ${targetTier.name}`,
+    interestRateAnnual: targetTier.interestRateAnnual,
+    cashbackPct: targetTier.cashbackPct,
+    rewardPoints: (card.rewardPoints || 0) + 150 // Bono por ascenso
+  };
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 5),
+      corporateCard: updatedCard
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: state.storeBankBalance - targetTier.annualFeeHNL,
+      commercialBanks: updatedBanks
+    },
+    success: true,
+    message: `¡ASCENSO EXITOSO! Tu tarjeta corporativa subió a nivel ${targetTier.name}. Nueva tasa: ${targetTier.interestRateAnnual}%, cashback: ${targetTier.cashbackPct}%, +150 puntos de bono.`
+  };
+}
+
+/**
+ * Canje de Puntos de Recompensas Corporativas
+ */
+export function redeemCardRewardPoints(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  rewardId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const currentRel = state.commercialBanks[bankId];
+  const card = currentRel?.corporateCard;
+  if (!card) {
+    return { updatedState: state, success: false, message: 'No dispones de tarjeta corporativa en este banco.' };
+  }
+
+  const reward = CORPORATE_REWARDS_CATALOG.find(r => r.id === rewardId);
+  if (!reward) {
+    return { updatedState: state, success: false, message: 'Recompensa no encontrada en el catálogo.' };
+  }
+
+  const currentPoints = card.rewardPoints || 0;
+  if (currentPoints < reward.pointsCost) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Puntos insuficientes. Requieres ${reward.pointsCost} pts (Disponibles: ${currentPoints} pts).`
+    };
+  }
+
+  const remainingPoints = currentPoints - reward.pointsCost;
+  const updatedCard: BankCorporateCreditCard = {
+    ...card,
+    rewardPoints: remainingPoints
+  };
+
+  let nextCash = state.storeCash;
+  let nextBank = state.storeBankBalance;
+  let nextSar = { ...state.sarTaxRecord };
+  let benefitMsg = '';
+
+  if (reward.category === 'cashback_directo') {
+    nextBank += reward.benefitValueHNL;
+    benefitMsg = `Se acreditaron L ${reward.benefitValueHNL.toLocaleString()} en efectivo a tu cuenta bancaria.`;
+  } else if (reward.category === 'combustible') {
+    // Ahorro directo en caja o bono de combustible
+    nextCash += reward.benefitValueHNL;
+    benefitMsg = `Se acreditaron L ${reward.benefitValueHNL.toLocaleString()} en vales de diésel/gasolina a caja para abastecer tu flota sin gasto.`;
+  } else if (reward.category === 'mantenimiento') {
+    // Si tiene maquinaria, optimiza su condición al 100% y acredita bono
+    const units = (state.ownedMachinery || []).map(m => ({ ...m, conditionPct: 100 }));
+    nextCash += 5000;
+    benefitMsg = `¡Mantenimiento preventivo ejecutado en toda tu flota (condición al 100%) más L 5,000 en insumos de taller!`;
+    return {
+      updatedState: {
+        ...state,
+        storeCash: nextCash,
+        ownedMachinery: units,
+        commercialBanks: {
+          ...state.commercialBanks,
+          [bankId]: { ...currentRel, corporateCard: updatedCard }
+        }
+      },
+      success: true,
+      message: `¡CANJE APROBADO! ${reward.title}. ${benefitMsg}`
+    };
+  } else if (reward.category === 'impuestos') {
+    // Descuento en pago fiscal del SAR aumentando deducciones y reduciendo ISR a pagar
+    nextSar.isrTaxAmount = Math.max(0, (nextSar.isrTaxAmount || 0) - reward.benefitValueHNL);
+    nextSar.deductibleOtherCosts = (nextSar.deductibleOtherCosts || 0) + reward.benefitValueHNL;
+    benefitMsg = `Se aplicó un crédito tributario de L ${reward.benefitValueHNL.toLocaleString()} reduciendo tus impuestos pendientes en el SAR.`;
+  }
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      corporateCard: updatedCard
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      storeCash: nextCash,
+      storeBankBalance: nextBank,
+      sarTaxRecord: nextSar,
+      commercialBanks: updatedBanks
+    },
+    success: true,
+    message: `¡CANJE APROBADO! ${reward.title}. ${benefitMsg} Puntos restantes: ${remainingPoints} pts.`
+  };
+}
+
+/**
+ * Reestructuración de Deuda y Préstamo Comercial (Ampliación de Plazo y Reducción de Cuota)
+ */
+export function restructureCommercialLoan(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  additionalMonths: number, // ej: 12, 24, 36 meses adicionales
+  negotiatedApr?: number
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const currentRel = state.commercialBanks[bankId];
+  const loan = currentRel?.activeLoan;
+  if (!loan || loan.balanceRemaining <= 0) {
+    return { updatedState: state, success: false, message: 'No tienes un préstamo comercial activo con saldo deudor en este banco.' };
+  }
+
+  const currentTerm = loan.termMonthsRemaining;
+  const newTerm = currentTerm + additionalMonths;
+  const effectiveApr = negotiatedApr || Math.max(9.5, Number((loan.interestRateAnnual - 0.75).toFixed(2))); // Reducción de tasa por reestructuración
+  const monthlyRate = effectiveApr / 100 / 12;
+  const oldPayment = loan.monthlyPayment;
+  const newMonthlyPayment = Math.round((loan.balanceRemaining * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -newTerm)));
+
+  const updatedLoan: BankCommercialLoan = {
+    ...loan,
+    termMonthsRemaining: newTerm,
+    interestRateAnnual: effectiveApr,
+    monthlyPayment: newMonthlyPayment,
+    isRestructured: true,
+    loanType: 'reestructurado',
+    originalTermMonths: loan.originalTermMonths || currentTerm,
+    originalMonthlyPayment: loan.originalMonthlyPayment || oldPayment
+  };
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 4),
+      activeLoan: updatedLoan
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      commercialBanks: updatedBanks
+    },
+    success: true,
+    message: `¡REESTRUCTURACIÓN DE DEUDA APROBADA! Plazo extendido en +${additionalMonths} meses (Total: ${newTerm} meses). Cuota reducida de L ${oldPayment.toLocaleString()} a L ${newMonthlyPayment.toLocaleString()}/mes (Ahorro mensual: L ${(oldPayment - newMonthlyPayment).toLocaleString()}).`
+  };
+}
+
+/**
+ * Constitución de Depósito en Garantía con Rendimiento Pasivo Diario (Fianza de Licitación o Contrato)
  */
 export function pledgeBankGuarantee(
   state: DailySimulationState,
   bankId: CommercialBankId,
   amountHNL: number,
-  purpose: string
+  purpose: string,
+  tenderIdRef?: string
 ): { updatedState: DailySimulationState; success: boolean; message: string } {
   if (state.storeBankBalance < amountHNL) {
     return {
@@ -518,13 +856,21 @@ export function pledgeBankGuarantee(
     };
   }
 
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
   const currentRel = state.commercialBanks[bankId];
+  // Tasa pasiva de garantía (3.5% a 4.5% APR)
+  const annualRate = bankId === 'occidente' ? 4.5 : bankId === 'atlantida' ? 4.2 : bankId === 'ficohsa' ? 3.8 : 3.5;
+
   const newDeposit: BankGuaranteeDeposit = {
     id: `fianza-${Date.now().toString().slice(-4)}`,
     bankId,
     amountPledged: amountHNL,
     purpose: purpose || 'Fianza de Cumplimiento de Contrato Público (SIT / SEFIN)',
-    status: 'activo'
+    tenderIdRef,
+    status: 'activo',
+    annualRatePct: annualRate,
+    accruedInterest: 0,
+    createdDay: state.currentDay
   };
 
   const updatedBanks = {
@@ -542,12 +888,12 @@ export function pledgeBankGuarantee(
       commercialBanks: updatedBanks
     },
     success: true,
-    message: `Depósito en garantía por L ${amountHNL.toLocaleString()} constituido en ${COMMERCIAL_BANKS_PROFILES[bankId].name}. Fianza emitida para respaldo de licitaciones públicas.`
+    message: `Depósito en garantía por L ${amountHNL.toLocaleString()} inmovilizado en ${bank.name}. Generando ${annualRate}% de rendimiento pasivo mientras está pignorado. Fianza y solvencia de licitación emitidas.`
   };
 }
 
 /**
- * Liberación de Depósito en Garantía
+ * Liberación de Depósito en Garantía con Intereses Ganados Reintegrados
  */
 export function releaseBankGuarantee(
   state: DailySimulationState,
@@ -559,6 +905,9 @@ export function releaseBankGuarantee(
   if (!dep) {
     return { updatedState: state, success: false, message: 'Fianza no encontrada.' };
   }
+
+  const accruedInterest = dep.accruedInterest || 0;
+  const totalRefund = dep.amountPledged + accruedInterest;
 
   const updatedDeposits = currentRel.guaranteeDeposits.filter(d => d.id !== depositId);
   const updatedBanks = {
@@ -572,16 +921,47 @@ export function releaseBankGuarantee(
   return {
     updatedState: {
       ...state,
-      storeBankBalance: state.storeBankBalance + dep.amountPledged,
+      storeBankBalance: state.storeBankBalance + totalRefund,
       commercialBanks: updatedBanks
     },
     success: true,
-    message: `Fianza liberada exitosamente. Se reintegraron L ${dep.amountPledged.toLocaleString()} a tu cuenta bancaria.`
+    message: `¡Fianza liberada exitosamente! Se reintegraron L ${dep.amountPledged.toLocaleString()} de capital más L ${accruedInterest.toLocaleString()} de intereses pasivos ganados (Total: L ${totalRefund.toLocaleString()}) a tu cuenta bancaria.`
   };
 }
 
 /**
- * Apertura de Depósito a Plazo Fijo (DPF)
+ * Acumulación Diaria de Intereses Pasivos sobre Depósitos en Garantía Pignorados
+ */
+export function processDailyGuaranteeAccrual(state: DailySimulationState): DailySimulationState {
+  let updatedBanks = { ...state.commercialBanks };
+  let anyAccrued = false;
+
+  Object.entries(updatedBanks).forEach(([bId, rel]) => {
+    const bankId = bId as CommercialBankId;
+    if (!rel || !rel.guaranteeDeposits || rel.guaranteeDeposits.length === 0) return;
+
+    const updatedDeps = rel.guaranteeDeposits.map(dep => {
+      if (dep.status !== 'activo') return dep;
+      const rate = dep.annualRatePct || 4.0;
+      const dailyYield = Math.round((dep.amountPledged * (rate / 100)) / 365);
+      if (dailyYield > 0) anyAccrued = true;
+      return {
+        ...dep,
+        accruedInterest: (dep.accruedInterest || 0) + dailyYield
+      };
+    });
+
+    updatedBanks[bankId] = {
+      ...rel,
+      guaranteeDeposits: updatedDeps
+    };
+  });
+
+  return anyAccrued ? { ...state, commercialBanks: updatedBanks } : state;
+}
+
+/**
+ * Apertura de Depósito a Plazo Fijo (DPF) con Bonificación por Volumen
  */
 export function openTermDeposit(
   state: DailySimulationState,
@@ -595,15 +975,20 @@ export function openTermDeposit(
 
   const bank = COMMERCIAL_BANKS_PROFILES[bankId];
   const currentRel = state.commercialBanks[bankId];
+  const tierBonus = calculateDpfTierBonus(amountHNL);
+  const effectiveRate = Number((bank.baseDpfRate + tierBonus.bonusPct).toFixed(2));
 
   const newDpf: BankTermDeposit = {
     id: `dpf-${bankId}-${Date.now().toString().slice(-4)}`,
     bankId,
     principalAmount: amountHNL,
     annualRatePct: bank.baseDpfRate,
+    tierBonusPct: tierBonus.bonusPct,
+    effectiveRatePct: effectiveRate,
     termDays,
     daysRemaining: termDays,
-    accruedInterest: 0
+    accruedInterest: 0,
+    currentBalance: amountHNL
   };
 
   const updatedBanks = {
@@ -621,7 +1006,118 @@ export function openTermDeposit(
       commercialBanks: updatedBanks
     },
     success: true,
-    message: `¡Certificado DPF constituido en ${bank.name}! Capital: L ${amountHNL.toLocaleString()} al ${bank.baseDpfRate}% anual a ${termDays} días.`
+    message: `¡Certificado DPF constituido en ${bank.name}! Capital: L ${amountHNL.toLocaleString()} al ${effectiveRate}% anual (${bank.baseDpfRate}% base + ${tierBonus.bonusPct}% bonificación ${tierBonus.tierName}) a ${termDays} días con capitalización diaria.`
+  };
+}
+
+/**
+ * Capitalización Diaria de Intereses Compuestos en Certificados DPF
+ */
+export function processDailyDpfCompounding(state: DailySimulationState): {
+  updatedState: DailySimulationState;
+  maturedDepositsCount: number;
+  totalMaturedAmount: number;
+} {
+  let updatedBanks = { ...state.commercialBanks };
+  let maturedDepositsCount = 0;
+  let totalMaturedAmount = 0;
+  let addedToBank = 0;
+  let notifications = [...(state.creditNotifications || [])];
+
+  Object.entries(updatedBanks).forEach(([bId, rel]) => {
+    const bankId = bId as CommercialBankId;
+    if (!rel || !rel.termDeposits || rel.termDeposits.length === 0) return;
+
+    const remainingDeposits: BankTermDeposit[] = [];
+
+    rel.termDeposits.forEach(dpf => {
+      const daysLeft = dpf.daysRemaining - 1;
+      const effectiveRate = dpf.effectiveRatePct || dpf.annualRatePct;
+      const currentPrincipal = dpf.currentBalance || dpf.principalAmount;
+      // Interés compuesto diario
+      const dailyInterest = Math.round((currentPrincipal * (effectiveRate / 100)) / 365);
+      const newBalance = currentPrincipal + dailyInterest;
+      const totalAccrued = dpf.accruedInterest + dailyInterest;
+
+      if (daysLeft <= 0) {
+        // Vencimiento natural del DPF
+        maturedDepositsCount++;
+        totalMaturedAmount += newBalance;
+        addedToBank += newBalance;
+
+        notifications.unshift({
+          id: `dpf-mat-${Date.now().toString().slice(-4)}-${dpf.id}`,
+          day: state.currentDay,
+          message: `📈 ¡VENCIMIENTO DE DPF! Certificado ${dpf.id} en ${COMMERCIAL_BANKS_PROFILES[bankId].name} liquidado con éxito. Se reintegraron L ${newBalance.toLocaleString()} (Capital: L ${dpf.principalAmount.toLocaleString()} + Ganancia: L ${totalAccrued.toLocaleString()}) a tu cuenta bancaria.`,
+          type: 'aumento_limite',
+          date: `Día ${state.currentDay}, Mes ${state.currentMonth}`
+        });
+      } else {
+        remainingDeposits.push({
+          ...dpf,
+          daysRemaining: daysLeft,
+          accruedInterest: totalAccrued,
+          currentBalance: newBalance
+        });
+      }
+    });
+
+    updatedBanks[bankId] = {
+      ...rel,
+      termDeposits: remainingDeposits
+    };
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: state.storeBankBalance + addedToBank,
+      commercialBanks: updatedBanks,
+      creditNotifications: notifications.slice(0, 15)
+    },
+    maturedDepositsCount,
+    totalMaturedAmount
+  };
+}
+
+/**
+ * Rescate Inmediato o Cancelación Anticipada de DPF
+ * Aplica penalización justa del 75% sobre intereses ganados (reintegra 100% capital + 25% interés ganado)
+ */
+export function earlyLiquidateDpf(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  depositId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const currentRel = state.commercialBanks[bankId];
+  const dpf = currentRel?.termDeposits.find(d => d.id === depositId);
+  if (!dpf) {
+    return { updatedState: state, success: false, message: 'Certificado DPF no encontrado.' };
+  }
+
+  const principal = dpf.principalAmount;
+  const accrued = dpf.accruedInterest || 0;
+  const penaltyInterest = Math.round(accrued * 0.75); // 75% penalización
+  const earnedInterestKept = Math.max(0, accrued - penaltyInterest);
+  const totalRefund = principal + earnedInterestKept;
+
+  const updatedDeposits = currentRel.termDeposits.filter(d => d.id !== depositId);
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      termDeposits: updatedDeposits
+    }
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: state.storeBankBalance + totalRefund,
+      commercialBanks: updatedBanks
+    },
+    success: true,
+    message: `¡CANCELACIÓN ANTICIPADA PROCESADA! Se reintegraron L ${principal.toLocaleString()} de capital más L ${earnedInterestKept.toLocaleString()} de interés neto (Penalización por rescate anticipado: L ${penaltyInterest.toLocaleString()}). Fondos líquidos en tu cuenta.`
   };
 }
 

@@ -1,59 +1,232 @@
-# Plan de Implementación: Sistema Bancario Empresarial, Score Crediticio y Auto-Financiamiento Multi-Rubro
+# Suite Bancaria Avanzada: Tarjetas Multi-Nivel, Reestructuración de Deuda, Garantías con Rendimiento y DPF Compuesto
 
-## Resumen Ejecutivo de Implementación
-Se ha modernizado completamente la suite financiera de los empresarios en el simulador retro (Windows 98/2000), habilitando capacidades bancarias completas tanto para **Constructora** (rubro por defecto) como para **Supermercado** y **Bar/Restaurante/Comida**. Se eliminó por completo el "Banco Aliado de la IA" y se reemplazó la etiqueta "4 Bancos" por **"Banco"**.
-
----
-
-## Cambios Implementados
-
-### 1. Rubro por Defecto: Constructora & Eliminación de "Banco Aliado IA"
-- **Predeterminado**: Tanto en la inicialización de `App.tsx`, como en `RetroTitleScreen.tsx` y `RetroNewGameModal.tsx`, el rubro por defecto es **Constructora & Obras** (`'constructora'`) con capital inicial y empresa `"Constructora Metropolitana"`.
-- **Eliminación Total de Smart Bank**: Se removió el módulo y ventana `smart_bank` / `SmartBankEnterpriseWindow` de la barra de tareas, del escritorio y del ciclo de vida de la empresa.
-- **Nomenclatura Limpia**: Se renombraron todas las referencias a `"Banco"` (ícono 🏦 / 🏛️), eliminando menciones como `"4 Bancos"`.
-
-### 2. Score Crediticio de la Empresa (300 a 850 Puntos)
-- Motor algorítmico `calculateCompanyCreditScore` que evalúa:
-  - Solvencia fiscal SAR (sin sanciones ni reparos)
-  - Reputación corporativa (0-100)
-  - Liquidez acumulada en caja y cuentas bancarias
-  - Facturación acumulada mensual
-  - Racha de pagos puntuales
-  - Índice DTI (Compromisos mensuales vs Facturación)
-  - Utilización de líneas de crédito (< 30% otorga bonificación)
-- Clasificación por categorías: **AAA (Excelente)**, **AA (Muy Bueno)**, **A (Bueno)**, **B (Aceptable)** y **C (En Riesgo)**.
-- Desbloquea descuentos en tasas de interés (hasta 2.5% anual) y aumentos automáticos de límites de tarjeta.
-
-### 3. Cuentas de Cheques y Ahorro: Depósitos, Retiros y Rendimiento Negociable
-- **Agregar Fondos**: Los empresarios pueden transferir efectivo acumulado en su caja registradora a su cuenta corriente bancaria (`depositCashToCheckingAccount`).
-- **Retirar Efectivo**: Posibilidad de retirar fondos de la cuenta bancaria para abastecer la caja registradora (`withdrawCashFromCheckingAccount`).
-- **Negociación de Tasa Pasiva**: Posibilidad de negociar rendimientos preferenciales de hasta 7.8% anual en cuenta de cheques según el Score Crediticio (`negotiateCheckingAccountRate`).
-
-### 4. Préstamos Bancarios: Deducción Automática y Abonos Extraordinarios a Capital
-- **Amortización Periódica**: En los días de corte (quincena 15 y mes 30), el simulador descuenta automáticamente la cuota mensual correspondiente, reduciendo el saldo de deuda y contabilizando el plazo restante (`processDailyLoanAmortization`).
-- **Abono Extraordinario a Capital**: Botón interactivo para realizar pagos directos a capital sin penalidad (`makeExtraordinaryLoanPayment`). Recalcula automáticamente a la baja la cuota mensual futura.
-- **Negociación de Tasa Activa**: Permite solicitar reducciones de tasa de interés anual ante los bancos (`negotiateLoanRate`).
-
-### 5. Tarjetas de Crédito Corporativas con Aumento Quincenal (Cada 15 Días)
-- Cada 15 días (días 15 y 30), el motor `processBiweeklyCardEvaluation` revisa el comportamiento de pago y el Score Crediticio.
-- Otorga aumentos automáticos de límite de crédito (+15% a +25%), mejoras en cashback (+0.5%) y reducciones de tasa APR, notificando al empresario en el escritorio.
-
-### 6. Concesionarias y Auto-Financiamiento Bancario Directo (1 a 5 Años)
-- Catálogo extendido con concesionarias para cada rubro (`getDealersForSector`):
-  - **Supermercados**: Camiones refrigerados Hino 3.5T, montacargas eléctricos Toyota, furgones Hyundai H350 y cámaras frigoríficas industriales.
-  - **Comida / Restaurantes**: Flotas de motos delivery Honda Cargo 150cc, vans refrigeradas Peugeot Partner, hornos combinados industriales Rational y líneas de enfriamiento True.
-  - **Constructoras**: Volquetas reforzadas CAT 770G, retroexcavadoras CAT 420F2 4x4, camiones mixer trompo y grúas torre.
-- **Financiamiento Bancario en el Concesionario**:
-  - Selector de Banco comercial oferente (Ficohsa, Atlántida, BAC, Occidente).
-  - Configuración de prima (enganche) del 10% al 30%.
-  - Plazos configurables de 1 a 5 años (12 a 60 meses).
-  - Tasa de interés preferencial ajustada por el Score Crediticio.
-  - Botón de negociación de tasa y cálculo en tiempo real de la cuota mensual estimada.
-  - Al aprobar, se debita la prima y se incorpora de inmediato la unidad con sus llaves a la flota propia del negocio.
+Plan integral para modernizar y profundizar los servicios financieros del simulador empresarial (retro Windows 98/2000), respondiendo con exactitud a las tres directrices confirmadas por el usuario.
 
 ---
 
-## Verificación de Calidad
-- **Pruebas Automatizadas**: 101 tests unitarios ejecutados exitosamente en `npm test`, incluyendo la nueva suite completa `tests/commercialBanksAndScore.test.ts`.
-- **Compilación & Tipos**: `compile_applet` y `lint_applet` verificados conjuntamente sin errores.
-- **Servidor Dev**: Dev server reiniciado y operativo en el puerto 3000.
+## Decisiones Críticas & Revisión del Usuario
+
+> [!IMPORTANT]
+> Se han incorporado las preferencias confirmadas en la fase de clarificación:
+> 1. **Tarjetas y Préstamos**: Tarjetas en 3 niveles (Business Clásica, Oro Ejecutiva, Black Platinum), catálogo interactivo de canje de puntos de recompensas corporativas y asistente de reestructuración de deuda para refinanciar pasivos pesados.
+> 2. **Depósitos en Garantía**: Generación de rendimiento pasivo diario sobre los fondos pignorados y liberación automática con intereses acumulados al concluir obras o licitaciones.
+> 3. **Inversiones a Plazo Fijo (DPF)**: Interés compuesto diario con cálculo de proyección exacta, tasas escalonadas por volumen de capital depositado (hasta +2.2% anual) y opción de cancelación anticipada para rescate de liquidez inmediata.
+
+---
+
+## 1. Visión General & Concepto Central
+
+- **Propósito**: Elevar la profundidad estratégica de la gestión financiera para empresarios (Constructoras, Supermercados y Restaurantes), transformando el Banco en un socio integral para apalancar proyectos grandes, mitigar riesgos de liquidez y rentabilizar excedentes de tesorería.
+- **Audiencia / Persona**: Empresarios virtuales que buscan optimizar su flujo de caja, licitar obras públicas y privadas sin perder liquidez, obtener financiamiento blando y canjear beneficios reales por sus transacciones diarias.
+- **Valor Agregado**:
+  - Elimina el dinero ocioso: los depósitos en garantía ahora generan rendimiento diario.
+  - Opciones ante crisis de liquidez: la reestructuración de préstamos evita la quiebra al reducir la cuota mensual extendiendo el plazo.
+  - Flexibilidad en inversiones: DPF con interés compuesto diario y rescate anticipado si surge una emergencia operativa.
+  - Gamificación y recompensas: puntos por compras con tarjeta corporativa canjeables por beneficios tributarios y operativos.
+
+---
+
+## 2. Experiencia de Usuario & Diseño Visual
+
+### A. Estética Retro y Filosofía de Diseño
+- **Dirección Visual**: Auténtica interfaz Windows 98 / 2000 (`#c0c0c0`, bordes biselados 3D inset/outset, sombreado gris carbón `#404040` y luz blanca `#ffffff`).
+- **Tipografía**: Fuentes del sistema en caja alta/baja, títulos nítidos y cifras financieras tabulares estrictas en monoespaciado (`font-mono tabular-nums`) con separadores de miles (`L 1,250,000.00`).
+- **Cero Elementos Genéricos (Anti-Slop)**: Sin etiquetas de píldora innecesarias, sin gradientes púrpuras ni tarjetas flotantes modernas; botones clásicos con efecto de pulsación tridimensional.
+
+### B. Flujos de Usuario Mejorados
+
+#### Flujo 1: Tarjetas Corporativas Multi-Nivel & Catálogo de Recompensas
+1. **Selector de Nivel de Tarjeta**:
+   - *Business Clásica*: Límite básico (L 100k - 300k), 1.0% cashback, 1 pt por cada L 100 gastados.
+   - *Oro Ejecutiva*: Límite intermedio (L 300k - 800k), 2.2% cashback, 1.5 pts por cada L 100, seguro de carga y descuento en combustible.
+   - *Black Platinum*: Límite prémium (L 800k - 3M), 3.5% cashback, 2.5 pts por cada L 100, concierge corporativo y exención de comisiones cambiarias.
+2. **Catálogo de Canje de Puntos**:
+   - Vales de Combustible (L 5,000 para maquinaria/flota - 500 pts).
+   - Crédito Fiscal ISR ante SAR (Deducción de L 25,000 - 2,000 pts).
+   - Mantenimiento Preventivo de Flota (+15% condición mecánica - 1,200 pts).
+   - Reembolso Directo en Efectivo a Cuenta Corriente (L 10,000 - 900 pts).
+
+#### Flujo 2: Préstamos Comerciales & Reestructuración de Deuda
+1. **Visualizador de Amortización**: Barra de progreso de amortización, cuota periódica y desglose capital/interés.
+2. **Modal de Reestructuración de Deuda**:
+   - Se activa cuando el empresario busca alivio financiero o ante un elevado ratio de endeudamiento (DTI).
+   - Permite seleccionar un nuevo plazo (hasta +36 meses adicionales).
+   - Muestra en tiempo real la nueva cuota mensual reducida (hasta un 45% menor).
+   - Aplica tasa preferencial si el Score Crediticio de la empresa es superior a 680 pts.
+
+#### Flujo 3: Depósitos en Garantía con Rendimiento Diario y Liberación Automática
+1. **Constitución de Fianza**: Inmovilización de fondos vinculada opcionalmente a un proyecto/licitación.
+2. **Generación Diaria de Intereses**: Los fondos pignorados devengan un rendimiento diario visible (3.5% - 4.5% anual) que se acumula en el depósito.
+3. **Liberación Automática o Manual**:
+   - Al finalizar exitosamente la obra en `advanceConstructionDay` o al avanzar el tiempo, la garantía se libera automáticamente acreditando el capital original + todos los intereses devengados en la cuenta corriente.
+   - Registro en el historial con certificado de solvencia de la fianza.
+
+#### Flujo 4: Inversión a Plazo Fijo (DPF) con Interés Compuesto y Cancelación Anticipada
+1. **Tasas Escalonadas por Tramo**:
+   - Tramo Estándar (< L 250,000): Tasa base (6.5% - 7.2%).
+   - Tramo Plata (L 250,000 - L 999,999): +0.8% de bonificación.
+   - Tramo Oro (L 1,000,000 - L 4,999,999): +1.5% de bonificación.
+   - Tramo Diamante ($\ge$ L 5,000,000): +2.2% de bonificación.
+2. **Capitalización Diaria**: El interés se reinvierte diariamente sobre el saldo acumulado.
+3. **Cancelación Anticipada (Rescate Inmediato)**:
+   - Permite al usuario liquidar el DPF antes del vencimiento si requiere fondos urgentes.
+   - Retiene el 75% del rendimiento generado a la fecha como penalidad leve y devuelve de inmediato el 100% del capital a la cuenta corriente.
+
+---
+
+## 3. Decisiones de Producto & Trade-Offs
+
+- **Decisión 1: Puntos de Recompensa vs. Cashback Directo**
+  - *Enfoque*: Ofrecer ambos. El cashback se aplica automáticamente como saldo a favor en la tarjeta, mientras que los puntos acumulables permiten canjear recompensas operativas de alto impacto (combustible, beneficios fiscales del SAR y mantenimiento de maquinaria).
+  - *Razón*: Conecta la banca con los otros subsistemas del juego (flota, obras y tributación).
+- **Decisión 2: Tasa de Interés en Garantías Pignoradas**
+  - *Enfoque*: Otorgar una tasa pasiva moderada (3.5% - 4.5%) inferior a un DPF formal (7% - 9%), reconociendo la naturaleza cautiva del colateral pero premiando al contratista.
+- **Decisión 3: Penalidad por Cancelación Anticipada de DPF**
+  - *Enfoque*: En lugar de confiscar todo el interés devengado, se liquida el 75% del interés ganado para mantener una experiencia justa y pedagógica en el simulador.
+
+---
+
+## 4. Arquitectura Técnica & Estrategia de Datos
+
+### Diagrama del Sistema y Jerarquía de Componentes
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        RetroDesktop (Sistema OS)                       │
+│                                                                        │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │             CommercialBanksWindow (Ventana Principal)          │   │
+│   │                                                                │   │
+│   │  [Selector Bancos: Ficohsa · Atlántida · BAC · Occidente]      │   │
+│   │  [HUD Score Crediticio Empresarial: 300 - 850 pts]             │   │
+│   │                                                                │   │
+│   │  ┌────────────┬────────────┬────────────┬───────────┬───────┐  │   │
+│   │  │ Préstamos  │  Tarjetas  │ Cta. Cheq  │ Garantías │  DPF  │  │   │
+│   │  └─────┬──────┴─────┬──────┴─────┬──────┴─────┬─────┴───┬───┘  │   │
+│   │        │            │            │            │         │      │   │
+│   │        ▼            ▼            ▼            ▼         ▼      │   │
+│   │   [Restruct.]  [3 Tiers &]  [Depósitos &]  [Interés &] [Comp. &]│   │
+│   │   [Abonos]     [Rewards]    [Retiros]      [Auto-Rel]  [Rescate]│   │
+│   └────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                     commercialBanksEngine.ts (Lógica)                  │
+│                                                                        │
+│  - calculateCompanyCreditScore()                                       │
+│  - restructureCommercialLoan()           [NUEVO]                       │
+│  - upgradeCorporateCardTier()            [NUEVO]                       │
+│  - redeemCardRewardPoints()              [NUEVO]                       │
+│  - processDailyGuaranteeAccrual()        [NUEVO]                       │
+│  - releaseGuaranteeDeposit()             [ACTUALIZADO: Auto + Manual]  │
+│  - processDailyDpfCompounding()          [NUEVO: Interés Compuesto]    │
+│  - earlyLiquidateDpf()                   [NUEVO: Cancelación Ant.]     │
+│  - processDailyLoanAmortization()                                      │
+│  - processBiweeklyCardEvaluation()                                     │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Estructuras de Datos Extendidas (`src/game/retroSimTypes.ts`)
+
+```typescript
+export type CorporateCardTierId = 'business_standard' | 'corporate_gold' | 'infinite_black';
+
+export interface CorporateCardRewardItem {
+  id: string;
+  title: string;
+  category: 'combustible' | 'sar_fiscal' | 'mantenimiento' | 'cash_rebate';
+  pointsCost: number;
+  description: string;
+  benefitValue: number;
+}
+
+export interface BankCorporateCreditCard {
+  cardId: string;
+  bankId: CommercialBankId;
+  brand: string;
+  tier: CorporateCardTierId;
+  creditLimit: number;
+  currentBalance: number;
+  interestRateAnnual: number;
+  minPaymentMonthly: number;
+  rewardPoints: number;
+  cashbackPct?: number;
+  lastLimitIncreaseDay?: number;
+  limitIncreasesCount?: number;
+}
+
+export interface BankCommercialLoan {
+  id: string;
+  bankId: CommercialBankId;
+  principalAmount: number;
+  balanceRemaining: number;
+  monthlyPayment: number;
+  interestRateAnnual: number;
+  termMonthsRemaining: number;
+  purpose: string;
+  loanType?: 'capital_trabajo' | 'vehicular_equipo' | 'reestructurado';
+  originalTermMonths?: number;
+  isRestructured?: boolean;
+  amortizedPrincipalTotal?: number;
+}
+
+export interface BankGuaranteeDeposit {
+  id: string;
+  bankId: CommercialBankId;
+  amountPledged: number;
+  accruedInterest: number;
+  annualRatePct: number;
+  tenderIdRef?: string;
+  purpose: string;
+  status: 'activo' | 'liberado';
+  createdDay: number;
+}
+
+export interface BankTermDeposit {
+  id: string;
+  bankId: CommercialBankId;
+  principalAmount: number;
+  currentBalance: number; // Saldo con interés compuesto acumulado
+  annualRatePct: number;
+  tierBonusPct: number; // Bonificación por tramo de capital
+  termDays: number;
+  daysRemaining: number;
+  accruedInterest: number;
+  isEarlyLiquidated?: boolean;
+}
+```
+
+---
+
+## 5. Plan de Ejecución en Código (Siguiente Turno tras Aprobación)
+
+1. **Modelos de Tipos (`src/game/retroSimTypes.ts`)**:
+   - Ampliar `BankCorporateCreditCard` con `tier`, `rewardPoints` y catálogo.
+   - Extender `BankCommercialLoan` con historial de reestructuración.
+   - Agregar acumulador de intereses `accruedInterest` y `annualRatePct` en `BankGuaranteeDeposit`.
+   - Extender `BankTermDeposit` con `currentBalance`, `tierBonusPct` y registro de capitalización compuesta.
+
+2. **Motor Financiero (`src/game/commercialBanksEngine.ts`)**:
+   - Implementar `upgradeCorporateCardTier` y `redeemCardRewardPoints`.
+   - Implementar `restructureCommercialLoan` (recalculando cuota a menor valor).
+   - Implementar `processDailyGuaranteeAccrual` y sincronizar la liberación automática de garantías cuando se complete una obra o licitación.
+   - Implementar `processDailyDpfCompounding` y `earlyLiquidateDpf`.
+   - Actualizar `createDefaultBankRelationships` con los nuevos campos de tier y recompensas.
+
+3. **Interfaz Gráfica Retro (`src/components/retro/CommercialBanksWindow.tsx`)**:
+   - Pestaña **Tarjetas**: Selector visual de nivel de tarjeta (Clásica, Oro, Black), badge de puntos de recompensa acumulados y catálogo modal de canje.
+   - Pestaña **Préstamos**: Botón y panel de "Reestructurar Préstamo" con cálculo comparativo de cuota vieja vs cuota nueva.
+   - Pestaña **Garantías**: Muestra los intereses diarios acumulados en tiempo real y el botón de liberación formal con liquidación a cuenta corriente.
+   - Pestaña **DPF**: Visualizador de tasa escalonada por tramo de inversión, tabla de proyección de capitalización compuesta y botón de "Cancelación Anticipada (Liquidez Inmediata)".
+
+4. **Integración Temporal en Escritorio (`src/components/retro/RetroDesktop.tsx`)**:
+   - En `handleAdvanceDay` y `handleAdvanceDays`, incorporar `processDailyGuaranteeAccrual` y `processDailyDpfCompounding` para que los rendimientos maduren de forma orgánica con el paso del tiempo.
+
+5. **Pruebas Automatizadas**:
+   - Extender `tests/commercialBanksAndScore.test.ts` para cubrir:
+     - Reestructuración de préstamos y reducción de cuota.
+     - Acumulación y canje de puntos de recompensa.
+     - Tiers de tarjetas corporativas.
+     - Interés devengado en garantías y liberación con rendimiento.
+     - Capitalización compuesta en DPF y liquidación anticipada.

@@ -12,7 +12,18 @@ import {
   processBiweeklyCardEvaluation,
   financeEquipmentLoan,
   createDefaultBankRelationships,
-  COMMERCIAL_BANKS_PROFILES
+  COMMERCIAL_BANKS_PROFILES,
+  requestCorporateCard,
+  upgradeCorporateCardTier,
+  redeemCardRewardPoints,
+  restructureCommercialLoan,
+  pledgeBankGuarantee,
+  releaseBankGuarantee,
+  processDailyGuaranteeAccrual,
+  openTermDeposit,
+  processDailyDpfCompounding,
+  earlyLiquidateDpf,
+  calculateDpfTierBonus
 } from '../src/game/commercialBanksEngine';
 import { 
   DEFAULT_MACHINERY_DEALERS, 
@@ -303,5 +314,141 @@ describe('Company Credit Score & Commercial Banking System', () => {
     const constDealers = getDealersForSector(DEFAULT_MACHINERY_DEALERS, 'constructora');
     assert.ok(constDealers.some(d => d.id === 'covesa_cat'), 'Constructora should see COVESA CAT');
     assert.ok(constDealers.some(d => d.id === 'camosa_komatsu'), 'Constructora should see CAMOSA Komatsu');
+  });
+
+  it('supports corporate credit card tiers and upgrading with reward points', () => {
+    const state = createMockState({
+      monthlySalesAccumulated: 800000,
+      storeBankBalance: 1000000
+    });
+
+    // Solicitar tarjeta Infinite Black con BAC
+    const reqRes = requestCorporateCard(state, 'bac', 150000, 'infinite_black');
+    assert.strictEqual(reqRes.success, true);
+    const card = reqRes.updatedState.commercialBanks.bac.corporateCard!;
+    assert.strictEqual(card.tier, 'infinite_black');
+    assert.strictEqual(card.cashbackPct, 4.5);
+    assert.strictEqual(card.interestRateAnnual, 14.5);
+    assert.strictEqual(card.rewardPoints, 100);
+
+    // Canje de recompensa con puntos
+    const stateWithPoints = {
+      ...reqRes.updatedState,
+      commercialBanks: {
+        ...reqRes.updatedState.commercialBanks,
+        bac: {
+          ...reqRes.updatedState.commercialBanks.bac,
+          corporateCard: { ...card, rewardPoints: 600 }
+        }
+      }
+    };
+
+    const redeemRes = redeemCardRewardPoints(stateWithPoints, 'bac', 'reward_gas_voucher');
+    assert.strictEqual(redeemRes.success, true);
+    assert.strictEqual(redeemRes.updatedState.commercialBanks.bac.corporateCard!.rewardPoints, 100); // 600 - 500
+    assert.strictEqual(redeemRes.updatedState.storeCash, stateWithPoints.storeCash + 10000);
+  });
+
+  it('restructures existing commercial loan extending terms and lowering monthly quota', () => {
+    const state = createMockState({
+      commercialBanks: {
+        ...createDefaultBankRelationships(1000000),
+        atlantida: {
+          bankId: 'atlantida',
+          relationshipScore: 70,
+          guaranteeDeposits: [],
+          termDeposits: [],
+          activeLoan: {
+            id: 'loan-atl-test',
+            bankId: 'atlantida',
+            principalAmount: 600000,
+            balanceRemaining: 500000,
+            monthlyPayment: 26000,
+            interestRateAnnual: 12.0,
+            termMonthsRemaining: 24,
+            purpose: 'Capital de Trabajo'
+          }
+        }
+      }
+    });
+
+    const restRes = restructureCommercialLoan(state, 'atlantida', 24); // +24 meses prórroga
+    assert.strictEqual(restRes.success, true);
+    const newLoan = restRes.updatedState.commercialBanks.atlantida.activeLoan!;
+    assert.strictEqual(newLoan.isRestructured, true);
+    assert.strictEqual(newLoan.loanType, 'reestructurado');
+    assert.strictEqual(newLoan.termMonthsRemaining, 48); // 24 + 24
+    assert.ok(newLoan.monthlyPayment < 26000, `Quota should be lower, got ${newLoan.monthlyPayment}`);
+    assert.strictEqual(newLoan.originalMonthlyPayment, 26000);
+  });
+
+  it('generates daily passive yield on guarantee deposits and releases principal plus accrued interest', () => {
+    const state = createMockState({
+      storeBankBalance: 800000
+    });
+
+    // Constituir fianza de L 500,000 en Occidente (4.5% APR)
+    const pledgeRes = pledgeBankGuarantee(state, 'occidente', 500000, 'Fianza de Cumplimiento SIT');
+    assert.strictEqual(pledgeRes.success, true);
+    assert.strictEqual(pledgeRes.updatedState.storeBankBalance, 300000);
+
+    const fianzaId = pledgeRes.updatedState.commercialBanks.occidente.guaranteeDeposits[0].id;
+
+    // Procesar acumulación de intereses pasivos diarios
+    let curState = pledgeRes.updatedState;
+    for (let day = 0; day < 30; day++) {
+      curState = processDailyGuaranteeAccrual(curState);
+    }
+
+    const accruedFianza = curState.commercialBanks.occidente.guaranteeDeposits[0];
+    assert.ok((accruedFianza.accruedInterest || 0) > 0, `Yield should accrue, got ${accruedFianza.accruedInterest}`);
+
+    // Liberar fianza
+    const releaseRes = releaseBankGuarantee(curState, 'occidente', fianzaId);
+    assert.strictEqual(releaseRes.success, true);
+    assert.strictEqual(
+      releaseRes.updatedState.storeBankBalance,
+      300000 + 500000 + (accruedFianza.accruedInterest || 0)
+    );
+  });
+
+  it('calculates tiered bonuses and compound interest on DPF investments with early liquidation', () => {
+    // Verificar bonificaciones por volumen
+    const diamondBonus = calculateDpfTierBonus(2500000);
+    assert.strictEqual(diamondBonus.bonusPct, 2.2);
+    const goldBonus = calculateDpfTierBonus(1200000);
+    assert.strictEqual(goldBonus.bonusPct, 1.5);
+
+    const state = createMockState({
+      storeBankBalance: 1500000
+    });
+
+    // Abrir DPF en Atlántida (7.2% base + 1.5% oro = 8.7% efectivo)
+    const openRes = openTermDeposit(state, 'atlantida', 1000000, 90);
+    assert.strictEqual(openRes.success, true);
+    assert.strictEqual(openRes.updatedState.storeBankBalance, 500000);
+
+    const dpf = openRes.updatedState.commercialBanks.atlantida.termDeposits[0];
+    assert.strictEqual(dpf.effectiveRatePct, 8.7);
+
+    // Simular capitalización diaria
+    let curState = openRes.updatedState;
+    for (let day = 0; day < 10; day++) {
+      const compRes = processDailyDpfCompounding(curState);
+      curState = compRes.updatedState;
+    }
+
+    const accruedDpf = curState.commercialBanks.atlantida.termDeposits[0];
+    assert.ok(accruedDpf.accruedInterest > 0);
+    assert.ok((accruedDpf.currentBalance || 0) > 1000000);
+
+    // Cancelación anticipada (rescate de liquidez inmediata)
+    const earlyRes = earlyLiquidateDpf(curState, 'atlantida', dpf.id);
+    assert.strictEqual(earlyRes.success, true);
+    assert.ok(
+      earlyRes.updatedState.storeBankBalance >= 1500000,
+      `Balance should recover principal + net interest, got ${earlyRes.updatedState.storeBankBalance}`
+    );
+    assert.strictEqual(earlyRes.updatedState.commercialBanks.atlantida.termDeposits.length, 0);
   });
 });

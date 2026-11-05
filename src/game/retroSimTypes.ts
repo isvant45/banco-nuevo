@@ -261,15 +261,43 @@ export interface BankCommercialLoan {
   interestRateAnnual: number;
   termMonthsRemaining: number;
   purpose: string;
-  loanType?: 'capital_trabajo' | 'vehicular_equipo';
+  loanType?: 'capital_trabajo' | 'vehicular_equipo' | 'reestructurado';
   equipmentModel?: string;
   amortizedPrincipalTotal?: number;
+  isRestructured?: boolean;
+  originalTermMonths?: number;
+  originalMonthlyPayment?: number;
+}
+
+export type CorporateCardTierId = 'business_standard' | 'corporate_gold' | 'infinite_black';
+
+export interface CorporateCardTierConfig {
+  tierId: CorporateCardTierId;
+  name: string;
+  badge: string;
+  colorHex: string;
+  cashbackPct: number;
+  interestRateAnnual: number;
+  minMonthlySales: number;
+  annualFeeHNL: number;
+  pointsMultiplier: number; // Puntos por cada L 100 de compra
+  perks: string[];
+}
+
+export interface CorporateCardRewardItem {
+  id: string;
+  title: string;
+  pointsCost: number;
+  category: 'combustible' | 'mantenimiento' | 'impuestos' | 'cashback_directo';
+  benefitValueHNL: number;
+  description: string;
 }
 
 export interface BankCorporateCreditCard {
   cardId: string;
   bankId: CommercialBankId;
   brand: string; // ej: "Visa Signature Corporativa"
+  tier?: CorporateCardTierId;
   creditLimit: number;
   currentBalance: number;
   interestRateAnnual: number;
@@ -277,6 +305,8 @@ export interface BankCorporateCreditCard {
   lastLimitIncreaseDay?: number;
   limitIncreasesCount?: number;
   cashbackPct?: number;
+  rewardPoints?: number;
+  pointsAccumulatedTotal?: number;
 }
 
 export interface BankCheckingAccount {
@@ -295,6 +325,10 @@ export interface BankGuaranteeDeposit {
   tenderIdRef?: string;
   purpose: string; // "Fianza de Cumplimiento de Contrato"
   status: 'activo' | 'liberado';
+  annualRatePct?: number; // Rendimiento pasivo anual (3.5% - 4.5%)
+  accruedInterest?: number; // Interés ganado acumulado
+  createdDay?: number;
+  releasedDay?: number;
 }
 
 export interface BankTermDeposit {
@@ -302,9 +336,13 @@ export interface BankTermDeposit {
   bankId: CommercialBankId;
   principalAmount: number;
   annualRatePct: number;
+  tierBonusPct?: number; // Bonificación de tasa por tramo de capital (+0.5% a +2.2%)
+  effectiveRatePct?: number; // Tasa base + bonificación
   termDays: number;
   daysRemaining: number;
   accruedInterest: number;
+  currentBalance?: number; // Capital + interés compuesto acumulado
+  isEarlyLiquidated?: boolean;
 }
 
 export interface CommercialBankRelationship {
