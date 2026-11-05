@@ -11,8 +11,6 @@ import {
 } from '../src/game/constructionEngine';
 import { DailySimulationState } from '../src/game/retroSimTypes';
 import { DEFAULT_SMART_BANK_OFFERS } from '../src/game/retailBusinessEngine';
-import { createDefaultBankRelationships } from '../src/game/commercialBanksEngine';
-import { DEFAULT_MACHINERY_DEALERS, DEFAULT_MANUFACTURER_QUOTES } from '../src/game/machineryAndSuppliersEngine';
 
 function createMockConstructionState(overrides: Partial<DailySimulationState> = {}): DailySimulationState {
   return {
@@ -50,10 +48,15 @@ function createMockConstructionState(overrides: Partial<DailySimulationState> = 
     sarTaxRecord: { ...DEFAULT_INITIAL_SAR_RECORD },
     fiscalSolvenciaActive: true,
 
-    commercialBanks: createDefaultBankRelationships(2000000),
+    commercialBanks: {
+      ficohsa: { bankId: 'ficohsa', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
+      atlantida: { bankId: 'atlantida', relationshipScore: 60, guaranteeDeposits: [], termDeposits: [] },
+      bac: { bankId: 'bac', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
+      occidente: { bankId: 'occidente', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] }
+    },
     ownedMachinery: [],
-    machineryDealers: DEFAULT_MACHINERY_DEALERS,
-    materialManufacturerQuotes: DEFAULT_MANUFACTURER_QUOTES,
+    machineryDealers: [],
+    materialManufacturerQuotes: [],
 
     bankerVaultCash: 500000,
     bankerBchReserve: 540000,
@@ -188,7 +191,7 @@ describe('Ejecución Diaria de Obra, Consumo de Materiales y Estimaciones de Cob
           progressPct: 10,
           daysRemaining: 30,
           totalDaysEstimated: 35,
-          requiredWorkersPerDay: 10,
+          requiredWorkersPerDay: 20,
           laborEfficiencyPct: 100,
           requiredMaterialsTotal: {
             cemento_gris: 100,
@@ -252,7 +255,7 @@ describe('Ejecución Diaria de Obra, Consumo de Materiales y Estimaciones de Cob
           progressPct: 15,
           daysRemaining: 60,
           totalDaysEstimated: 70,
-          requiredWorkersPerDay: 20,
+          requiredWorkersPerDay: 40,
           laborEfficiencyPct: 100,
           requiredMaterialsTotal: {
             cemento_gris: 500,

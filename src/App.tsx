@@ -1,20 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { GameState } from './game/types';
 import { INITIAL_GAME_STATE } from './game/initialState';
-import { startNewGame } from './game/economyEngine';
-import type { GameSetupProfile } from './game/types';
-import { RetailSectorId } from './game/retroSimTypes';
-import { AuditedRegulatoryReportModal } from './components/analytics/AuditedRegulatoryReportModal';
+import { restoreGameState } from './game/savedState';
 import { RetroDesktop } from './components/retro/RetroDesktop';
 import { RetroTitleScreen } from './components/retro/RetroTitleScreen';
-import { restoreGameState } from './game/savedState';
+import { AuditedRegulatoryReportModal } from './components/analytics/AuditedRegulatoryReportModal';
+import { RetailSectorId, RetroRoleMode } from './game/retroSimTypes';
 
-const STORAGE_KEY = 'aureo-bank-sim-state-v5';
-const RETRO_SECTOR_KEY = 'aureo-bank-retro-sector-v1';
+const STORAGE_KEY = 'aureo-bank-sim-state-v6';
+const RETRO_ROLE_KEY = 'aureo-retro-role-mode-v2';
+const RETRO_SECTOR_KEY = 'aureo-retro-sector-mode-v2';
 
 export default function App() {
   const [isAuditedReportModalOpen, setIsAuditedReportModalOpen] = useState<boolean>(false);
-  const [showTitleScreen, setShowTitleScreen] = useState<boolean>(true);
+  const [showTitleScreen, setShowTitleScreen] = useState<boolean>(false);
+
+  const [roleMode, setRoleMode] = useState<RetroRoleMode>(() => {
+    try {
+      const saved = localStorage.getItem(RETRO_ROLE_KEY);
+      if (saved === 'empresario' || saved === 'banquero' || saved === 'grupo_empresarial') {
+        return saved;
+      }
+    } catch {
+      // Storage no disponible
+    }
+    return 'empresario';
+  });
+
+  const [retailSector, setRetailSector] = useState<RetailSectorId>(() => {
+    try {
+      const saved = localStorage.getItem(RETRO_SECTOR_KEY);
+      if (saved === 'minimarket' || saved === 'constructora' || saved === 'supermercado' || saved === 'autolote' || saved === 'bar_restaurante') {
+        return saved;
+      }
+    } catch {
+      // Storage no disponible
+    }
+    return 'minimarket';
+  });
+
+  const [entityName, setEntityName] = useState<string>(() => {
+    return roleMode === 'empresario'
+      ? (retailSector === 'constructora'
+          ? 'Constructora Metropolitana'
+          : retailSector === 'supermercado'
+          ? 'Supermercados del Norte'
+          : retailSector === 'autolote'
+          ? 'Autolote El Diamante'
+          : 'Minimarket San Pedro')
+      : roleMode === 'banquero'
+      ? 'Áureo Bank Honduras S.A.'
+      : 'Grupo Financiero & Empresarial Áureo';
+  });
 
   const [gameState, setGameState] = useState<GameState>(() => {
     try {
@@ -29,93 +66,55 @@ export default function App() {
     return INITIAL_GAME_STATE;
   });
 
-  const [retroSector, setRetroSector] = useState<RetailSectorId>(() => {
-    try {
-      const savedSector = localStorage.getItem(RETRO_SECTOR_KEY) as RetailSectorId | null;
-      if (savedSector) return savedSector;
-    } catch {
-      // fallback
-    }
-    const firstEnterprise = gameState.enterprises?.[0];
-    if (firstEnterprise?.sector === 'supermercado' || firstEnterprise?.sector === 'tienda_retail') return 'minimarket';
-    return 'constructora';
-  });
-
-  // Persistir en cada cambio
+  // Guardar rol y sector en cada cambio
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-      localStorage.setItem(RETRO_SECTOR_KEY, retroSector);
+      localStorage.setItem(RETRO_ROLE_KEY, roleMode);
+      localStorage.setItem(RETRO_SECTOR_KEY, retailSector);
     } catch {
-      // Storage lleno o privado
+      // Storage lleno
     }
-  }, [gameState, retroSector]);
+  }, [roleMode, retailSector]);
 
-  const handleStartNewGame = (setup: GameSetupProfile, sector: RetailSectorId) => {
-    const newState = startNewGame(setup);
-    setGameState(newState);
-    setRetroSector(sector);
-    try {
-      localStorage.setItem(RETRO_SECTOR_KEY, sector);
-    } catch {
-      // ignore
-    }
+  const handleStartNewGameFromTitle = (params: {
+    roleMode: RetroRoleMode;
+    retailSector: RetailSectorId;
+    entityName: string;
+    city: string;
+  }) => {
+    setRoleMode(params.roleMode);
+    setRetailSector(params.retailSector);
+    setEntityName(params.entityName);
+    setShowTitleScreen(false);
   };
 
-  // 1. Pantalla de Bienvenida Retro OS (Continuar vs Nueva Partida)
-  if (showTitleScreen) {
-    const hasSaved = !!localStorage.getItem(STORAGE_KEY);
-    const role: 'empresario' | 'banquero' = gameState.roleMode === 'empresario' ? 'empresario' : 'banquero';
-    const firstEnterprise = gameState.enterprises?.[0];
-    const savedDetails = {
-      name: firstEnterprise?.name || (role === 'empresario' ? (retroSector === 'constructora' ? 'Constructora Metropolitana' : 'Minimarket San Pedro') : 'Áureo Bank Honduras'),
-      role,
-      day: 1,
-      month: gameState.gameMonth || 1,
-      year: gameState.bch.year || 2026
-    };
-
-    return (
-      <RetroTitleScreen
-        hasSavedGame={hasSaved}
-        savedGameDetails={savedDetails}
-        onContinueGame={() => {
-          setShowTitleScreen(false);
-        }}
-        onStartNewGame={(params) => {
-          const isConstructora = params.retailSector === 'constructora';
-          const setupProf: GameSetupProfile = {
-            founderName: 'Director Ejecutivo',
-            entityName: params.entityName,
-            roleMode: params.roleMode,
-            startingCity: params.city,
-            difficulty: 'estandar',
-            initialCapitalHNL: params.roleMode === 'empresario' ? (isConstructora ? 1850000 : 50000) : 850000,
-            isCustomGame: true
-          };
-          handleStartNewGame(setupProf, params.retailSector);
-          setShowTitleScreen(false);
-        }}
-      />
-    );
-  }
-
-  // 2. Sistema Operativo Retro Completo (Bank 2000 & Business Simulator Desktop)
-  const role: 'empresario' | 'banquero' = gameState.roleMode === 'empresario' ? 'empresario' : 'banquero';
-  const firstEnterprise = gameState.enterprises?.[0];
-  const name = firstEnterprise?.name || (role === 'empresario' ? (retroSector === 'constructora' ? 'Constructora Metropolitana' : 'Minimarket San Pedro') : 'Áureo Bank Honduras');
-
   return (
-    <div className="w-screen h-screen overflow-hidden">
-      <RetroDesktop
-        initialRole={role}
-        initialSector={retroSector}
-        initialName={name}
-        onOpenAuditReport={() => setIsAuditedReportModalOpen(true)}
-        onReturnToTitle={() => setShowTitleScreen(true)}
-      />
+    <div className="w-screen h-screen overflow-hidden bg-[#008080]">
+      {showTitleScreen ? (
+        <RetroTitleScreen
+          hasSavedGame={true}
+          savedGameDetails={{
+            name: entityName,
+            role: roleMode,
+            day: 1,
+            month: gameState.gameMonth,
+            year: 2026
+          }}
+          onContinueGame={() => setShowTitleScreen(false)}
+          onStartNewGame={handleStartNewGameFromTitle}
+        />
+      ) : (
+        <RetroDesktop
+          key={`${roleMode}-${retailSector}-${entityName}`}
+          initialRole={roleMode}
+          initialSector={retailSector}
+          initialName={entityName}
+          onOpenAuditReport={() => setIsAuditedReportModalOpen(true)}
+          onReturnToTitle={() => setShowTitleScreen(true)}
+        />
+      )}
 
-      {/* Modal de Auditoría Integral Regulada */}
+      {/* Modal de Auditoría Regulada BCH & CNBS */}
       {isAuditedReportModalOpen && (
         <AuditedRegulatoryReportModal
           state={gameState}
@@ -125,3 +124,4 @@ export default function App() {
     </div>
   );
 }
+

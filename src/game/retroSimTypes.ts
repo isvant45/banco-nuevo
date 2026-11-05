@@ -2,7 +2,9 @@
  * Tipos de datos para la simulación retro inspirada en Bank 2000 y el módulo de gestión empresarial aislada.
  */
 
-export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora';
+export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora' | 'supermercado' | 'autolote';
+
+export type RetroRoleMode = 'empresario' | 'banquero' | 'grupo_empresarial';
 
 export interface RetailProduct {
   id: string;
@@ -416,7 +418,7 @@ export interface DailySimulationState {
   currentYear: number;
   dailyHour: number; // 9 a 18
   isDayClosed: boolean;
-  roleMode: 'empresario' | 'banquero'; // Estricto y binario
+  roleMode: RetroRoleMode; // 3 etapas completamente separadas
   lastClosingSummary: {
     revenue: number;
     cogs: number;

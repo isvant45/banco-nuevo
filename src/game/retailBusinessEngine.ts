@@ -240,6 +240,140 @@ export const SECTOR_DEFAULT_PRODUCTS: Record<RetailSectorId, RetailProduct[]> = 
       dailyDemandBase: 3,
       spoilageRatePct: 0
     }
+  ],
+  supermercado: [
+    {
+      id: 'prod-super-meat',
+      name: 'Cortes de Res & Pollo Fresco (Lote 50kg)',
+      category: 'Carnicería & Perecederos',
+      icon: '🥩',
+      stock: 40,
+      unitCost: 2800,
+      sellingPrice: 4200,
+      supplierDeliveryDays: 1,
+      minOrderUnits: 10,
+      dailyDemandBase: 12,
+      spoilageRatePct: 6
+    },
+    {
+      id: 'prod-super-dairy',
+      name: 'Lácteos, Yogures & Quesos Frescos (Caja)',
+      category: 'Lácteos & Refrigerados',
+      icon: '🧀',
+      stock: 60,
+      unitCost: 1200,
+      sellingPrice: 1850,
+      supplierDeliveryDays: 1,
+      minOrderUnits: 15,
+      dailyDemandBase: 18,
+      spoilageRatePct: 5
+    },
+    {
+      id: 'prod-super-grains',
+      name: 'Granos Básicos: Frijol Rojo & Arroz (Quintal)',
+      category: 'Granos & Alimentos Básicos',
+      icon: '🌾',
+      stock: 50,
+      unitCost: 950,
+      sellingPrice: 1400,
+      supplierDeliveryDays: 2,
+      minOrderUnits: 15,
+      dailyDemandBase: 14,
+      spoilageRatePct: 2
+    },
+    {
+      id: 'prod-super-produce',
+      name: 'Verduras, Hortalizas & Frutas Frescas (Cajas)',
+      category: 'Frutas & Legumbres',
+      icon: '🍎',
+      stock: 45,
+      unitCost: 750,
+      sellingPrice: 1250,
+      supplierDeliveryDays: 1,
+      minOrderUnits: 20,
+      dailyDemandBase: 22,
+      spoilageRatePct: 8
+    },
+    {
+      id: 'prod-super-clean',
+      name: 'Detergentes, Cloro & Cuidado del Hogar (Pack)',
+      category: 'Cuidado del Hogar',
+      icon: '🧴',
+      stock: 70,
+      unitCost: 850,
+      sellingPrice: 1350,
+      supplierDeliveryDays: 3,
+      minOrderUnits: 15,
+      dailyDemandBase: 10,
+      spoilageRatePct: 0
+    }
+  ],
+  autolote: [
+    {
+      id: 'prod-auto-sedan',
+      name: 'Sedán Familiar Japonés 1.6L 2023',
+      category: 'Vehículos Nuevos & Seminuevos',
+      icon: '🚗',
+      stock: 8,
+      unitCost: 260000,
+      sellingPrice: 345000,
+      supplierDeliveryDays: 5,
+      minOrderUnits: 2,
+      dailyDemandBase: 1,
+      spoilageRatePct: 0
+    },
+    {
+      id: 'prod-auto-pickup',
+      name: 'Pickup Doble Cabina 4x4 Diésel 2024',
+      category: 'Vehículos Comerciales & Trabajo',
+      icon: '🛻',
+      stock: 5,
+      unitCost: 520000,
+      sellingPrice: 675000,
+      supplierDeliveryDays: 7,
+      minOrderUnits: 1,
+      dailyDemandBase: 1,
+      spoilageRatePct: 0
+    },
+    {
+      id: 'prod-auto-suv',
+      name: 'Camioneta SUV 4x2 Automática 2022',
+      category: 'SUVs & Familiares',
+      icon: '🚙',
+      stock: 6,
+      unitCost: 340000,
+      sellingPrice: 440000,
+      supplierDeliveryDays: 5,
+      minOrderUnits: 2,
+      dailyDemandBase: 1,
+      spoilageRatePct: 0
+    },
+    {
+      id: 'prod-auto-truck',
+      name: 'Camión Liviano 3.5 Toneladas Chasis',
+      category: 'Transporte & Flotillas',
+      icon: '🚛',
+      stock: 3,
+      unitCost: 480000,
+      sellingPrice: 615000,
+      supplierDeliveryDays: 8,
+      minOrderUnits: 1,
+      dailyDemandBase: 0.5,
+      spoilageRatePct: 0
+    },
+    {
+      id: 'prod-auto-tradein',
+      name: 'Lote Vehículos Usados Retirados (Trade-in)',
+      category: 'Trade-in & Valuaciones',
+      icon: '🔄',
+      stock: 4,
+      unitCost: 140000,
+      sellingPrice: 195000,
+      supplierDeliveryDays: 1,
+      minOrderUnits: 1,
+      dailyDemandBase: 1,
+      spoilageRatePct: 0
+    }
   ]
 };
 

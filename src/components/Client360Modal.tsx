@@ -183,6 +183,38 @@ export const Client360Modal: React.FC<Client360ModalProps> = ({
             </span>
           </div>
 
+          {/* Bienes Patrimoniales y Garantías Admisibles (Casas, Carros, Terrenos) */}
+          <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-200 font-mono">BIENES PATRIMONIALES & GARANTÍAS ADMISIBLES:</span>
+              <span className="text-[10px] text-amber-400 font-mono">Respaldo Colateral para Elevar Monto o Mejorar Tasa</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <div className="flex justify-between font-bold text-slate-100">
+                  <span>🏡 Casa Residencia (Lomas del Guijarro)</span>
+                  <span className="text-emerald-400">L 4,800,000</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 flex justify-between">
+                  <span>Estado: Libre de Gravamen</span>
+                  <span>Valor Recuperable (LTV 75%): L 3,600,000</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <div className="flex justify-between font-bold text-slate-100">
+                  <span>🚗 Vehículo Comercial (Pickup 4x4 2024)</span>
+                  <span className="text-emerald-400">L 1,150,000</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 flex justify-between">
+                  <span>Estado: Prenda Registrada</span>
+                  <span>Valor Recuperable (LTV 60%): L 690,000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <p className="text-xs text-slate-400">
             El buró detecta los saldos que este cliente mantiene en otras instituciones bancarias hondureñas. Puedes lanzar ofertas agresivas de compra de deuda, portabilidad de saldos y beneficios para captar su liquidez y cartera hacia Áureo Bank.
           </p>
