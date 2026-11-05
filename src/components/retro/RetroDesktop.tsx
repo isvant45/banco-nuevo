@@ -1066,6 +1066,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
               materials={simState.constructionMaterials}
               fiscalSolvenciaActive={simState.fiscalSolvenciaActive}
               storeReputation={simState.storeReputation}
+              staffCount={simState.staffCount}
               onSubmitBid={handleSubmitConstructionBid}
             />
           </RetroWindow>
@@ -1339,7 +1340,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           onMaximize={() => handleMaximizeWindow('bancos_comerciales')}
         >
           <CommercialBanksWindow
-            simState={simState}
+            state={simState}
             onOpenChecking={handleOpenBankChecking}
             onRequestLoan={handleRequestCommercialLoan}
             onRequestCard={handleRequestCorporateCard}
@@ -1371,7 +1372,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         >
           <MachineryDealerWindow
             dealers={simState.machineryDealers || DEFAULT_MACHINERY_DEALERS}
-            ownedFleet={simState.ownedMachinery || []}
+            ownedMachinery={simState.ownedMachinery || []}
             storeCash={simState.storeCash}
             storeBankBalance={simState.storeBankBalance}
             onBuyMachinery={handleBuyMachinery}
@@ -1398,10 +1399,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         >
           <MaterialTenderWindow
             quotes={simState.materialManufacturerQuotes || DEFAULT_MANUFACTURER_QUOTES}
-            activeOrders={simState.constructionOrders || []}
             storeCash={simState.storeCash}
             storeBankBalance={simState.storeBankBalance}
-            onOrderMaterial={handleOrderFromManufacturerQuote}
+            onOrderFromManufacturer={handleOrderFromManufacturerQuote}
           />
         </RetroWindow>
       )}

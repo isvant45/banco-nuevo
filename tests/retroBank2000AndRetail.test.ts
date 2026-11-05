@@ -23,6 +23,8 @@ import {
   DEFAULT_CONSTRUCTION_MATERIALS, 
   DEFAULT_INITIAL_SAR_RECORD 
 } from '../src/game/constructionEngine';
+import { createDefaultBankRelationships } from '../src/game/commercialBanksEngine';
+import { DEFAULT_MACHINERY_DEALERS, DEFAULT_MANUFACTURER_QUOTES } from '../src/game/machineryAndSuppliersEngine';
 
 describe('Bank 2000 Engine: Evaluación Crediticia y Ventanilla', () => {
   it('calcula correctamente el DTI y riesgo de pérdida para solicitantes solventes vs insolventes', () => {
@@ -125,6 +127,11 @@ describe('Bank 2000 Engine: Evaluación Crediticia y Ventanilla', () => {
       completedWorksHistory: [],
       sarTaxRecord: DEFAULT_INITIAL_SAR_RECORD,
       fiscalSolvenciaActive: true,
+
+      commercialBanks: createDefaultBankRelationships(0),
+      ownedMachinery: [],
+      machineryDealers: DEFAULT_MACHINERY_DEALERS,
+      materialManufacturerQuotes: DEFAULT_MANUFACTURER_QUOTES,
 
       bankerVaultCash: 500000,
       bankerBchReserve: 200000,
@@ -302,6 +309,11 @@ describe('Retail Business Engine: Gestión de Inventario, Ventas y Proveedores',
       completedWorksHistory: [],
       sarTaxRecord: DEFAULT_INITIAL_SAR_RECORD,
       fiscalSolvenciaActive: true,
+
+      commercialBanks: createDefaultBankRelationships(0),
+      ownedMachinery: [],
+      machineryDealers: DEFAULT_MACHINERY_DEALERS,
+      materialManufacturerQuotes: DEFAULT_MANUFACTURER_QUOTES,
 
       bankerVaultCash: 0,
       bankerBchReserve: 0,

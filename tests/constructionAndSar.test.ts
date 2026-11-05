@@ -11,6 +11,8 @@ import {
 } from '../src/game/constructionEngine';
 import { DailySimulationState } from '../src/game/retroSimTypes';
 import { DEFAULT_SMART_BANK_OFFERS } from '../src/game/retailBusinessEngine';
+import { createDefaultBankRelationships } from '../src/game/commercialBanksEngine';
+import { DEFAULT_MACHINERY_DEALERS, DEFAULT_MANUFACTURER_QUOTES } from '../src/game/machineryAndSuppliersEngine';
 
 function createMockConstructionState(overrides: Partial<DailySimulationState> = {}): DailySimulationState {
   return {
@@ -47,6 +49,11 @@ function createMockConstructionState(overrides: Partial<DailySimulationState> = 
 
     sarTaxRecord: { ...DEFAULT_INITIAL_SAR_RECORD },
     fiscalSolvenciaActive: true,
+
+    commercialBanks: createDefaultBankRelationships(2000000),
+    ownedMachinery: [],
+    machineryDealers: DEFAULT_MACHINERY_DEALERS,
+    materialManufacturerQuotes: DEFAULT_MANUFACTURER_QUOTES,
 
     bankerVaultCash: 500000,
     bankerBchReserve: 540000,
@@ -181,6 +188,8 @@ describe('Ejecución Diaria de Obra, Consumo de Materiales y Estimaciones de Cob
           progressPct: 10,
           daysRemaining: 30,
           totalDaysEstimated: 35,
+          requiredWorkersPerDay: 10,
+          laborEfficiencyPct: 100,
           requiredMaterialsTotal: {
             cemento_gris: 100,
             varilla_acero: 50,
@@ -243,6 +252,8 @@ describe('Ejecución Diaria de Obra, Consumo de Materiales y Estimaciones de Cob
           progressPct: 15,
           daysRemaining: 60,
           totalDaysEstimated: 70,
+          requiredWorkersPerDay: 20,
+          laborEfficiencyPct: 100,
           requiredMaterialsTotal: {
             cemento_gris: 500,
             varilla_acero: 200,

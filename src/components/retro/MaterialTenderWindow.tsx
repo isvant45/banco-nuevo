@@ -149,7 +149,7 @@ export const MaterialTenderWindow: React.FC<MaterialTenderWindowProps> = ({
 
               {!canAfford && (
                 <div className="p-2 bg-rose-50 border border-rose-300 text-rose-800 text-[10px]">
-                  ⚠️ Fondos insuficientes. Se requieren L {(totalOrderCost - totalAvailableFunds).toLocaleString()} adicionales. Puedes solicitar crédito en los 4 Bancos Comerciales.
+                  ⚠️ Fondos insuficientes. Se requieren L {(totalOrderCost - totalFunds).toLocaleString()} adicionales. Puedes solicitar crédito en los 4 Bancos Comerciales.
                 </div>
               )}
 
