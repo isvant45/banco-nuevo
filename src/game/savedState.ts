@@ -1,5 +1,12 @@
 import { INITIAL_GAME_STATE } from './initialState';
 import type { GameState } from './types';
+import type { DailySimulationState } from './retroSimTypes';
+import { 
+  createDefaultRealEstateCollaterals, 
+  createInitialSimulatedEmails, 
+  createDefaultBankRelationships 
+} from './commercialBanksEngine';
+import { DEFAULT_INITIAL_SAR_RECORD } from './constructionEngine';
 
 // Fill newly introduced fields without replacing the player's balances or lists.
 function mergeDefaults(defaults: any, saved: any): any {
@@ -102,4 +109,41 @@ export function restoreGameState(saved: unknown): GameState {
     state.gameSetup = structuredClone(INITIAL_GAME_STATE.gameSetup);
   }
   return state;
+}
+
+export function restoreDailySimulationState(saved: any): DailySimulationState {
+  if (!saved || typeof saved !== 'object') {
+    throw new Error('Estado de partida inválido');
+  }
+
+  const result: DailySimulationState = { ...saved };
+  const storeName = result.storeName || (result.retailSector === 'constructora' ? 'Constructora Metropolitana' : 'Minimarket San Pedro');
+  const retailSector = result.retailSector || 'minimarket';
+  const storeBank = result.storeBankBalance ?? 120000;
+
+  if (!result.realEstateCollaterals || result.realEstateCollaterals.length === 0) {
+    result.realEstateCollaterals = createDefaultRealEstateCollaterals(storeName, retailSector);
+  }
+  if (!result.simulatedEmails || result.simulatedEmails.length === 0) {
+    result.simulatedEmails = createInitialSimulatedEmails(storeName, retailSector, storeBank);
+  }
+  if (!Array.isArray(result.transactionVouchers)) {
+    result.transactionVouchers = [];
+  }
+  if (!Array.isArray(result.dynamicBankOffers)) {
+    result.dynamicBankOffers = [];
+  }
+  if (!Array.isArray(result.fiscalPeriods)) {
+    result.fiscalPeriods = [];
+  }
+  if (!result.commercialBanks) {
+    result.commercialBanks = createDefaultBankRelationships(storeBank);
+  }
+  if (!result.sarTaxRecord) {
+    result.sarTaxRecord = structuredClone(DEFAULT_INITIAL_SAR_RECORD);
+  }
+  if (result.fiscalSolvenciaActive === undefined) {
+    result.fiscalSolvenciaActive = true;
+  }
+  return result;
 }

@@ -5,7 +5,9 @@ import {
   RetroRoleMode,
   RetailCustomerWalkIn, 
   ConstructionMaterialId,
-  CommercialLoanType
+  CommercialLoanType,
+  TransactionVoucher,
+  SimulatedEmail
 } from '../../game/retroSimTypes';
 import { 
   SECTOR_DEFAULT_PRODUCTS, 
@@ -56,7 +58,14 @@ import {
   makeExtraordinaryLoanPaymentWithOptions,
   pledgeRealEstateCollateralToLoan,
   releaseRealEstateCollateral,
-  executeInvoiceFactoring
+  executeInvoiceFactoring,
+  createDefaultRealEstateCollaterals,
+  executeFlexibleLoanPayment,
+  transferBetweenAccounts,
+  requestNewAppraisal,
+  registerNewAssetAsCollateral,
+  evaluateAndGenerateBankOffers,
+  createInitialSimulatedEmails
 } from '../../game/commercialBanksEngine';
 import {
   DEFAULT_MACHINERY_DEALERS,
@@ -64,6 +73,7 @@ import {
   buyMachineryUnit,
   orderFromMaterialManufacturer
 } from '../../game/machineryAndSuppliersEngine';
+import { restoreDailySimulationState } from '../../game/savedState';
 import { sound } from '../../game/audioFx';
 import { RetroWindow } from './RetroWindow';
 import { RetroTaskbar, WindowInfo } from './RetroTaskbar';
@@ -81,6 +91,8 @@ import { SarTaxAuditWindow } from './SarTaxAuditWindow';
 import { FinancialStatementsWindow } from './FinancialStatementsWindow';
 import { LiabilitiesManagerWindow } from './LiabilitiesManagerWindow';
 import { CompetitorsMarketWindow } from './CompetitorsMarketWindow';
+import { BusinessEmailWindow } from './BusinessEmailWindow';
+import { TransactionVoucherModal } from './TransactionVoucherModal';
 import { DailyClosingModal } from './DailyClosingModal';
 import { RetroNewGameModal } from './RetroNewGameModal';
 
@@ -88,7 +100,7 @@ interface RetroDesktopProps {
   initialRole: RetroRoleMode;
   initialSector?: RetailSectorId;
   initialName?: string;
-  onOpenAuditReport: () => void;
+  onOpenAuditReport?: () => void;
   onToggleViewMode?: () => void;
   onReturnToTitle?: () => void;
 }
@@ -193,6 +205,13 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       approvedAmountToday: 0,
       rejectedCountToday: 0,
 
+      // Garantías Reales, Correos, Vouchers y Ofertas Dinámicas
+      realEstateCollaterals: createDefaultRealEstateCollaterals(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro'), initialSector),
+      simulatedEmails: createInitialSimulatedEmails(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro'), initialSector, initialStoreBank),
+      transactionVouchers: [],
+      dynamicBankOffers: [],
+      fiscalPeriods: [],
+
       dailyHistory: []
     };
   });
@@ -208,6 +227,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     licitacion_materiales: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     sar_audit: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     staff_store: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    business_email: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 10 },
     bank_docket: { isOpen: roleMode === 'banquero', isMinimized: false, isMaximized: false, zIndex: 10 },
     bank_vault: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     holding_board: { isOpen: roleMode === 'grupo_empresarial', isMinimized: false, isMaximized: false, zIndex: 10 },
@@ -224,6 +244,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   );
   const [isDailyClosingModalOpen, setIsDailyClosingModalOpen] = useState(false);
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
+  const [activeVoucherModal, setActiveVoucherModal] = useState<TransactionVoucher | null>(null);
 
   // Manejo de foco y visualización de ventanas
   const bringToFront = (id: string) => {
@@ -466,9 +487,82 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     termMonths: number,
     purpose: string,
     graceMonths: number = 0,
-    collateralId?: string
+    collateralId?: string,
+    destinationBankId?: string
   ) => {
-    const res = requestFullCommercialCredit(simState, bankId, productType, amount, termMonths, purpose, graceMonths, collateralId);
+    const res = requestFullCommercialCredit(
+      simState,
+      bankId,
+      productType,
+      amount,
+      termMonths,
+      purpose,
+      graceMonths,
+      collateralId,
+      destinationBankId
+    );
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+    } else {
+      sound.playRejectBuzzer();
+    }
+    alert(res.message);
+  };
+
+  const handleExecuteFlexiblePayment = (params: {
+    bankId: any;
+    paymentMode: 'una_cuota' | 'varias_cuotas' | 'pago_parcial' | 'abono_capital' | 'cancelar_prestamo';
+    amount: number;
+    numberOfInstallments?: number;
+    extraordinaryStrategy?: 'reducir_cuota' | 'reducir_plazo';
+    sourceAccount?: 'efectivo' | 'cuenta_bancaria';
+  }) => {
+    const res = executeFlexibleLoanPayment(simState, params);
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+    } else {
+      sound.playRejectBuzzer();
+    }
+    alert(res.message);
+  };
+
+  const handleTransferBetweenAccounts = (
+    fromBankId: string,
+    toBankId: string,
+    amount: number,
+    concept?: string
+  ) => {
+    const res = transferBetweenAccounts(simState, fromBankId, toBankId, amount, concept);
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+    } else {
+      sound.playRejectBuzzer();
+    }
+    alert(res.message);
+  };
+
+  const handleRequestNewAppraisal = (collateralId: string) => {
+    const res = requestNewAppraisal(simState, collateralId);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    else sound.playRejectBuzzer();
+    alert(res.message);
+  };
+
+  const handleRegisterAssetAsCollateral = (data: any) => {
+    const res = registerNewAssetAsCollateral(simState, data);
     setSimState(res.updatedState);
     if (res.success) sound.playApprovalStamp();
     else sound.playRejectBuzzer();
@@ -536,7 +630,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         const text = e.target?.result as string;
         const parsed = JSON.parse(text);
         if (parsed.simState) {
-          setSimState(parsed.simState);
+          const restored = restoreDailySimulationState(parsed.simState);
+          setSimState(restored);
           if (parsed.roleMode) setRoleMode(parsed.roleMode);
           if (parsed.retailSector) setRetailSector(parsed.retailSector);
           if (parsed.entityName) setEntityName(parsed.entityName);
@@ -800,6 +895,36 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     } else {
       nextState = advanceBankDay(simState);
     }
+
+    // Evaluar y generar ofertas bancarias dinámicas según salud financiera
+    nextState = evaluateAndGenerateBankOffers(nextState);
+
+    // Enviar resumen diario de ventas por correo si hubo cobros en el día
+    if (nextState.dailyReceipts && nextState.dailyReceipts.length > 0) {
+      const totalVentasDia = nextState.dailyReceipts.reduce((sum, r) => sum + r.totalAmount, 0);
+      const emailResumen: SimulatedEmail = {
+        id: `em-sales-resumen-d${nextState.currentDay}-${Date.now()}`,
+        dateDay: nextState.currentDay,
+        dateMonth: nextState.currentMonth,
+        dateYear: nextState.currentYear,
+        sender: 'Caja & Terminal POS',
+        senderEmail: 'pos-terminal@aureo-sistema.hn',
+        recipient: entityName,
+        recipientEmail: `gerencia@${entityName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+        subject: `📊 Resumen de Ventas Diarias - Día ${nextState.currentDay}: L ${totalVentasDia.toLocaleString('es-HN', { minimumFractionDigits: 2 })}`,
+        category: 'ventas_clientes',
+        snippet: `Cierre del día completado con ${nextState.dailyReceipts.length} transacciones registradas.`,
+        body: `Estimada Gerencia:\n\nSe ha completado el corte de caja del día ${nextState.currentDay}/${nextState.currentMonth}/${nextState.currentYear}.\n\nTotal de clientes atendidos: ${nextState.dailyReceipts.length} ventas.\nIngresos totales brutos: L ${totalVentasDia.toLocaleString('es-HN', { minimumFractionDigits: 2 })}.\n\nEl arqueo de efectivo y comprobantes ha sido sincronizado con la contabilidad.`,
+        isRead: false,
+        isStarred: false,
+        status: 'informativo'
+      };
+      nextState = {
+        ...nextState,
+        simulatedEmails: [emailResumen, ...(nextState.simulatedEmails || [])]
+      };
+    }
+
     setSimState(nextState);
     setIsDailyClosingModalOpen(true);
   };
@@ -826,6 +951,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       const dpfRes = accrueTermDeposits(cardRes, daysCount);
       nextState = dpfRes.updatedState;
     }
+
+    // Ofertas bancarias dinámicas
+    nextState = evaluateAndGenerateBankOffers(nextState);
 
     setSimState(nextState);
     setIsDailyClosingModalOpen(true);
@@ -904,6 +1032,13 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       approvedAmountToday: 0,
       rejectedCountToday: 0,
 
+      // Garantías, Correos, Vouchers y Ofertas
+      realEstateCollaterals: createDefaultRealEstateCollaterals(params.entityName, params.retailSector),
+      simulatedEmails: createInitialSimulatedEmails(params.entityName, params.retailSector, initialBank),
+      transactionVouchers: [],
+      dynamicBankOffers: [],
+      fiscalPeriods: [],
+
       dailyHistory: []
     });
 
@@ -970,6 +1105,13 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       { id: 'bancos_comerciales', title: 'Tesorería & Bancos', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
       { id: 'sar_audit', title: 'SAR - Consolidado', icon: '📋', isOpen: !!openWindows.sar_audit?.isOpen, isMinimized: !!openWindows.sar_audit?.isMinimized }
     ] : []),
+    { 
+      id: 'business_email', 
+      title: `Correo Empresarial (${simState.simulatedEmails?.filter(e => !e.isRead).length || 0})`, 
+      icon: '📨', 
+      isOpen: !!openWindows.business_email?.isOpen, 
+      isMinimized: !!openWindows.business_email?.isMinimized 
+    },
     { id: 'financial_statements', title: 'Contabilidad: Balance & P&L', icon: '⚖️', isOpen: !!openWindows.financial_statements?.isOpen, isMinimized: !!openWindows.financial_statements?.isMinimized },
     { id: 'liabilities_manager', title: 'Centro de Pasivos & Obligaciones', icon: '📑', isOpen: !!openWindows.liabilities_manager?.isOpen, isMinimized: !!openWindows.liabilities_manager?.isMinimized },
     { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized }
@@ -1471,15 +1613,20 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         <button
           onClick={() => {
             sound.playClick();
-            onOpenAuditReport();
+            bringToFront('business_email');
           }}
-          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none relative"
         >
-          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
-            📊
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1 relative">
+            📨
+            {simState.simulatedEmails && simState.simulatedEmails.filter(e => !e.isRead).length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow">
+                {simState.simulatedEmails.filter(e => !e.isRead).length}
+              </span>
+            )}
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-            Auditoría General
+            Correo Empresarial
           </span>
         </button>
 
@@ -1637,6 +1784,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           onMaximize={() => handleMaximizeWindow('sar_audit')}
         >
           <SarTaxAuditWindow
+            state={simState}
+            onUpdateState={(nextSt) => setSimState(nextSt)}
             companyName={entityName}
             sarRecord={simState.sarTaxRecord}
             storeCash={simState.storeCash}
@@ -1857,6 +2006,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
             onPledgeCollateral={handlePledgeCollateral}
             onReleaseCollateral={handleReleaseCollateral}
             onExecuteFactoring={handleExecuteFactoring}
+            onExecuteFlexiblePayment={handleExecuteFlexiblePayment}
+            onTransferBetweenAccounts={handleTransferBetweenAccounts}
+            onRequestNewAppraisal={handleRequestNewAppraisal}
+            onRegisterAssetAsCollateral={handleRegisterAssetAsCollateral}
+            onViewVoucher={(v) => setActiveVoucherModal(v)}
           />
         </RetroWindow>
       )}
@@ -2087,6 +2241,41 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         />
       </RetroWindow>
 
+      {/* Ventana: Correo Empresarial */}
+      <RetroWindow
+        id="business_email"
+        title={`Correo Empresarial - Bandeja Corporativa: ${entityName}`}
+        icon="📨"
+        initialX={95}
+        initialY={40}
+        isOpen={!!openWindows.business_email?.isOpen}
+        isMinimized={!!openWindows.business_email?.isMinimized}
+        isMaximized={!!openWindows.business_email?.isMaximized}
+        zIndex={openWindows.business_email?.zIndex || 10}
+        onFocus={() => bringToFront('business_email')}
+        onClose={() => handleCloseWindow('business_email')}
+        onMinimize={() => handleMinimizeWindow('business_email')}
+        onMaximize={() => handleMaximizeWindow('business_email')}
+      >
+        <BusinessEmailWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          companyName={entityName}
+          onOpenBank={() => bringToFront('bancos_comerciales')}
+          onOpenSar={() => bringToFront('sar_audit')}
+          onOpenRegister={() => bringToFront('pos_register')}
+          onViewVoucher={(voucher) => setActiveVoucherModal(voucher)}
+        />
+      </RetroWindow>
+
+      {/* Modal de Comprobante Oficial de Transacción Bancaria */}
+      {activeVoucherModal && (
+        <TransactionVoucherModal
+          voucher={activeVoucherModal}
+          onClose={() => setActiveVoucherModal(null)}
+        />
+      )}
+
       {/* Barra de Tareas Inferior */}
       <RetroTaskbar
         windows={windowsInfo}
@@ -2101,6 +2290,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onAdvanceDays={handleAdvanceDays}
         onOpenNewGame={() => setIsNewGameModalOpen(true)}
         onOpenAuditReport={onOpenAuditReport}
+        onOpenBusinessEmail={() => bringToFront('business_email')}
+        unreadEmailsCount={simState.simulatedEmails?.filter(e => !e.isRead).length || 0}
         onOpenFinancialStatements={() => bringToFront('financial_statements')}
         onOpenLiabilitiesManager={() => bringToFront('liabilities_manager')}
         onOpenCompetitorsMarket={() => bringToFront('competitors_market')}

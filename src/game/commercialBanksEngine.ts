@@ -16,7 +16,11 @@ import {
   SupplierCreditItem,
   CompetitorFirm,
   FinancialStatementsSummary,
-  RetailSectorId
+  RetailSectorId,
+  TransactionVoucher,
+  SimulatedEmail,
+  CollateralLien,
+  DynamicBankOffer
 } from './retroSimTypes';
 
 /**
@@ -2399,10 +2403,28 @@ export function requestFullCommercialCredit(
   termMonths: number,
   purpose: string,
   gracePeriodMonths: number = 0,
-  collateralId?: string
-): { updatedState: DailySimulationState; success: boolean; message: string; disclosure: CreditTermsDisclosure } {
+  collateralId?: string,
+  destinationBankId?: CommercialBankId
+): { updatedState: DailySimulationState; success: boolean; message: string; disclosure: CreditTermsDisclosure; voucher?: TransactionVoucher } {
   const disclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
   const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+
+  // Prevenir deuda activa duplicada en el mismo banco
+  const currentRel = state.commercialBanks[bankId] || {
+    bankId,
+    relationshipScore: 50,
+    guaranteeDeposits: [],
+    termDeposits: []
+  };
+
+  if (currentRel.activeLoan && currentRel.activeLoan.balanceRemaining > 0) {
+    return {
+      updatedState: state,
+      success: false,
+      disclosure,
+      message: `Ya mantienes un crédito activo pendiente en ${bank.name} con un saldo de L ${currentRel.activeLoan.balanceRemaining.toLocaleString()}. Cancela o consolida la deuda antes de solicitar otro préstamo.`
+    };
+  }
 
   // Validaciones estrictas
   if (requestedAmount > disclosure.approvedAmountHNL) {
@@ -2423,13 +2445,6 @@ export function requestFullCommercialCredit(
     };
   }
 
-  const currentRel = state.commercialBanks[bankId] || {
-    bankId,
-    relationshipScore: 50,
-    guaranteeDeposits: [],
-    termDeposits: []
-  };
-
   const newLoanId = `loan-${productType.slice(0, 4)}-${Date.now().toString().slice(-4)}`;
 
   const newLoan: BankCommercialLoan = {
@@ -2449,34 +2464,146 @@ export function requestFullCommercialCredit(
     revolvingDrawn: productType === 'linea_revolvente' ? 0 : undefined
   };
 
-  // Si se vinculó una garantía real, pignorarla
-  let updatedCollaterals = state.realEstateCollaterals || [];
-  if (collateralId) {
-    updatedCollaterals = updatedCollaterals.map(c => c.id === collateralId ? {
-      ...c,
-      isPledged: true,
-      pledgedToBankId: bankId,
-      linkedDebtId: newLoanId
-    } : c);
-  }
+  // Desembolso neto = Monto aprobado menos deducción de comisión de apertura (1.5%)
+  const netCashReceived = disclosure.netDisbursementHNL;
 
-  const updatedBanks = {
-    ...state.commercialBanks,
-    [bankId]: {
-      ...currentRel,
-      relationshipScore: Math.min(100, currentRel.relationshipScore + 10),
-      activeLoan: newLoan
+  // Determinar banco y cuenta de cheques destino
+  const targetBankId: CommercialBankId = destinationBankId || bankId;
+  const targetBank = COMMERCIAL_BANKS_PROFILES[targetBankId];
+  const targetRel = state.commercialBanks[targetBankId] || {
+    bankId: targetBankId,
+    relationshipScore: 50,
+    guaranteeDeposits: [],
+    termDeposits: []
+  };
+
+  const priorCheckingBalance = targetRel.checkingAccount?.balance ?? 0;
+  const newCheckingBalance = priorCheckingBalance + netCashReceived;
+  const targetCheckingAccNum = targetRel.checkingAccount?.accountNumber || `CTA-${targetBankId.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const updatedTargetRel: CommercialBankRelationship = {
+    ...targetRel,
+    checkingAccount: {
+      accountNumber: targetCheckingAccNum,
+      balance: newCheckingBalance,
+      interestRateYieldPct: targetRel.checkingAccount?.interestRateYieldPct || 2.5,
+      openedDay: targetRel.checkingAccount?.openedDay || state.currentDay,
+      monthlyFeeHNL: targetRel.checkingAccount?.monthlyFeeHNL || 150
     }
   };
 
-  // Desembolso: se acredita el monto neto (monto aprobado menos comisión bancaria)
-  const netCashReceived = disclosure.netDisbursementHNL;
+  let updatedBanks = { ...state.commercialBanks };
+  if (targetBankId === bankId) {
+    updatedBanks[bankId] = {
+      ...updatedTargetRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 10),
+      activeLoan: newLoan
+    };
+  } else {
+    updatedBanks[targetBankId] = updatedTargetRel;
+    updatedBanks[bankId] = {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 10),
+      activeLoan: newLoan
+    };
+  }
+
+  // Si se vinculó una garantía real, pignorarla con gravamen de 1er o 2do rango
+  let updatedCollaterals = state.realEstateCollaterals || [];
+  if (collateralId) {
+    updatedCollaterals = updatedCollaterals.map(c => {
+      if (c.id !== collateralId) return c;
+      const rank: 1 | 2 = (c.liens && c.liens.length > 0) ? 2 : 1;
+      const committed = Math.min(c.availableCoverageHNL ?? c.eligibleCollateralValueHNL, disclosure.approvedAmountHNL);
+      const newLien: CollateralLien = {
+        id: `lien-${Date.now().toString().slice(-4)}`,
+        rank,
+        beneficiaryBankId: bankId,
+        beneficiaryBankName: bank.name,
+        linkedLoanId: newLoanId,
+        committedCoverageHNL: committed,
+        registeredDate: `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`
+      };
+      const existingLiens = c.liens || [];
+      const newLiens = [...existingLiens, newLien];
+      const newPledgedTotal = newLiens.reduce((sum, l) => sum + l.committedCoverageHNL, 0);
+      const newAvailable = Math.max(0, c.eligibleCollateralValueHNL - newPledgedTotal);
+
+      return {
+        ...c,
+        liens: newLiens,
+        pledgedAmountTotal: newPledgedTotal,
+        availableCoverageHNL: newAvailable,
+        status: newAvailable <= 0 ? 'pignorado_total' as const : 'pignorado_parcial' as const,
+        isPledged: true,
+        isLockedForSale: true,
+        pledgedToBankId: bankId,
+        linkedDebtId: newLoanId
+      };
+    });
+  }
+
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+  const voucherNum = `VCH-DES-${state.currentDay}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  // Comprobante oficial de desembolso
+  const voucher: TransactionVoucher = {
+    id: `vch-loan-${Date.now()}`,
+    voucherNumber: voucherNum,
+    operationType: 'desembolso_prestamo',
+    title: `Desembolso Neto: ${disclosure.productConfig.name}`,
+    timestamp: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    companyName: state.storeName,
+    primaryBankId: bankId,
+    destinationBankId: targetBankId,
+    destinationAccountNumber: `${targetBank.name} - ${targetCheckingAccNum}`,
+    grossAmountHNL: disclosure.approvedAmountHNL,
+    deductionsHNL: disclosure.openingFeeHNL,
+    netDisbursedOrPaidHNL: netCashReceived,
+    deductionsBreakdown: [
+      { concept: 'Comisión Bancaria de Apertura (1.5%)', amountHNL: disclosure.openingFeeHNL }
+    ],
+    priorBalanceHNL: priorCheckingBalance,
+    newBalanceHNL: newCheckingBalance,
+    loanBalancePriorHNL: 0,
+    loanBalanceNewHNL: disclosure.approvedAmountHNL,
+    referenceCode: `CR-${bankId.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`,
+    authStamp: `BCH-DISB-${state.currentYear || 2026}-${Date.now().toString().slice(-6)}`
+  };
+
+  // Correo institucional al buzón de la empresa
+  const disbursementEmail: SimulatedEmail = {
+    id: `email-disb-${Date.now()}`,
+    category: 'bancos_financiamiento',
+    senderName: `${bank.name} - Gerencia de Créditos`,
+    senderEmail: `creditos@${bankId}.banca.hn`,
+    recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+    companyName: state.storeName,
+    subject: `Acreditación Confirmada: Desembolso ${disclosure.productConfig.name} (L ${netCashReceived.toLocaleString()})`,
+    body: `Aviso de Acreditación de Fondos:\n\nNos complace informarle que ${bank.name} ha efectuado el desembolso de su crédito comercial:\n\n• Monto Aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()}\n• Deducción Comisión de Apertura (1.5%): -L ${disclosure.openingFeeHNL.toLocaleString()}\n• Desembolso Neto Acreditado: L ${netCashReceived.toLocaleString()}\n• Banco y Cuenta de Destino: ${targetBank.name} (${targetCheckingAccNum})\n• Saldo Anterior de la Cuenta: L ${priorCheckingBalance.toLocaleString()}\n• Nuevo Saldo en Cuenta: L ${newCheckingBalance.toLocaleString()}\n• Cuota Mensual Pactada: L ${disclosure.monthlyPaymentHNL.toLocaleString()}/mes al ${disclosure.annualNominalRatePct}% anual.\n\nEl comprobante digital ha quedado registrado en su bitácora financiera.`,
+    sentDate: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    isRead: false,
+    isStarred: true,
+    isArchived: false,
+    folder: 'inbox',
+    relatedEntityType: 'loan_payment',
+    relatedEntityId: newLoanId,
+    voucherPayload: voucher
+  };
 
   const nextState: DailySimulationState = {
     ...state,
     storeBankBalance: state.storeBankBalance + netCashReceived,
     commercialBanks: updatedBanks,
-    realEstateCollaterals: updatedCollaterals
+    realEstateCollaterals: updatedCollaterals,
+    transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
+    simulatedEmails: [disbursementEmail, ...(state.simulatedEmails || [])]
   };
 
   const newScore = calculateCompanyCreditScore(nextState);
@@ -2488,7 +2615,8 @@ export function requestFullCommercialCredit(
     },
     success: true,
     disclosure,
-    message: `¡FINANCIAMIENTO DESEMBOLSADO! ${bank.name} aprobó tu "${disclosure.productConfig.name}" por L ${disclosure.approvedAmountHNL.toLocaleString()} al ${disclosure.annualNominalRatePct}% anual. Desembolso neto acreditado a cuenta: L ${netCashReceived.toLocaleString()} (Comisión de apertura deducida: L ${disclosure.openingFeeHNL.toLocaleString()}). Cuota mensual: L ${disclosure.monthlyPaymentHNL.toLocaleString()}.`
+    voucher,
+    message: `¡FINANCIAMIENTO DESEMBOLSADO! ${bank.name} acreditó L ${netCashReceived.toLocaleString()} en tu cuenta de ${targetBank.name}. Monto aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()} (Comisión 1.5% deducida: L ${disclosure.openingFeeHNL.toLocaleString()}). Saldo anterior: L ${priorCheckingBalance.toLocaleString()} ➔ Nuevo saldo: L ${newCheckingBalance.toLocaleString()}. Comprobante No. ${voucherNum}.`
   };
 }
 
@@ -2809,118 +2937,6 @@ export function makeExtraordinaryLoanPaymentWithOptions(
   };
 }
 
-// =========================================================================
-// GESTIÓN DE GARANTÍAS REALES (PIGNORACIÓN Y LIBERACIÓN DE BIENES)
-// =========================================================================
-
-export function createDefaultRealEstateCollaterals(sector: RetailSectorId = 'constructora'): RealEstateCollateralItem[] {
-  return [
-    {
-      id: 'col_casa_palmas',
-      title: 'Residencia en Col. Las Palmas (Terreno 450 v²)',
-      assetType: 'casa_habitacion',
-      ownerName: 'Empresario Propietario',
-      location: 'Tegucigalpa, M.D.C.',
-      marketValueHNL: 4500000,
-      appraisalValueHNL: 3800000,
-      ltvAcceptedPct: 80, // 80% LTV
-      isPledged: false,
-      registrationNumber: 'MAT-FMI-2024-8891'
-    },
-    {
-      id: 'col_terreno_norte',
-      title: 'Lote Comercial en Bulevar del Norte (1,200 v²)',
-      assetType: 'terreno_comercial',
-      ownerName: 'Empresa Mercantil S.A.',
-      location: 'San Pedro Sula, Cortés',
-      marketValueHNL: 7200000,
-      appraisalValueHNL: 6200000,
-      ltvAcceptedPct: 75,
-      isPledged: false,
-      registrationNumber: 'MAT-FMI-2023-4109'
-    },
-    {
-      id: 'col_bodega_valle',
-      title: 'Bodega Industrial y Oficinas (800 m²)',
-      assetType: 'local_bodega',
-      ownerName: 'Empresa Mercantil S.A.',
-      location: 'El Progreso, Yoro',
-      marketValueHNL: 5800000,
-      appraisalValueHNL: 4900000,
-      ltvAcceptedPct: 70,
-      isPledged: false,
-      registrationNumber: 'MAT-FMI-2022-7734'
-    }
-  ];
-}
-
-export function pledgeRealEstateCollateralToLoan(
-  state: DailySimulationState,
-  collateralId: string,
-  bankId: CommercialBankId,
-  loanId: string
-): { updatedState: DailySimulationState; success: boolean; message: string } {
-  const collaterals = state.realEstateCollaterals || [];
-  const col = collaterals.find(c => c.id === collateralId);
-
-  if (!col) return { updatedState: state, success: false, message: 'Garantía patrimonial no encontrada.' };
-  if (col.isPledged) return { updatedState: state, success: false, message: `El bien "${col.title}" ya se encuentra pignorado a otra obligación bancaria.` };
-
-  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
-    ...c,
-    isPledged: true,
-    pledgedToBankId: bankId,
-    linkedDebtId: loanId
-  } : c);
-
-  return {
-    updatedState: {
-      ...state,
-      realEstateCollaterals: updatedCollaterals
-    },
-    success: true,
-    message: `¡GRAVAMEN INSCRITO! "${col.title}" (Valor avalúo: L ${col.appraisalValueHNL.toLocaleString()}) fue pignorado a favor de ${COMMERCIAL_BANKS_PROFILES[bankId].name} con un LTV de cobertura del ${col.ltvAcceptedPct}%.`
-  };
-}
-
-export function releaseRealEstateCollateral(
-  state: DailySimulationState,
-  collateralId: string
-): { updatedState: DailySimulationState; success: boolean; message: string } {
-  const collaterals = state.realEstateCollaterals || [];
-  const col = collaterals.find(c => c.id === collateralId);
-
-  if (!col) return { updatedState: state, success: false, message: 'Garantía patrimonial no encontrada.' };
-  if (!col.isPledged) return { updatedState: state, success: false, message: `El bien "${col.title}" ya está libre de gravamen.` };
-
-  // Verificar si la deuda asociada está completamente pagada
-  if (col.pledgedToBankId) {
-    const rel = state.commercialBanks[col.pledgedToBankId];
-    if (rel?.activeLoan && rel.activeLoan.id === col.linkedDebtId && rel.activeLoan.balanceRemaining > 0) {
-      return {
-        updatedState: state,
-        success: false,
-        message: `No se puede liberar la garantía: el préstamo vinculado aún tiene un saldo deudor de L ${rel.activeLoan.balanceRemaining.toLocaleString()}.`
-      };
-    }
-  }
-
-  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
-    ...c,
-    isPledged: false,
-    pledgedToBankId: undefined,
-    linkedDebtId: undefined
-  } : c);
-
-  return {
-    updatedState: {
-      ...state,
-      realEstateCollaterals: updatedCollaterals
-    },
-    success: true,
-    message: `¡CARTA DE LIBERACIÓN EMITIDA! "${col.title}" ha sido liberado de todo gravamen. Disponibilidad restituida al 100%.`
-  };
-}
 
 // =========================================================================
 // FACTORAJE DE FACTURAS Y ESTIMACIONES DE OBRA
@@ -3292,4 +3308,1024 @@ export function calculateComprehensiveFinancialStatements(state: DailySimulation
     }
   };
 }
+
+// =========================================================================
+// GESTIÓN DE GARANTÍAS REALES (PIGNORACIÓN Y LIBERACIÓN DE BIENES)
+// =========================================================================
+
+export function createDefaultRealEstateCollaterals(sector: RetailSectorId = 'constructora'): RealEstateCollateralItem[] {
+  return [
+    {
+      id: 'col_casa_palmas',
+      title: 'Residencia en Col. Las Palmas (Terreno 450 v²)',
+      assetType: 'casa_habitacion',
+      ownerName: 'Empresario Propietario',
+      companyName: 'Empresa Mercantil S.A.',
+      description: 'Vivienda unifamiliar de 2 niveles, acabados de madera de color, 4 habitaciones y garaje techado.',
+      location: 'Tegucigalpa, M.D.C.',
+      status: 'disponible',
+      acquisitionValueHNL: 3200000,
+      marketValueHNL: 4500000,
+      appraisalValueHNL: 3800000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 80, // 80% LTV
+      eligibleCollateralValueHNL: 3040000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 3040000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'MAT-FMI-2024-8891',
+      simulatedDocumentNumber: 'ESCRITURA-PUB-2024-912',
+      situationNotes: 'Inmueble residencial libre de gravamen con avalúo pericial vigente.'
+    },
+    {
+      id: 'col_terreno_norte',
+      title: 'Lote Comercial en Bulevar del Norte (1,200 v²)',
+      assetType: 'terreno_comercial',
+      ownerName: 'Empresa Mercantil S.A.',
+      companyName: 'Empresa Mercantil S.A.',
+      description: 'Terreno plano de alta plusvalía comercial con 35 metros de frente sobre bulevar principal.',
+      location: 'San Pedro Sula, Cortés',
+      status: 'disponible',
+      acquisitionValueHNL: 4800000,
+      marketValueHNL: 7200000,
+      appraisalValueHNL: 6500000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 80, // 80% LTV
+      eligibleCollateralValueHNL: 5200000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 5200000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'MAT-SPS-2023-4102',
+      simulatedDocumentNumber: 'ESCRITURA-PUB-2023-305',
+      situationNotes: 'Propiedad comercial de alta demanda apta para hipoteca de 1er rango.'
+    },
+    {
+      id: 'col_bodega_logistic',
+      title: 'Bodega Industrial en Parque Logístico San José (1,800 m²)',
+      assetType: 'local_bodega',
+      ownerName: 'Empresa Mercantil S.A.',
+      companyName: 'Empresa Mercantil S.A.',
+      description: 'Nave industrial con altura libre de 9m, 4 andenes de carga con rampas niveladoras y oficinas.',
+      location: 'Choloma, Cortés',
+      status: 'disponible',
+      acquisitionValueHNL: 6500000,
+      marketValueHNL: 9800000,
+      appraisalValueHNL: 8200000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 75, // 75% LTV
+      eligibleCollateralValueHNL: 6150000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 6150000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'MAT-CHO-2022-7711',
+      simulatedDocumentNumber: 'ESCRITURA-PUB-2022-814',
+      situationNotes: 'Activo industrial clave libre de todo gravamen con seguro todo riesgo vigente.'
+    },
+    {
+      id: 'col_maquinaria_fleet',
+      title: 'Flota de Maquinaria Pesada (3 Excavadoras CAT 320)',
+      assetType: 'maquinaria_pesada',
+      ownerName: 'Empresa Mercantil S.A.',
+      companyName: 'Empresa Mercantil S.A.',
+      description: 'Lote de 3 excavadoras sobre orugas Caterpillar modelo 320 año 2023 con mantenimientos de agencia.',
+      location: 'Patio de Maquinaria SPS',
+      status: 'disponible',
+      acquisitionValueHNL: 5400000,
+      marketValueHNL: 4800000,
+      appraisalValueHNL: 4500000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 70, // 70% LTV
+      eligibleCollateralValueHNL: 3150000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 3150000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'PRENDA-MAQ-2024-001',
+      simulatedDocumentNumber: 'FACTURA-IMPORT-2023-991',
+      situationNotes: 'Garantía prendaria sobre equipo pesado con inspección mecánica favorable.'
+    },
+    {
+      id: 'col_vehiculos_flota',
+      title: 'Flota de Volquetas Doble Troque (4 Camiones Mack 14 m³)',
+      assetType: 'vehiculo_comercial',
+      ownerName: 'Empresa Mercantil S.A.',
+      companyName: 'Empresa Mercantil S.A.',
+      description: '4 camiones de volteo Mack Granite modelo 2022 capacidad 14 metros cúbicos.',
+      location: 'Plantel de Obras Tegucigalpa',
+      status: 'disponible',
+      acquisitionValueHNL: 3800000,
+      marketValueHNL: 3400000,
+      appraisalValueHNL: 3200000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 70, // 70% LTV
+      eligibleCollateralValueHNL: 2240000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 2240000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'PRENDA-VEH-2023-810',
+      simulatedDocumentNumber: 'BOLETA-REGISTRO-IP-401',
+      situationNotes: 'Garantía prendaria vehicular con póliza de seguro de transporte vigente.'
+    },
+    {
+      id: 'col_dpf_fideicomiso',
+      title: 'Certificado de Depósito a Plazo Fijo Pignorable en Banco de Occidente',
+      assetType: 'deposito_plazo',
+      ownerName: 'Empresario Propietario',
+      companyName: 'Empresa Mercantil S.A.',
+      description: 'Certificado DPF a 360 días renovable, tasa 7.5%, custodiado en administración fiduciaria.',
+      location: 'Banco de Occidente, Tegucigalpa',
+      status: 'disponible',
+      acquisitionValueHNL: 1000000,
+      marketValueHNL: 1000000,
+      appraisalValueHNL: 1000000,
+      appraisalDate: 'Día 1, Mes 1 (2026)',
+      ltvAcceptedPct: 100, // 100% LTV en garantías líquidas
+      eligibleCollateralValueHNL: 1000000,
+      liens: [],
+      pledgedAmountTotal: 0,
+      availableCoverageHNL: 1000000,
+      isPledged: false,
+      isLockedForSale: false,
+      registrationNumber: 'DPF-CERT-2026-9001',
+      simulatedDocumentNumber: 'TITULO-VALOR-OCC-901',
+      situationNotes: 'Garantía líquida de máxima calidad (Back-to-Back) con tasa de interés preferencial.'
+    }
+  ];
+}
+
+export function pledgeRealEstateCollateralToLoan(
+  state: DailySimulationState,
+  collateralId: string,
+  bankId: CommercialBankId,
+  loanId: string,
+  coverageRequested?: number
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const collaterals = state.realEstateCollaterals || [];
+  const col = collaterals.find(c => c.id === collateralId);
+
+  if (!col) return { updatedState: state, success: false, message: 'Garantía real no encontrada.' };
+
+  const available = col.availableCoverageHNL ?? col.eligibleCollateralValueHNL;
+  if (available <= 0) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `El bien "${col.title}" ya tiene su capacidad de cobertura al 100% comprometida en gravámenes previos.`
+    };
+  }
+
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+  const committed = coverageRequested ? Math.min(available, coverageRequested) : available;
+  const rank: 1 | 2 = (col.liens && col.liens.length > 0) ? 2 : 1;
+
+  const newLien: CollateralLien = {
+    id: `lien-${Date.now().toString().slice(-4)}`,
+    rank,
+    beneficiaryBankId: bankId,
+    beneficiaryBankName: bank.name,
+    linkedLoanId: loanId,
+    committedCoverageHNL: committed,
+    registeredDate: `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`
+  };
+
+  const existingLiens = col.liens || [];
+  const updatedLiens = [...existingLiens, newLien];
+  const newPledgedTotal = updatedLiens.reduce((sum, l) => sum + l.committedCoverageHNL, 0);
+  const newAvailable = Math.max(0, col.eligibleCollateralValueHNL - newPledgedTotal);
+
+  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
+    ...c,
+    liens: updatedLiens,
+    pledgedAmountTotal: newPledgedTotal,
+    availableCoverageHNL: newAvailable,
+    status: newAvailable <= 0 ? 'pignorado_total' as const : 'pignorado_parcial' as const,
+    isPledged: true,
+    isLockedForSale: true,
+    pledgedToBankId: bankId,
+    linkedDebtId: loanId
+  } : c);
+
+  return {
+    updatedState: {
+      ...state,
+      realEstateCollaterals: updatedCollaterals
+    },
+    success: true,
+    message: `¡GRAVAMEN REGISTRADO! Se constituyó hipoteca/prenda de ${rank}er rango sobre "${col.title}" a favor de ${bank.name} por L ${committed.toLocaleString()}. Cobertura restante disponible: L ${newAvailable.toLocaleString()}.`
+  };
+}
+
+export function releaseRealEstateCollateral(
+  state: DailySimulationState,
+  collateralId: string
+): { updatedState: DailySimulationState; success: boolean; message: string; voucher?: TransactionVoucher } {
+  const collaterals = state.realEstateCollaterals || [];
+  const col = collaterals.find(c => c.id === collateralId);
+
+  if (!col) return { updatedState: state, success: false, message: 'Garantía real no encontrada.' };
+
+  // Verificar si hay préstamos activos vigentes que dependan de este bien
+  const activeLinkedLoans = Object.values(state.commercialBanks || {}).some(rel => {
+    return rel.activeLoan && rel.activeLoan.balanceRemaining > 0 && (
+      rel.activeLoan.collateralIdRef === collateralId ||
+      (col.liens || []).some(l => l.linkedLoanId === rel.activeLoan?.id)
+    );
+  });
+
+  if (activeLinkedLoans) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `No se puede cancelar el gravamen sobre "${col.title}". Aún mantiene saldo deudor activo vinculado en el banco acreedor. Cancela primero el préstamo para emitir el finiquito.`
+    };
+  }
+
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+  const voucherNum = `VCH-LIB-${state.currentDay}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
+    ...c,
+    liens: [],
+    pledgedAmountTotal: 0,
+    availableCoverageHNL: c.eligibleCollateralValueHNL,
+    status: 'disponible' as const,
+    isPledged: false,
+    isLockedForSale: false,
+    pledgedToBankId: undefined,
+    linkedDebtId: undefined,
+    situationNotes: 'Activo liberado mediante acta notarial de cancelación de hipoteca/prenda.'
+  } : c);
+
+  const voucher: TransactionVoucher = {
+    id: `vch-rel-${Date.now()}`,
+    voucherNumber: voucherNum,
+    operationType: 'liberacion_garantia',
+    title: `Liberación Notarial de Gravamen: ${col.title}`,
+    timestamp: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    companyName: state.storeName,
+    grossAmountHNL: col.appraisalValueHNL,
+    deductionsHNL: 0,
+    netDisbursedOrPaidHNL: col.eligibleCollateralValueHNL,
+    priorBalanceHNL: 0,
+    newBalanceHNL: col.eligibleCollateralValueHNL,
+    releasedCollaterals: [col.title],
+    referenceCode: `LIB-${col.registrationNumber}`,
+    authStamp: `NOTARIA-PUBLICA-CANCELACION-${state.currentYear || 2026}`
+  };
+
+  const emailNotice: SimulatedEmail = {
+    id: `email-rel-${Date.now()}`,
+    category: 'garantias',
+    senderName: 'Registro Inmobiliario y Notaría de Finiquitos',
+    senderEmail: 'registros@ip.gob.hn',
+    recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+    companyName: state.storeName,
+    subject: `Acta de Cancelación y Alzamiento de Gravamen: ${col.title}`,
+    body: `Se confirma formalmente que la garantía real "${col.title}" (Matrícula: ${col.registrationNumber}) ha sido liberada en su totalidad tras la cancelación satisfactoria de las obligaciones financieras vinculadas.\n\n• Cobertura elegible restablecida: L ${col.eligibleCollateralValueHNL.toLocaleString()}\n• Estado registral: DISPONIBLE Y LIBRE DE TODO GRAVAMEN\n• Bloqueo de venta: DESACTIVADO\n\nEl bien puede ser vendido, transferido o utilizado en nuevas solicitudes de financiamiento.`,
+    sentDate: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    isRead: false,
+    isStarred: true,
+    isArchived: false,
+    folder: 'inbox',
+    relatedEntityType: 'collateral_asset',
+    relatedEntityId: col.id,
+    voucherPayload: voucher
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      realEstateCollaterals: updatedCollaterals,
+      transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
+      simulatedEmails: [emailNotice, ...(state.simulatedEmails || [])]
+    },
+    success: true,
+    voucher,
+    message: `¡GARANTÍA LIBERADA! Se cancelaron todos los gravámenes sobre "${col.title}". Capacidad elegible disponible: L ${col.eligibleCollateralValueHNL.toLocaleString()}. Comprobante No. ${voucherNum}.`
+  };
+}
+
+export function requestNewAppraisal(
+  state: DailySimulationState,
+  collateralId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const collaterals = state.realEstateCollaterals || [];
+  const col = collaterals.find(c => c.id === collateralId);
+  if (!col) return { updatedState: state, success: false, message: 'Garantía no encontrada.' };
+
+  const appraisalFeeHNL = 2500;
+  if (state.storeCash < appraisalFeeHNL && state.storeBankBalance < appraisalFeeHNL) {
+    return { updatedState: state, success: false, message: `Fondos insuficientes para cubrir el arancel del perito valuador (L ${appraisalFeeHNL.toLocaleString()}).` };
+  }
+
+  let newCash = state.storeCash;
+  let newBank = state.storeBankBalance;
+  if (newCash >= appraisalFeeHNL) {
+    newCash -= appraisalFeeHNL;
+  } else {
+    newBank -= appraisalFeeHNL;
+  }
+
+  // Plusvalía simulada razonable (+4% a +9%)
+  const plusvaliaPct = Math.round((Math.random() * 5 + 4) * 10) / 10;
+  const newMarket = Math.round(col.marketValueHNL * (1 + plusvaliaPct / 100));
+  const newAppraisal = Math.round(col.appraisalValueHNL * (1 + plusvaliaPct / 100));
+  const newEligible = Math.round(newAppraisal * (col.ltvAcceptedPct / 100));
+  const newAvailable = Math.max(0, newEligible - (col.pledgedAmountTotal || 0));
+
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+
+  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
+    ...c,
+    marketValueHNL: newMarket,
+    appraisalValueHNL: newAppraisal,
+    appraisalDate: timestampStr,
+    eligibleCollateralValueHNL: newEligible,
+    availableCoverageHNL: newAvailable,
+    situationNotes: `Avalúo actualizado (${timestampStr}) por perito colegiado. Plusvalía estimada: +${plusvaliaPct}%.`
+  } : c);
+
+  return {
+    updatedState: {
+      ...state,
+      storeCash: newCash,
+      storeBankBalance: newBank,
+      realEstateCollaterals: updatedCollaterals
+    },
+    success: true,
+    message: `¡AVALÚO ACTUALIZADO! Peritaje técnico completado para "${col.title}". Nuevo valor pericial: L ${newAppraisal.toLocaleString()} (+${plusvaliaPct}% plusvalía). Cobertura LTV admisible: L ${newEligible.toLocaleString()}. Cobertura disponible: L ${newAvailable.toLocaleString()}.`
+  };
+}
+
+export function registerNewAssetAsCollateral(
+  state: DailySimulationState,
+  asset: {
+    title: string;
+    assetType: 'casa_habitacion' | 'terreno_comercial' | 'local_bodega' | 'vehiculo_comercial' | 'maquinaria_pesada';
+    description: string;
+    location: string;
+    acquisitionCost: number;
+    ltvAcceptedPct?: number;
+  }
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const ltv = asset.ltvAcceptedPct || (asset.assetType.includes('maquinaria') || asset.assetType.includes('vehiculo') ? 70 : 80);
+  const appraisalValue = Math.round(asset.acquisitionCost * 0.95);
+  const eligible = Math.round(appraisalValue * (ltv / 100));
+  const newId = `col-${Date.now().toString().slice(-4)}`;
+
+  const newCollateral: RealEstateCollateralItem = {
+    id: newId,
+    title: asset.title,
+    assetType: asset.assetType,
+    ownerName: state.storeName,
+    companyName: state.storeName,
+    description: asset.description,
+    location: asset.location,
+    status: 'disponible',
+    acquisitionValueHNL: asset.acquisitionCost,
+    marketValueHNL: asset.acquisitionCost,
+    appraisalValueHNL: appraisalValue,
+    appraisalDate: `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`,
+    ltvAcceptedPct: ltv,
+    eligibleCollateralValueHNL: eligible,
+    liens: [],
+    pledgedAmountTotal: 0,
+    availableCoverageHNL: eligible,
+    isPledged: false,
+    isLockedForSale: false,
+    registrationNumber: `MAT-REG-${Math.floor(1000 + Math.random() * 9000)}`,
+    simulatedDocumentNumber: `DOC-IP-${state.currentYear || 2026}-${Math.floor(1000 + Math.random() * 9000)}`,
+    situationNotes: 'Activo incorporado recientemente al inventario de garantías elegibles.'
+  };
+
+  const updatedCollaterals = [...(state.realEstateCollaterals || []), newCollateral];
+
+  return {
+    updatedState: {
+      ...state,
+      realEstateCollaterals: updatedCollaterals
+    },
+    success: true,
+    message: `¡ACTIVO REGISTRADO! "${asset.title}" se incorporó con avalúo inicial de L ${appraisalValue.toLocaleString()} y cobertura admisible de L ${eligible.toLocaleString()} (${ltv}% LTV).`
+  };
+}
+
+export function executeFlexibleLoanPayment(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  paymentType: 'cuota_mensual' | 'varias_cuotas' | 'pago_parcial' | 'abono_capital' | 'cancelacion_total',
+  amountPaid: number,
+  sourceAccount: 'checking' | 'cash' = 'checking',
+  strategy: 'reducir_cuota' | 'reducir_plazo' = 'reducir_plazo',
+  numberOfInstallments: number = 1
+): { 
+  updatedState: DailySimulationState; 
+  success: boolean; 
+  message: string; 
+  voucher?: TransactionVoucher;
+  distributionBreakdown?: {
+    cargosMora: number;
+    interesesDevengados: number;
+    amortizacionCapital: number;
+    reglaAplicada: string;
+  };
+} {
+  const currentRel = state.commercialBanks[bankId];
+  const loan = currentRel?.activeLoan;
+
+  if (!loan || loan.balanceRemaining <= 0) {
+    return { updatedState: state, success: false, message: 'No hay préstamo activo con saldo pendiente en este banco.' };
+  }
+
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+  const monthlyRate = loan.interestRateAnnual / 100 / 12;
+
+  // Intereses devengados al corte mensual actual
+  const accruedInterest = Math.round(loan.balanceRemaining * monthlyRate);
+  const lateFees = loan.delinquentDays && loan.delinquentDays > 0 ? Math.round(loan.monthlyPayment * 0.05) : 0;
+
+  let targetPaymentAmount = amountPaid;
+  if (paymentType === 'cuota_mensual') {
+    targetPaymentAmount = loan.monthlyPayment;
+  } else if (paymentType === 'varias_cuotas') {
+    targetPaymentAmount = loan.monthlyPayment * numberOfInstallments;
+  } else if (paymentType === 'cancelacion_total') {
+    // Saldo total exacto a la fecha sin cobrar intereses futuros no devengados
+    targetPaymentAmount = Math.round(loan.balanceRemaining + accruedInterest + lateFees);
+  }
+
+  // Validar fondos disponibles
+  const chkBal = currentRel.checkingAccount?.balance ?? (state.storeBankBalance || 0);
+  const availableFunds = sourceAccount === 'checking' ? chkBal : state.storeCash;
+
+  if (availableFunds < targetPaymentAmount) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Fondos insuficientes en ${sourceAccount === 'checking' ? 'la cuenta de cheques' : 'la caja chica'}. Saldo disponible: L ${availableFunds.toLocaleString()}, importe requerido: L ${targetPaymentAmount.toLocaleString()}.`
+    };
+  }
+
+  // Prelación de pagos BCH: 1. Cargos y mora -> 2. Intereses devengados -> 3. Capital
+  let remainingMoney = targetPaymentAmount;
+  const appliedLateFees = Math.min(remainingMoney, lateFees);
+  remainingMoney -= appliedLateFees;
+
+  const appliedInterest = Math.min(remainingMoney, accruedInterest);
+  remainingMoney -= appliedInterest;
+
+  const appliedPrincipal = Math.min(remainingMoney, loan.balanceRemaining);
+  const newLoanBalance = Math.max(0, loan.balanceRemaining - appliedPrincipal);
+
+  // Recálculo de amortización según tipo y estrategia
+  let newMonthlyPayment = loan.monthlyPayment;
+  let newTermMonths = loan.termMonthsRemaining;
+  let ruleExplanation = 'Prelación legal CNBS: 1º Cargos/Mora, 2º Intereses devengados del periodo, 3º Amortización a Capital.';
+
+  if (newLoanBalance <= 0 || paymentType === 'cancelacion_total') {
+    ruleExplanation = 'Cancelación total anticipada de deuda sin cobro de intereses futuros no devengados. Préstamo finiquitado.';
+  } else if (paymentType === 'abono_capital') {
+    if (strategy === 'reducir_cuota') {
+      newMonthlyPayment = Math.round((newLoanBalance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -newTermMonths)));
+      ruleExplanation = `Abono extraordinario a capital: Se recalcula la cuota mensual de L ${loan.monthlyPayment.toLocaleString()} a L ${newMonthlyPayment.toLocaleString()}, manteniendo el plazo en ${newTermMonths} meses.`;
+    } else {
+      if (monthlyRate > 0 && newMonthlyPayment > newLoanBalance * monthlyRate) {
+        newTermMonths = Math.max(1, Math.ceil(Math.log(newMonthlyPayment / (newMonthlyPayment - newLoanBalance * monthlyRate)) / Math.log(1 + monthlyRate)));
+      } else {
+        newTermMonths = Math.max(1, newTermMonths - 3);
+      }
+      ruleExplanation = `Abono extraordinario a capital: Se reduce el plazo de ${loan.termMonthsRemaining} a ${newTermMonths} meses, manteniendo la cuota mensual en L ${newMonthlyPayment.toLocaleString()}.`;
+    }
+  } else if (paymentType === 'varias_cuotas') {
+    newTermMonths = Math.max(0, newTermMonths - numberOfInstallments);
+    ruleExplanation = `Pago adelantado de ${numberOfInstallments} cuotas mensuales. Plazo restante reducido a ${newTermMonths} meses.`;
+  } else if (paymentType === 'cuota_mensual') {
+    newTermMonths = Math.max(0, newTermMonths - 1);
+  } else if (paymentType === 'pago_parcial') {
+    ruleExplanation = `Pago parcial aplicado: L ${appliedPrincipal.toLocaleString()} redujeron el capital, pero la cuota de L ${loan.monthlyPayment.toLocaleString()} permanece pendiente para el periodo siguiente.`;
+  }
+
+  // Actualizar saldos monetarios
+  let newStoreBank = state.storeBankBalance;
+  let newStoreCash = state.storeCash;
+  let updatedRel = { ...currentRel };
+
+  if (sourceAccount === 'checking') {
+    newStoreBank -= targetPaymentAmount;
+    if (updatedRel.checkingAccount) {
+      updatedRel.checkingAccount = {
+        ...updatedRel.checkingAccount,
+        balance: Math.max(0, updatedRel.checkingAccount.balance - targetPaymentAmount)
+      };
+    }
+  } else {
+    newStoreCash -= targetPaymentAmount;
+  }
+
+  // Liberación automática de garantías si el préstamo se canceló
+  let updatedCollaterals = state.realEstateCollaterals || [];
+  let releasedCollateralNames: string[] = [];
+
+  if (newLoanBalance <= 0) {
+    updatedRel = {
+      ...updatedRel,
+      activeLoan: undefined,
+      relationshipScore: Math.min(100, updatedRel.relationshipScore + 15)
+    };
+
+    updatedCollaterals = updatedCollaterals.map(c => {
+      const hasLienFromThisLoan = (c.liens || []).some(l => l.linkedLoanId === loan.id || l.beneficiaryBankId === bankId);
+      if (!hasLienFromThisLoan && c.linkedDebtId !== loan.id) return c;
+
+      const remainingLiens = (c.liens || []).filter(l => l.linkedLoanId !== loan.id && l.beneficiaryBankId !== bankId);
+      const newPledged = remainingLiens.reduce((sum, l) => sum + l.committedCoverageHNL, 0);
+      const newAvailable = Math.max(0, c.eligibleCollateralValueHNL - newPledged);
+      releasedCollateralNames.push(c.title);
+
+      return {
+        ...c,
+        liens: remainingLiens,
+        pledgedAmountTotal: newPledged,
+        availableCoverageHNL: newAvailable,
+        status: remainingLiens.length === 0 ? 'disponible' as const : 'pignorado_parcial' as const,
+        isPledged: remainingLiens.length > 0,
+        isLockedForSale: remainingLiens.length > 0,
+        pledgedToBankId: remainingLiens.length > 0 ? remainingLiens[0].beneficiaryBankId : undefined,
+        linkedDebtId: remainingLiens.length > 0 ? remainingLiens[0].linkedLoanId : undefined
+      };
+    });
+  } else {
+    updatedRel = {
+      ...updatedRel,
+      activeLoan: {
+        ...loan,
+        balanceRemaining: newLoanBalance,
+        monthlyPayment: newMonthlyPayment,
+        termMonthsRemaining: newTermMonths,
+        amortizedPrincipalTotal: (loan.amortizedPrincipalTotal || 0) + appliedPrincipal,
+        delinquentDays: 0
+      }
+    };
+  }
+
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+  const voucherNum = `VCH-PAG-${state.currentDay}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const voucher: TransactionVoucher = {
+    id: `vch-pay-${Date.now()}`,
+    voucherNumber: voucherNum,
+    operationType: paymentType,
+    title: paymentType === 'cancelacion_total' ? 'Cancelación Total de Préstamo Bancario' : `Pago de Crédito: ${loan.purpose}`,
+    timestamp: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    companyName: state.storeName,
+    primaryBankId: bankId,
+    accountNumber: sourceAccount === 'checking' ? `${bank.name} - ${updatedRel.checkingAccount?.accountNumber || 'Cuenta Corriente'}` : 'Caja Chica',
+    grossAmountHNL: targetPaymentAmount,
+    deductionsHNL: 0,
+    netDisbursedOrPaidHNL: targetPaymentAmount,
+    priorBalanceHNL: availableFunds,
+    newBalanceHNL: availableFunds - targetPaymentAmount,
+    loanBalancePriorHNL: loan.balanceRemaining,
+    loanBalanceNewHNL: newLoanBalance,
+    distributionBreakdown: {
+      cargosMora: appliedLateFees,
+      interesesDevengados: appliedInterest,
+      amortizacionCapital: appliedPrincipal,
+      reglaAplicada: ruleExplanation
+    },
+    releasedCollaterals: releasedCollateralNames,
+    referenceCode: `PAG-${bankId.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`,
+    authStamp: `BCH-PAG-${state.currentYear || 2026}-${Date.now().toString().slice(-6)}`
+  };
+
+  const receiptEmail: SimulatedEmail = {
+    id: `email-receipt-${Date.now()}`,
+    category: 'pagos_vencimientos',
+    senderName: `${bank.name} - Centro de Pagos`,
+    senderEmail: `cobros@${bankId}.banca.hn`,
+    recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+    companyName: state.storeName,
+    subject: `Recibo Oficial de Pago No. ${voucherNum} - ${newLoanBalance <= 0 ? 'CRÉDITO CANCELADO' : 'ABONO REGISTRADO'}`,
+    body: `Recibo de Operación Crediticia:\n\nSe ha procesado exitosamente la operación sobre su crédito en ${bank.name}:\n\n• Monto Pagado: L ${targetPaymentAmount.toLocaleString()}\n• Distribución: Mora L ${appliedLateFees.toLocaleString()} | Intereses L ${appliedInterest.toLocaleString()} | Capital L ${appliedPrincipal.toLocaleString()}\n• Saldo Anterior: L ${loan.balanceRemaining.toLocaleString()}\n• Nuevo Saldo Insoluto: L ${newLoanBalance.toLocaleString()}\n• Cuota Mensual Resultante: L ${newMonthlyPayment.toLocaleString()}/mes (Plazo: ${newTermMonths} meses)\n\n${newLoanBalance <= 0 ? '¡FINIQUITO TOTAL CONCEDIDO! El crédito ha quedado saldado en su totalidad y las garantías vinculadas han sido liberadas.' : ''}`,
+    sentDate: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    isRead: false,
+    isStarred: false,
+    isArchived: false,
+    folder: 'inbox',
+    relatedEntityType: 'loan_payment',
+    relatedEntityId: loan.id,
+    voucherPayload: voucher
+  };
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: updatedRel
+  };
+
+  const nextState: DailySimulationState = {
+    ...state,
+    storeBankBalance: newStoreBank,
+    storeCash: newStoreCash,
+    commercialBanks: updatedBanks,
+    realEstateCollaterals: updatedCollaterals,
+    transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
+    simulatedEmails: [receiptEmail, ...(state.simulatedEmails || [])]
+  };
+
+  return {
+    updatedState: nextState,
+    success: true,
+    voucher,
+    distributionBreakdown: {
+      cargosMora: appliedLateFees,
+      interesesDevengados: appliedInterest,
+      amortizacionCapital: appliedPrincipal,
+      reglaAplicada: ruleExplanation
+    },
+    message: `¡PAGO APLICADO! Se pagaron L ${targetPaymentAmount.toLocaleString()} a ${bank.name}. Distribución: Mora L ${appliedLateFees.toLocaleString()}, Interés L ${appliedInterest.toLocaleString()}, Capital L ${appliedPrincipal.toLocaleString()}. Nuevo saldo deudor: L ${newLoanBalance.toLocaleString()}. Comprobante No. ${voucherNum}.`
+  };
+}
+
+export function transferBetweenAccounts(
+  state: DailySimulationState,
+  fromBankId: CommercialBankId,
+  toBankId: CommercialBankId,
+  amount: number
+): { updatedState: DailySimulationState; success: boolean; message: string; voucher?: TransactionVoucher } {
+  if (fromBankId === toBankId) {
+    return { updatedState: state, success: false, message: 'La cuenta de origen y destino deben ser diferentes.' };
+  }
+  if (amount <= 0) {
+    return { updatedState: state, success: false, message: 'Ingresa un monto válido para transferir.' };
+  }
+
+  const fromRel = state.commercialBanks[fromBankId];
+  const toRel = state.commercialBanks[toBankId];
+  const fromChecking = fromRel?.checkingAccount;
+
+  if (!fromChecking || fromChecking.balance < amount) {
+    const avail = fromChecking?.balance || 0;
+    return {
+      updatedState: state,
+      success: false,
+      message: `Fondos insuficientes en la cuenta de origen (${COMMERCIAL_BANKS_PROFILES[fromBankId].name}). Saldo disponible: L ${avail.toLocaleString()}.`
+    };
+  }
+
+  const toBank = COMMERCIAL_BANKS_PROFILES[toBankId];
+  const fromBank = COMMERCIAL_BANKS_PROFILES[fromBankId];
+
+  const toChecking = toRel?.checkingAccount || {
+    accountNumber: `CTA-${toBankId.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`,
+    balance: 0,
+    interestRateYieldPct: 2.5,
+    openedDay: state.currentDay,
+    monthlyFeeHNL: 150
+  };
+
+  const updatedFromRel: CommercialBankRelationship = {
+    ...fromRel,
+    checkingAccount: {
+      ...fromChecking,
+      balance: fromChecking.balance - amount
+    }
+  };
+
+  const updatedToRel: CommercialBankRelationship = {
+    ...toRel,
+    checkingAccount: {
+      ...toChecking,
+      balance: toChecking.balance + amount
+    }
+  };
+
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+  const voucherNum = `VCH-TRF-${state.currentDay}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const voucher: TransactionVoucher = {
+    id: `vch-trf-${Date.now()}`,
+    voucherNumber: voucherNum,
+    operationType: 'transferencia_cuentas',
+    title: 'Transferencia Interbancaria entre Cuentas Propias',
+    timestamp: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    companyName: state.storeName,
+    primaryBankId: fromBankId,
+    destinationBankId: toBankId,
+    accountNumber: `${fromBank.name} - ${fromChecking.accountNumber}`,
+    destinationAccountNumber: `${toBank.name} - ${toChecking.accountNumber}`,
+    grossAmountHNL: amount,
+    deductionsHNL: 0,
+    netDisbursedOrPaidHNL: amount,
+    priorBalanceHNL: fromChecking.balance,
+    newBalanceHNL: fromChecking.balance - amount,
+    referenceCode: `ACH-TRF-${Math.floor(100000 + Math.random() * 900000)}`,
+    authStamp: `BCH-ACH-${state.currentYear || 2026}-${Date.now().toString().slice(-6)}`
+  };
+
+  const emailNotice: SimulatedEmail = {
+    id: `email-trf-${Date.now()}`,
+    category: 'sistema_avisos',
+    senderName: 'Red Financiera Interbancaria ACH Honduras',
+    senderEmail: 'transferencias@ach.bch.hn',
+    recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+    companyName: state.storeName,
+    subject: `Transferencia Procesada: L ${amount.toLocaleString()} de ${fromBank.name} a ${toBank.name}`,
+    body: `Aviso de Transferencia Realizada:\n\n• Monto: L ${amount.toLocaleString()}\n• Cuenta Débito: ${fromBank.name} (${fromChecking.accountNumber})\n• Cuenta Crédito: ${toBank.name} (${toChecking.accountNumber})\n• Fecha: ${timestampStr}\n• Saldo Final Débito: L ${(fromChecking.balance - amount).toLocaleString()}\n• Saldo Final Crédito: L ${(toChecking.balance + amount).toLocaleString()}\n\nOperación liquidada de forma inmediata.`,
+    sentDate: timestampStr,
+    simDay: state.currentDay,
+    simMonth: state.currentMonth,
+    simYear: state.currentYear || 2026,
+    isRead: false,
+    isStarred: false,
+    isArchived: false,
+    folder: 'inbox',
+    voucherPayload: voucher
+  };
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [fromBankId]: updatedFromRel,
+    [toBankId]: updatedToRel
+  };
+
+  return {
+    updatedState: {
+      ...state,
+      commercialBanks: updatedBanks,
+      transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
+      simulatedEmails: [emailNotice, ...(state.simulatedEmails || [])]
+    },
+    success: true,
+    voucher,
+    message: `¡TRANSFERENCIA COMPLETADA! Se transfirieron L ${amount.toLocaleString()} de ${fromBank.name} a ${toBank.name}. Comprobante No. ${voucherNum}.`
+  };
+}
+
+export function evaluateAndGenerateBankOffers(state: DailySimulationState): DailySimulationState {
+  const currentOffers = state.dynamicBankOffers || [];
+  const currentEmails = state.simulatedEmails || [];
+  const totalLiquidity = state.storeCash + state.storeBankBalance;
+  const sales = state.monthlySalesAccumulated || 200000;
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+
+  const newOffers: DynamicBankOffer[] = [];
+  const newEmails: SimulatedEmail[] = [];
+
+  // Oferta 1: Banco Atlántida - Préstamo de Capital de Trabajo si ventas >= L 300,000
+  if (sales >= 300000 && !currentOffers.some(o => o.id === 'offer_atl_capital')) {
+    const amount = Math.min(2500000, Math.round(sales * 2.5));
+    const rate = 11.5;
+    const term = 36;
+    const monthlyRate = rate / 100 / 12;
+    const cuota = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -term)));
+
+    const offer: DynamicBankOffer = {
+      id: 'offer_atl_capital',
+      bankId: 'atlantida',
+      productType: 'capital_trabajo',
+      title: 'Préstamo Comercial de Capital de Trabajo con Tasa Preferencial',
+      amountOrLimitHNL: amount,
+      annualRatePct: rate,
+      termMonths: term,
+      openingFeePct: 1.5,
+      requiresCollateral: false,
+      estimatedMonthlyPaymentHNL: cuota,
+      expiresDay: state.currentDay + 15,
+      expiresMonth: state.currentMonth,
+      isPreApproved: true,
+      status: 'vigente'
+    };
+    newOffers.push(offer);
+
+    newEmails.push({
+      id: `email-offer-atl-${Date.now()}`,
+      category: 'bancos_financiamiento',
+      senderName: 'Banco Atlántida - Gerencia de Banca Empresas',
+      senderEmail: 'bancaempresas@atlantida.banca.hn',
+      recipientEmail: `${state.storeName.toLowerCase().replace(/\s+/g, '')}@banca.hn`,
+      companyName: state.storeName,
+      subject: `Propuesta Pre-Aprobada: Línea de Capital por L ${amount.toLocaleString()} al 11.5%`,
+      body: `Estimado(a) Director(a) de ${state.storeName}:\n\nEn virtud del excelente dinamismo de sus ventas mensuales (L ${sales.toLocaleString()}), el Comité de Riesgo de Banco Atlántida ha emitido una aprobación ejecutiva para su empresa:\n\n• Monto Pre-Aprobado: L ${amount.toLocaleString()}\n• Tasa Anual: 11.5% (Tasa Corporativa)\n• Plazo de Financiamiento: 36 meses\n• Cuota Mensual Estimada: L ${cuota.toLocaleString()}/mes\n• Garantía Requerida: Fianza solidaria estándar sin hipoteca\n• Validez de la Oferta: 15 días del calendario comercial\n\nPuede revisar las condiciones detalladas y solicitar el desembolso directo desde este mensaje o en ventanilla bancaria.`,
+      sentDate: timestampStr,
+      simDay: state.currentDay,
+      simMonth: state.currentMonth,
+      simYear: state.currentYear || 2026,
+      isRead: false,
+      isStarred: true,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'bank_offer',
+      relatedEntityId: offer.id,
+      bankOfferPayload: offer
+    });
+  }
+
+  // Oferta 2: BAC Credomatic - Tarjeta Infinite Black si liquidez >= L 500,000
+  if (totalLiquidity >= 500000 && !currentOffers.some(o => o.id === 'offer_bac_card')) {
+    const cardLimit = 450000;
+    const offer: DynamicBankOffer = {
+      id: 'offer_bac_card',
+      bankId: 'bac',
+      productType: 'tarjeta_empresarial',
+      title: 'Tarjeta de Crédito Corporativa Infinite Black con 4.5% Cashback',
+      amountOrLimitHNL: cardLimit,
+      annualRatePct: 14.5,
+      termMonths: 12,
+      openingFeePct: 0,
+      requiresCollateral: false,
+      estimatedMonthlyPaymentHNL: Math.round(cardLimit * 0.05),
+      expiresDay: state.currentDay + 20,
+      expiresMonth: state.currentMonth,
+      isPreApproved: true,
+      status: 'vigente'
+    };
+    newOffers.push(offer);
+
+    newEmails.push({
+      id: `email-offer-bac-${Date.now()}`,
+      category: 'bancos_financiamiento',
+      senderName: 'BAC Credomatic - Medios de Pago Corporativo',
+      senderEmail: 'empresas@bac.banca.hn',
+      recipientEmail: `${state.storeName.toLowerCase().replace(/\s+/g, '')}@banca.hn`,
+      companyName: state.storeName,
+      subject: `Invitación Exclusiva: Tarjeta Infinite Black L ${cardLimit.toLocaleString()} (4.5% Cashback)`,
+      body: `Estimado(a) ejecutivo(a) de ${state.storeName}:\n\nPor mantener una sólida liquidez operativa superior a L ${totalLiquidity.toLocaleString()}, le extendemos nuestra tarjeta insignia corporativa:\n\n• Cupo Aprobado: L ${cardLimit.toLocaleString()}\n• Tasa Preferencial: 14.5% anual\n• Cashback Efectivo: 4.5% en compras de insumos, materiales y combustible\n• Periodo de gracia para compras: Hasta 30 días sin intereses\n\nPuede activarla directamente sin trámites burocráticos.`,
+      sentDate: timestampStr,
+      simDay: state.currentDay,
+      simMonth: state.currentMonth,
+      simYear: state.currentYear || 2026,
+      isRead: false,
+      isStarred: true,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'bank_offer',
+      relatedEntityId: offer.id,
+      bankOfferPayload: offer
+    });
+  }
+
+  // Oferta 3: Banco de Occidente - DPF Step-Up con Bonificación de Tasa si liquidez >= L 300,000
+  if (totalLiquidity >= 300000 && !currentOffers.some(o => o.id === 'offer_occ_dpf')) {
+    const invAmount = 200000;
+    const offer: DynamicBankOffer = {
+      id: 'offer_occ_dpf',
+      bankId: 'occidente',
+      productType: 'capital_trabajo',
+      title: 'Certificado de Depósito a Plazo Fijo (DPF) con Tasa Bonificada 8.5%',
+      amountOrLimitHNL: invAmount,
+      annualRatePct: 8.5,
+      termMonths: 3,
+      openingFeePct: 0,
+      requiresCollateral: false,
+      estimatedMonthlyPaymentHNL: Math.round((invAmount * 0.085) / 12),
+      expiresDay: state.currentDay + 30,
+      expiresMonth: state.currentMonth,
+      isPreApproved: true,
+      status: 'vigente'
+    };
+    newOffers.push(offer);
+
+    newEmails.push({
+      id: `email-offer-occ-${Date.now()}`,
+      category: 'bancos_financiamiento',
+      senderName: 'Banco de Occidente - Banca Patrimonial',
+      senderEmail: 'tesoreria@occidente.banca.hn',
+      recipientEmail: `${state.storeName.toLowerCase().replace(/\s+/g, '')}@banca.hn`,
+      companyName: state.storeName,
+      subject: `Rendimiento de Tesorería: Certificado DPF con Tasa Fija del 8.5% anual`,
+      body: `Estimado(a) inversionista de ${state.storeName}:\n\nMaximice el rendimiento de sus excedentes de caja con nuestro producto líder en captación:\n\n• Tasa Promocional de Rendimiento: 8.5% APR (+1.5% bonificación sobre tasa base)\n• Plazo de Inversión: 90 Días\n• Capitalización de Interés: Mensual con reintegro total al vencimiento\n• Disponibilidad de Liquidez: Opción de cancelación anticipada en caso de imprevistos.\n\nConsulte con nuestro asesor o constituya su certificado en ventanilla.`,
+      sentDate: timestampStr,
+      simDay: state.currentDay,
+      simMonth: state.currentMonth,
+      simYear: state.currentYear || 2026,
+      isRead: false,
+      isStarred: false,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'bank_offer',
+      relatedEntityId: offer.id,
+      bankOfferPayload: offer
+    });
+  }
+
+  if (newOffers.length === 0) return state;
+
+  return {
+    ...state,
+    dynamicBankOffers: [...currentOffers, ...newOffers],
+    simulatedEmails: [...newEmails, ...currentEmails]
+  };
+}
+
+export function createInitialSimulatedEmails(companyName: string, sector: RetailSectorId = 'constructora'): SimulatedEmail[] {
+  const companySlug = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const companyEmail = `gerencia@${companySlug}.hn`;
+  const personalEmail = `propietario@${companySlug}.hn`;
+
+  return [
+    {
+      id: 'email-init-sar-solvencia',
+      category: 'sar_tributario',
+      senderName: 'Servicio de Administración de Rentas (SAR)',
+      senderEmail: 'notificaciones@sar.gob.hn',
+      recipientEmail: companyEmail,
+      companyName,
+      subject: 'Aviso Obligatorio: Periodo Fiscal Ordinario y Formulario SAR-25',
+      body: `Estimado(a) contribuyente ${companyName}:\n\nLe notificamos la apertura formal del periodo fiscal corriente. Conforme al Código Tributario de Honduras, su empresa debe presentar su declaración jurada anual del Impuesto Sobre la Renta (ISR - Tasa del 25%) y mantener la solvencia fiscal vigente para operar licitaciones públicas y celebrar contratos financieros.\n\nRecuerde: Presentar la declaración jurada y pagar la obligación tributaria son actos independientes. Puede solicitar su Constancia de Solvencia Fiscal una vez se encuentre al día con todas las obligaciones.\n\nAtentamente,\nDirección de Grandes y Medianos Contribuyentes\nSAR Tegucigalpa, M.D.C.`,
+      sentDate: 'Día 1, Mes 1 (2026)',
+      simDay: 1,
+      simMonth: 1,
+      simYear: 2026,
+      isRead: false,
+      isStarred: true,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'sar_obligation',
+      relatedEntityId: 'period-2026'
+    },
+    {
+      id: 'email-init-order-client',
+      category: 'ventas_clientes',
+      senderName: 'Inversiones y Proyectos de Honduras S.A.',
+      senderEmail: 'adquisiciones@proyectoshn.com',
+      recipientEmail: companyEmail,
+      companyName,
+      subject: 'Pedido de Insumos y Suministros #PED-2026-081',
+      body: `Estimados señores de ${companyName}:\n\nAdjuntamos la orden formal de pedido #PED-2026-081 para el suministro requerido en nuestras obras del presente mes.\n\n• Estado del pedido: Pendiente de confirmación y entrega\n• Monto estipulado: L 185,000.00\n• Términos de pago: Pago contra entrega y recepción conforme\n\nNOTA FINANCIERA: La recepción de este pedido registra la transacción en el sistema, pero no acredita automáticamente el efectivo en cuentas hasta la liquidación o facturación correspondiente.\n\nQuedamos a la espera de su confirmación de despacho.`,
+      sentDate: 'Día 1, Mes 1 (2026)',
+      simDay: 1,
+      simMonth: 1,
+      simYear: 2026,
+      isRead: false,
+      isStarred: false,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'customer_order',
+      relatedEntityId: 'PED-2026-081'
+    },
+    {
+      id: 'email-init-collaterals-reg',
+      category: 'garantias',
+      senderName: 'Registro de la Propiedad Inmueble y Mercantil',
+      senderEmail: 'certificaciones@ip.gob.hn',
+      recipientEmail: companyEmail,
+      companyName,
+      subject: 'Certificación de Bienes Registrados y Avalúos Elegibles',
+      body: `Aviso Registral Oficial:\n\nSe confirman inscritos a nombre de ${companyName} y su propietario los bienes inmuebles, residencias, predios comerciales y maquinaria pesada en los folios reales del Instituto de la Propiedad.\n\nLos bienes se encuentran actualmente con avalúos actualizados y disponibles para respaldar operaciones de financiamiento comercial con cobertura LTV del 70% al 80% ante las instituciones del sistema financiero nacional.\n\nCualquier gravamen hipotecario o prendario constituido bloqueará la venta del bien hasta su cancelación mediante comprobante de finiquito.`,
+      sentDate: 'Día 1, Mes 1 (2026)',
+      simDay: 1,
+      simMonth: 1,
+      simYear: 2026,
+      isRead: false,
+      isStarred: false,
+      isArchived: false,
+      folder: 'inbox',
+      relatedEntityType: 'collateral_asset',
+      relatedEntityId: 'col_casa_palmas'
+    },
+    {
+      id: 'email-init-personal-notice',
+      category: 'sistema_avisos',
+      senderName: 'Secretaría de Gerencia General',
+      senderEmail: 'asistente@banca.hn',
+      recipientEmail: personalEmail,
+      companyName,
+      subject: 'Bienvenida a la Plataforma Financiera Áureo Bank 2000',
+      body: `Estimado(a) Director(a) Propietario(a):\n\nSe ha activado su buzón de correo empresarial. A través de este canal recibirá:\n\n1. Avisos y órdenes de clientes.\n2. Ofertas de financiamiento bancario pre-aprobadas de Ficohsa, Atlántida, BAC y Occidente.\n3. Vencimientos de cuotas y recibos de pago con botón directo de amortización.\n4. Resoluciones tributarias del SAR y certificados de solvencia.\n\nPuede redactar respuestas, revisar comprobantes y gestionar sus cuentas con total flexibilidad.`,
+      sentDate: 'Día 1, Mes 1 (2026)',
+      simDay: 1,
+      simMonth: 1,
+      simYear: 2026,
+      isRead: false,
+      isStarred: true,
+      isArchived: false,
+      folder: 'inbox'
+    }
+  ];
+}
+
 

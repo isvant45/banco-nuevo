@@ -572,6 +572,16 @@ export interface DailySimulationState {
     summary: string;
   }[];
 
+  // Cumplimiento Tributario Detallado (SAR)
+  fiscalPeriods?: SarFiscalPeriodRecord[];
+
+  // Ofertas Bancarias Dinámicas & Comprobantes Oficiales
+  dynamicBankOffers?: DynamicBankOffer[];
+  transactionVouchers?: TransactionVoucher[];
+
+  // Correo Empresarial Simulado Dentro del Juego
+  simulatedEmails?: SimulatedEmail[];
+
   // Garantías Reales Registradas (Casas, Terrenos, Locales, Maquinaria, etc.)
   realEstateCollaterals?: RealEstateCollateralItem[];
 
@@ -583,19 +593,186 @@ export interface DailySimulationState {
   activeCompetitors?: CompetitorFirm[];
 }
 
+export type CollateralAssetType = 
+  | 'casa_habitacion' 
+  | 'terreno_comercial' 
+  | 'local_bodega' 
+  | 'vehiculo_comercial' 
+  | 'maquinaria_pesada' 
+  | 'deposito_plazo' 
+  | 'cuentas_por_cobrar';
+
+export type CollateralStatus = 'disponible' | 'pignorado_parcial' | 'pignorado_total';
+
+export interface CollateralLien {
+  id: string;
+  rank: 1 | 2; // 1er o 2do rango
+  beneficiaryBankId: CommercialBankId;
+  beneficiaryBankName: string;
+  linkedLoanId: string;
+  committedCoverageHNL: number;
+  registeredDate: string;
+}
+
 export interface RealEstateCollateralItem {
   id: string;
   title: string;
-  assetType: 'casa_habitacion' | 'terreno_comercial' | 'local_bodega' | 'vehiculo_comercial' | 'maquinaria_pesada' | 'deposito_plazo' | 'cuentas_por_cobrar';
+  assetType: CollateralAssetType;
   ownerName: string;
+  companyName: string;
+  description: string;
   location: string;
+  status: CollateralStatus;
+  acquisitionValueHNL: number;
   marketValueHNL: number;
   appraisalValueHNL: number; // Valor de avalúo oficial
-  ltvAcceptedPct: number; // Porcentaje aceptado de cobertura (ej: 75% o 80%)
+  appraisalDate: string;
+  ltvAcceptedPct: number; // Porcentaje aceptado de cobertura (ej: 75% u 80%)
+  eligibleCollateralValueHNL: number; // Avalúo * % LTV
+  liens: CollateralLien[];
+  pledgedAmountTotal: number;
+  availableCoverageHNL: number;
+  isPledged: boolean;
+  isLockedForSale: boolean;
+  registrationNumber: string;
+  simulatedDocumentNumber: string;
+  situationNotes: string;
+  // Compatibilidad hacia atrás
   pledgedToBankId?: CommercialBankId;
   linkedDebtId?: string;
-  isPledged: boolean;
-  registrationNumber: string;
+}
+
+export type VoucherOperationType = 
+  | 'desembolso_prestamo'
+  | 'pago_cuota'
+  | 'pago_parcial'
+  | 'abono_capital'
+  | 'cancelacion_total'
+  | 'retiro_caja'
+  | 'deposito_cuenta'
+  | 'transferencia_cuentas'
+  | 'pago_impuesto_sar'
+  | 'liberacion_garantia';
+
+export interface TransactionVoucher {
+  id: string;
+  voucherNumber: string;
+  operationType: VoucherOperationType;
+  title: string;
+  timestamp: string;
+  simDay: number;
+  simMonth: number;
+  simYear: number;
+  companyName: string;
+  primaryBankId?: CommercialBankId;
+  destinationBankId?: CommercialBankId;
+  accountNumber?: string;
+  destinationAccountNumber?: string;
+  grossAmountHNL: number;
+  deductionsHNL: number;
+  netDisbursedOrPaidHNL: number;
+  deductionsBreakdown?: {
+    concept: string;
+    amountHNL: number;
+  }[];
+  priorBalanceHNL: number;
+  newBalanceHNL: number;
+  loanBalancePriorHNL?: number;
+  loanBalanceNewHNL?: number;
+  distributionBreakdown?: {
+    cargosMora: number;
+    interesesDevengados: number;
+    amortizacionCapital: number;
+    reglaAplicada: string;
+  };
+  releasedCollaterals?: string[];
+  referenceCode: string;
+  authStamp: string;
+  notes?: string;
+}
+
+export type EmailCategory = 
+  | 'ventas_clientes'
+  | 'bancos_financiamiento'
+  | 'pagos_vencimientos'
+  | 'proveedores'
+  | 'sar_tributario'
+  | 'garantias'
+  | 'proyectos'
+  | 'competidores_adquisiciones'
+  | 'sistema_avisos';
+
+export interface DynamicBankOffer {
+  id: string;
+  bankId: CommercialBankId;
+  productType: CommercialLoanType;
+  title: string;
+  amountOrLimitHNL: number;
+  annualRatePct: number;
+  termMonths: number;
+  openingFeePct: number;
+  requiresCollateral: boolean;
+  estimatedMonthlyPaymentHNL: number;
+  expiresDay: number;
+  expiresMonth: number;
+  isPreApproved: boolean;
+  status: 'vigente' | 'negociando' | 'aceptada' | 'rechazada' | 'expirada';
+  negotiatedRateDiscountPct?: number;
+}
+
+export interface SimulatedEmail {
+  id: string;
+  category: EmailCategory;
+  senderName: string;
+  senderEmail: string;
+  recipientEmail: string;
+  companyName: string;
+  subject: string;
+  body: string;
+  sentDate: string;
+  simDay: number;
+  simMonth: number;
+  simYear: number;
+  isRead: boolean;
+  isStarred: boolean;
+  isArchived: boolean;
+  folder: 'inbox' | 'starred' | 'sent' | 'archive';
+  relatedEntityType?: 'loan_payment' | 'bank_offer' | 'customer_order' | 'supplier_invoice' | 'sar_obligation' | 'collateral_asset' | 'daily_summary';
+  relatedEntityId?: string;
+  bankOfferPayload?: DynamicBankOffer;
+  paymentNoticePayload?: {
+    targetType: 'loan' | 'sar' | 'supplier';
+    bankId?: CommercialBankId;
+    dueDay: number;
+    amountDueHNL: number;
+    penaltyHNL?: number;
+    interestHNL?: number;
+    principalHNL?: number;
+  };
+  voucherPayload?: TransactionVoucher;
+  actionRequired?: boolean;
+  statusTag?: 'Pendiente' | 'Resuelto' | 'Pre-Aprobado' | 'Vencido';
+  isReplied?: boolean;
+}
+
+export interface SarFiscalPeriodRecord {
+  fiscalYear: number;
+  periodName: string;
+  grossRevenueHNL: number;
+  allowableDeductionsHNL: number;
+  taxableNetIncomeHNL: number;
+  calculatedTaxAmount: number; // 25% ISR
+  isDeclared: boolean;
+  declaredDate?: string;
+  declarationFormNumber?: string;
+  isPaid: boolean;
+  paidDate?: string;
+  paidAmountHNL: number;
+  paymentReceiptNumber?: string;
+  paymentVoucherId?: string;
+  solvenciaIssued: boolean;
+  solvenciaNumber?: string;
+  solvenciaExpiryDate?: string;
 }
 
 export interface SupplierCreditItem {
