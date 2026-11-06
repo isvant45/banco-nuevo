@@ -127,16 +127,6 @@ describe('Bank 2000 Engine: Evaluación Crediticia y Ventanilla', () => {
       completedWorksHistory: [],
       sarTaxRecord: DEFAULT_INITIAL_SAR_RECORD,
       fiscalSolvenciaActive: true,
-      commercialBanks: {
-        ficohsa: { bankId: 'ficohsa', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
-        atlantida: { bankId: 'atlantida', relationshipScore: 60, guaranteeDeposits: [], termDeposits: [] },
-        bac: { bankId: 'bac', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
-        occidente: { bankId: 'occidente', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] }
-      },
-      ownedMachinery: [],
-      machineryDealers: [],
-      materialManufacturerQuotes: [],
-
       commercialBanks: createDefaultBankRelationships(0),
       ownedMachinery: [],
       machineryDealers: DEFAULT_MACHINERY_DEALERS,
@@ -318,16 +308,6 @@ describe('Retail Business Engine: Gestión de Inventario, Ventas y Proveedores',
       completedWorksHistory: [],
       sarTaxRecord: DEFAULT_INITIAL_SAR_RECORD,
       fiscalSolvenciaActive: true,
-      commercialBanks: {
-        ficohsa: { bankId: 'ficohsa', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
-        atlantida: { bankId: 'atlantida', relationshipScore: 60, guaranteeDeposits: [], termDeposits: [] },
-        bac: { bankId: 'bac', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] },
-        occidente: { bankId: 'occidente', relationshipScore: 50, guaranteeDeposits: [], termDeposits: [] }
-      },
-      ownedMachinery: [],
-      machineryDealers: [],
-      materialManufacturerQuotes: [],
-
       commercialBanks: createDefaultBankRelationships(0),
       ownedMachinery: [],
       machineryDealers: DEFAULT_MACHINERY_DEALERS,

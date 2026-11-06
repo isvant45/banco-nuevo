@@ -1122,6 +1122,167 @@ export function earlyLiquidateDpf(
 }
 
 /**
+ * Liquidación de Depósito a Plazo Fijo (DPF) con Acreditación de Capital e Intereses
+ */
+export function liquidateTermDeposit(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  depositId: string,
+  isEarly: boolean = false
+): { updatedState: DailySimulationState; success: boolean; message: string; totalReceived: number } {
+  const currentRel = state.commercialBanks[bankId];
+  const dpf = currentRel?.termDeposits.find(d => d.id === depositId);
+  if (!dpf) {
+    return { updatedState: state, success: false, message: 'Certificado DPF no encontrado.', totalReceived: 0 };
+  }
+
+  // Interés acumulado hasta la fecha
+  const daysElapsed = Math.max(1, dpf.termDays - dpf.daysRemaining);
+  const dailyRate = (dpf.annualRatePct / 100) / 365;
+  const earnedInterest = Math.round(dpf.principalAmount * dailyRate * daysElapsed);
+
+  // Si es cancelación anticipada, se retiene el 20% del interés devengado por penalidad
+  const finalInterest = isEarly ? Math.round(earnedInterest * 0.8) : earnedInterest;
+  const totalPayout = dpf.principalAmount + finalInterest;
+
+  const updatedTermDeposits = currentRel.termDeposits.filter(d => d.id !== depositId);
+  const checking = currentRel.checkingAccount;
+  const updatedChecking = checking ? {
+    ...checking,
+    balance: checking.balance + totalPayout
+  } : undefined;
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + (isEarly ? 1 : 4)),
+      checkingAccount: updatedChecking,
+      termDeposits: updatedTermDeposits
+    }
+  };
+
+  const nextState = {
+    ...state,
+    storeBankBalance: state.storeBankBalance + totalPayout,
+    commercialBanks: updatedBanks
+  };
+
+  return {
+    updatedState: nextState,
+    success: true,
+    totalReceived: totalPayout,
+    message: isEarly
+      ? `Liquidación anticipada de DPF procesada: Capital L ${dpf.principalAmount.toLocaleString()} + Intereses netos L ${finalInterest.toLocaleString()} acreditados a tu cuenta bancaria (Penalidad aplicada por retiro antes de tiempo).`
+      : `¡DPF VENCIDO Y LIQUIDADO! Se acreditaron L ${totalPayout.toLocaleString()} (Capital L ${dpf.principalAmount.toLocaleString()} + Rendimiento L ${finalInterest.toLocaleString()}) en tu cuenta bancaria de ${COMMERCIAL_BANKS_PROFILES[bankId].name}.`
+  };
+}
+
+/**
+ * Devengo diario/periódico de intereses para certificados DPF
+ */
+export function accrueTermDeposits(
+  state: DailySimulationState,
+  daysElapsed: number = 1
+): { updatedState: DailySimulationState; maturedDepositsCount: number; interestAccruedTotal: number } {
+  let updatedBanks = { ...state.commercialBanks };
+  let maturedDepositsCount = 0;
+  let interestAccruedTotal = 0;
+
+  Object.entries(updatedBanks).forEach(([bId, rel]) => {
+    const bankId = bId as CommercialBankId;
+    if (!rel?.termDeposits || rel.termDeposits.length === 0) return;
+
+    const newDeposits = rel.termDeposits.map(dpf => {
+      const remaining = Math.max(0, dpf.daysRemaining - daysElapsed);
+      const dailyRate = (dpf.annualRatePct / 100) / 365;
+      const accrued = Math.round(dpf.principalAmount * dailyRate * daysElapsed);
+      interestAccruedTotal += accrued;
+
+      if (remaining === 0) {
+        maturedDepositsCount++;
+      }
+
+      return {
+        ...dpf,
+        daysRemaining: remaining,
+        accruedInterest: (dpf.accruedInterest || 0) + accrued
+      };
+    });
+
+    updatedBanks[bankId] = {
+      ...rel,
+      termDeposits: newDeposits
+    };
+  });
+
+  return {
+    updatedState: {
+      ...state,
+      commercialBanks: updatedBanks
+    },
+    maturedDepositsCount,
+    interestAccruedTotal
+  };
+}
+
+/**
+ * Cargo o Compra Directa con Tarjeta de Crédito Corporativa
+ */
+export function chargeCorporateCard(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  amount: number,
+  concept: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const currentRel = state.commercialBanks[bankId];
+  const card = currentRel?.corporateCard;
+  if (!card) {
+    return { updatedState: state, success: false, message: 'No dispones de tarjeta corporativa con este banco.' };
+  }
+
+  const availableCredit = card.creditLimit - card.currentBalance;
+  if (amount > availableCredit) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Límite de crédito insuficiente en tu ${card.brand}. Disponible: L ${availableCredit.toLocaleString()}, Requerido: L ${amount.toLocaleString()}.`
+    };
+  }
+
+  const newBalance = card.currentBalance + amount;
+  const cashbackEarned = Math.round(amount * ((card.cashbackPct || 1.5) / 100));
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      corporateCard: {
+        ...card,
+        currentBalance: newBalance,
+        minPaymentMonthly: Math.round(newBalance * 0.05)
+      }
+    }
+  };
+
+  const nextState = {
+    ...state,
+    commercialBanks: updatedBanks
+  };
+
+  const newProfile = calculateCompanyCreditScore(nextState);
+
+  return {
+    updatedState: {
+      ...nextState,
+      companyCreditProfile: newProfile
+    },
+    success: true,
+    message: `¡COMPRA APROBADA! Se cargaron L ${amount.toLocaleString()} a tu ${card.brand} por concepto de "${concept}". Cashback acreditado: L ${cashbackEarned.toLocaleString()}. Saldo en tarjeta: L ${newBalance.toLocaleString()}.`
+  };
+}
+
+/**
  * Pago o Abono a Préstamo Bancario
  */
 export function payCommercialLoan(

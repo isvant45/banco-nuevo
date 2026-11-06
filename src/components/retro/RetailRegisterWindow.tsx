@@ -23,11 +23,37 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentCustomer = queue[currentIndex] || queue[0];
+  const [cashTendered, setCashTendered] = useState<number>(0);
+  const [showZReport, setShowZReport] = useState<boolean>(false);
 
   const unservedCount = queue.filter(q => !q.isServed).length;
 
+  const calculateSubtotal = () => {
+    if (!currentCustomer) return 0;
+    return currentCustomer.cart.reduce((sum, item) => sum + (item.units * item.unitPrice), 0);
+  };
+
+  const subtotal = calculateSubtotal();
+  const tax = Math.round(subtotal * 0.15);
+  const total = subtotal + tax;
+
+  // Actualizar efectivo recibido por defecto con el total exacto o redondeado
+  React.useEffect(() => {
+    if (total > 0) {
+      setCashTendered(total);
+    }
+  }, [total]);
+
+  const changeDue = Math.max(0, cashTendered - total);
+
   const handleCharge = (paymentMethod: 'efectivo' | 'tarjeta') => {
     if (!currentCustomer) return;
+
+    if (paymentMethod === 'efectivo' && cashTendered < total) {
+      sound.playRejectBuzzer();
+      alert(`Monto recibido insuficiente. El cliente debe entregar al menos L ${total.toLocaleString()}.`);
+      return;
+    }
 
     // Verificar si hay stock
     const isOutOfStock = currentCustomer.cart.some(item => {
@@ -43,15 +69,6 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
 
     onServeCustomer(currentCustomer, paymentMethod);
   };
-
-  const calculateSubtotal = () => {
-    if (!currentCustomer) return 0;
-    return currentCustomer.cart.reduce((sum, item) => sum + (item.units * item.unitPrice), 0);
-  };
-
-  const subtotal = calculateSubtotal();
-  const tax = Math.round(subtotal * 0.15);
-  const total = subtotal + tax;
 
   return (
     <div className="space-y-3 font-sans text-xs">
@@ -156,30 +173,67 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
               </div>
 
               {/* Totales y Botones de Cobro de Caja Registradora */}
-              <div className="bg-[#e9ecef] border border-[#a0a0a0] p-2.5 flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] text-slate-600">Subtotal: L {subtotal.toLocaleString()}</div>
-                  <div className="text-[11px] text-slate-600">ISV 15%: L {tax.toLocaleString()}</div>
-                  <div className="font-mono text-sm font-black text-slate-900">
-                    TOTAL A COBRAR: L {total.toLocaleString()}
+              <div className="bg-[#e9ecef] border border-[#a0a0a0] p-2.5 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-300 pb-2">
+                  <div>
+                    <div className="text-[11px] text-slate-600">Subtotal: L {subtotal.toLocaleString()}</div>
+                    <div className="text-[11px] text-slate-600">ISV 15%: L {tax.toLocaleString()}</div>
+                    <div className="font-mono text-sm font-black text-slate-900">
+                      TOTAL A COBRAR: L {total.toLocaleString()}
+                    </div>
                   </div>
+
+                  {/* Calculadora de Vuelto / Cambio en Efectivo */}
+                  {!currentCustomer.isServed && (
+                    <div className="bg-white p-2 border border-slate-300 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-600">Efectivo Recibido (L):</span>
+                        <input
+                          type="number"
+                          min={total}
+                          value={cashTendered}
+                          onChange={(e) => setCashTendered(Math.max(0, Number(e.target.value)))}
+                          className="w-24 bg-amber-50 border border-slate-400 px-1.5 py-0.5 font-mono font-bold text-xs"
+                        />
+                      </div>
+
+                      {/* Botones de billetes rápidos */}
+                      <div className="flex gap-1">
+                        {[total, Math.ceil(total / 50) * 50, Math.ceil(total / 100) * 100, Math.ceil(total / 500) * 500].filter((val, i, arr) => arr.indexOf(val) === i && val >= total).slice(0, 3).map((amt, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setCashTendered(amt)}
+                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border text-[10px] font-mono font-bold text-slate-700"
+                          >
+                            L {amt.toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="text-[11px] font-mono font-bold text-emerald-800 pt-0.5 flex justify-between">
+                        <span>VUELTO / CAMBIO:</span>
+                        <span>L {changeDue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {!currentCustomer.isServed ? (
-                  <div className="flex gap-2">
+                  <div className="flex justify-end gap-2">
                     <button
                       onClick={() => handleCharge('efectivo')}
-                      className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border-t border-l border-emerald-300 border-b border-r border-emerald-950 shadow-sm flex items-center gap-1.5"
+                      className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border-t border-l border-emerald-300 border-b border-r border-emerald-950 shadow-sm flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>💵</span>
-                      <span>Cobrar en Efectivo</span>
+                      <span>Cobrar en Efectivo (Vuelto: L {changeDue.toLocaleString()})</span>
                     </button>
                     <button
                       onClick={() => handleCharge('tarjeta')}
-                      className="px-3 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs border-t border-l border-blue-300 border-b border-r border-blue-950 shadow-sm flex items-center gap-1.5"
+                      className="px-3 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs border-t border-l border-blue-300 border-b border-r border-blue-950 shadow-sm flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>💳</span>
-                      <span>Cobrar Tarjeta POS</span>
+                      <span>Cobrar Tarjeta POS (Exacto)</span>
                     </button>
                   </div>
                 ) : (
@@ -194,7 +248,7 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
                         if (firstUnserved !== -1) setCurrentIndex(firstUnserved);
                       }
                     }}
-                    className="px-3 py-1.5 bg-[#c0c0c0] hover:bg-[#d0d0d0] border border-white border-b-[#404040] border-r-[#404040] font-bold text-slate-900"
+                    className="w-full py-1.5 bg-[#c0c0c0] hover:bg-[#d0d0d0] border border-white border-b-[#404040] border-r-[#404040] font-bold text-slate-900 cursor-pointer"
                   >
                     Atender Siguiente Cliente ▶
                   </button>
@@ -239,11 +293,73 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
             )}
           </div>
 
-          <div className="border-t border-dashed border-slate-400 pt-1.5 text-[10px] text-slate-500 text-center">
-            {receipts.length} transacciones registradas hoy
+          <div className="border-t border-dashed border-slate-400 pt-1.5 flex items-center justify-between text-[10px] text-slate-600">
+            <span>{receipts.length} ventas hoy</span>
+            <button
+              onClick={() => {
+                sound.playClick();
+                setShowZReport(true);
+              }}
+              className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold border border-amber-400"
+            >
+              📊 Arqueo Z
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Modal de Arqueo de Caja Diario (Reporte Z) */}
+      {showZReport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#f0f0f0] border-2 border-[#808080] shadow-2xl p-4 w-full max-w-md font-mono text-xs space-y-3">
+            <div className="flex justify-between items-center border-b pb-1 font-bold text-slate-900">
+              <span>🧾 CIERRE Y ARQUEO DIARIO DE CAJA (REPORTE Z)</span>
+              <button
+                onClick={() => setShowZReport(false)}
+                className="text-slate-500 hover:text-black font-bold px-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-white p-3 border space-y-1.5 text-slate-800">
+              <div className="text-center font-bold border-b pb-1">
+                {storeName.toUpperCase()}
+              </div>
+              <div className="flex justify-between">
+                <span>Ventas Totales del Día:</span>
+                <span className="font-bold">L {receipts.reduce((sum, r) => sum + r.total, 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 text-[11px]">
+                <span>- Base Imponible:</span>
+                <span>L {receipts.reduce((sum, r) => sum + r.subtotal, 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 text-[11px]">
+                <span>- ISV 15% Recaudado:</span>
+                <span>L {receipts.reduce((sum, r) => sum + r.tax, 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1 font-bold">
+                <span>Efectivo Actual en Gaveta:</span>
+                <span className="text-emerald-800">L {storeCash.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-500">
+                <span>Transacciones Emitidas:</span>
+                <span>{receipts.length} tickets</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                sound.playApprovalStamp();
+                setShowZReport(false);
+              }}
+              className="w-full py-1.5 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs"
+            >
+              Imprimir Arqueo y Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
