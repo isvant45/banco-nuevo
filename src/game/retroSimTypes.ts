@@ -252,6 +252,22 @@ export interface CompanyCreditProfile {
   dtiRatioPct: number;
 }
 
+export type CommercialLoanType = 
+  | 'capital_trabajo'
+  | 'linea_revolvente'
+  | 'credito_inventario'
+  | 'credito_maquinaria'
+  | 'credito_vehicular'
+  | 'vehicular_equipo'
+  | 'financiamiento_inmobiliario'
+  | 'construccion_avances'
+  | 'adquisicion_competidores'
+  | 'tarjeta_empresarial'
+  | 'credito_proveedores'
+  | 'leasing_financiero'
+  | 'factoraje_facturas'
+  | 'reestructurado';
+
 export interface BankCommercialLoan {
   id: string;
   bankId: CommercialBankId;
@@ -261,12 +277,19 @@ export interface BankCommercialLoan {
   interestRateAnnual: number;
   termMonthsRemaining: number;
   purpose: string;
-  loanType?: 'capital_trabajo' | 'vehicular_equipo' | 'reestructurado';
+  loanType?: CommercialLoanType;
   equipmentModel?: string;
   amortizedPrincipalTotal?: number;
   isRestructured?: boolean;
   originalTermMonths?: number;
   originalMonthlyPayment?: number;
+  gracePeriodMonthsRemaining?: number;
+  collateralIdRef?: string;
+  revolvingLimit?: number;
+  revolvingDrawn?: number;
+  leasingBuyoutOptionHNL?: number;
+  factoredInvoiceAmount?: number;
+  factoringDiscountPct?: number;
 }
 
 export type CorporateCardTierId = 'business_standard' | 'corporate_gold' | 'infinite_black';
@@ -548,4 +571,114 @@ export interface DailySimulationState {
     netProfit: number;
     summary: string;
   }[];
+
+  // Garantías Reales Registradas (Casas, Terrenos, Locales, Maquinaria, etc.)
+  realEstateCollaterals?: RealEstateCollateralItem[];
+
+  // Centro de Obligaciones y Pasivos
+  supplierCredits?: SupplierCreditItem[];
+  autoDebitEnabled?: boolean;
+
+  // Competidores Activos del Mercado Local (M&A)
+  activeCompetitors?: CompetitorFirm[];
 }
+
+export interface RealEstateCollateralItem {
+  id: string;
+  title: string;
+  assetType: 'casa_habitacion' | 'terreno_comercial' | 'local_bodega' | 'vehiculo_comercial' | 'maquinaria_pesada' | 'deposito_plazo' | 'cuentas_por_cobrar';
+  ownerName: string;
+  location: string;
+  marketValueHNL: number;
+  appraisalValueHNL: number; // Valor de avalúo oficial
+  ltvAcceptedPct: number; // Porcentaje aceptado de cobertura (ej: 75% o 80%)
+  pledgedToBankId?: CommercialBankId;
+  linkedDebtId?: string;
+  isPledged: boolean;
+  registrationNumber: string;
+}
+
+export interface SupplierCreditItem {
+  id: string;
+  supplierName: string;
+  concept: string;
+  invoiceNumber: string;
+  amountHNL: number;
+  issuedDay: number;
+  dueDay: number;
+  isPaid: boolean;
+  earlyDiscountPct: number;
+  latePenaltyDailyPct: number;
+}
+
+export interface CompetitorFirm {
+  id: string;
+  name: string;
+  sector: RetailSectorId;
+  marketSharePct: number;
+  cashBalanceHNL: number;
+  bankDebtHNL: number;
+  inventoryValueHNL: number;
+  monthlySalesHNL: number;
+  pricingStrategy: 'agresiva' | 'moderada' | 'calidad_premium';
+  isDistressed: boolean;
+  acquisitionPriceAssetDealHNL: number;
+  acquisitionPriceSharePurchaseHNL: number;
+  status: 'activo' | 'adquirido_jugador' | 'en_quiebra';
+}
+
+export interface FinancialStatementsSummary {
+  // Balance General
+  currentAssets: {
+    cashInHand: number;
+    cashInBank: number;
+    guaranteeDeposits: number;
+    inventoryStock: number;
+    accountsReceivable: number;
+    total: number;
+  };
+  nonCurrentAssets: {
+    machineryAndFleet: number;
+    accumulatedDepreciation: number;
+    realEstateCollaterals: number;
+    total: number;
+  };
+  totalAssets: number;
+
+  currentLiabilities: {
+    shortTermLoans: number;
+    creditCardsBalance: number;
+    supplierAccountsPayable: number;
+    customerAdvancesLiability: number;
+    sarTaxPayable: number;
+    total: number;
+  };
+  nonCurrentLiabilities: {
+    longTermLoans: number;
+    total: number;
+  };
+  totalLiabilities: number;
+
+  netEquity: number; // Activos - Pasivos (comprobación contable)
+
+  // Estado de Resultados
+  incomeStatement: {
+    grossRevenue: number;
+    cogs: number;
+    grossProfit: number;
+    operatingExpenses: number; // Salarios, alquiler, insumos
+    ebitda: number;
+    interestExpenses: number; // Intereses a bancos
+    taxExpenseSAR: number; // 25% ISR
+    netIncome: number;
+  };
+
+  // Flujo de Efectivo
+  cashFlowStatement: {
+    operatingCashFlow: number;
+    investingCashFlow: number;
+    financingCashFlow: number;
+    netChangeInCash: number;
+  };
+}
+

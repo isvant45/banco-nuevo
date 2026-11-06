@@ -22,6 +22,11 @@ interface RetroTaskbarProps {
   onAdvanceDays?: (days: number) => void;
   onOpenNewGame: () => void;
   onOpenAuditReport: () => void;
+  onOpenFinancialStatements?: () => void;
+  onOpenLiabilitiesManager?: () => void;
+  onOpenCompetitorsMarket?: () => void;
+  onSaveGame?: () => void;
+  onLoadGame?: (file: File) => void;
 }
 
 export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
@@ -36,7 +41,12 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
   onAdvanceDay,
   onAdvanceDays,
   onOpenNewGame,
-  onOpenAuditReport
+  onOpenAuditReport,
+  onOpenFinancialStatements,
+  onOpenLiabilitiesManager,
+  onOpenCompetitorsMarket,
+  onSaveGame,
+  onLoadGame
 }) => {
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(sound.getMuted());
@@ -46,13 +56,20 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
     setIsMuted(muted);
   };
 
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onLoadGame) {
+      onLoadGame(file);
+    }
+  };
+
   return (
     <>
       {/* Menú Inicio Desplegable */}
       {isStartMenuOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="fixed bottom-10 left-0 w-64 bg-[#c0c0c0] border-t-2 border-l-2 border-white border-b-2 border-r-2 border-[#404040] shadow-2xl z-50 flex"
+          className="fixed bottom-10 left-0 w-72 bg-[#c0c0c0] border-t-2 border-l-2 border-white border-b-2 border-r-2 border-[#404040] shadow-2xl z-50 flex"
         >
           {/* Banda lateral azul vertical */}
           <div className="w-8 bg-gradient-to-t from-[#000080] to-[#1084d0] flex items-end justify-center pb-4">
@@ -69,11 +86,53 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
                 setIsStartMenuOpen(false);
                 onOpenNewGame();
               }}
-              className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
             >
               <span className="text-sm">⭐</span>
               <span className="font-semibold">Nueva Partida (Cambiar Rol / Rubro)...</span>
             </button>
+
+            {onOpenFinancialStatements && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setIsStartMenuOpen(false);
+                  onOpenFinancialStatements();
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              >
+                <span className="text-sm">⚖️</span>
+                <span>Contabilidad: Balance General & P&L</span>
+              </button>
+            )}
+
+            {onOpenLiabilitiesManager && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setIsStartMenuOpen(false);
+                  onOpenLiabilitiesManager();
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              >
+                <span className="text-sm">📑</span>
+                <span>Centro de Pasivos & Obligaciones</span>
+              </button>
+            )}
+
+            {onOpenCompetitorsMarket && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setIsStartMenuOpen(false);
+                  onOpenCompetitorsMarket();
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              >
+                <span className="text-sm">🏢</span>
+                <span>Mercado Competidor & M&A</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -81,11 +140,41 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
                 setIsStartMenuOpen(false);
                 onOpenAuditReport();
               }}
-              className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
             >
               <span className="text-sm">📊</span>
-              <span>Auditoría & Estados Financieros</span>
+              <span>Reporte Auditoría Anual CNBS</span>
             </button>
+
+            <div className="border-t border-[#808080] my-1 border-b border-white" />
+
+            {/* Guardado y Carga de Partida */}
+            {onSaveGame && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setIsStartMenuOpen(false);
+                  onSaveGame();
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              >
+                <span className="text-sm">💾</span>
+                <span className="font-semibold text-emerald-900 hover:text-white">Guardar Partida (Exportar .JSON)</span>
+              </button>
+            )}
+
+            {onLoadGame && (
+              <label className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white cursor-pointer">
+                <span className="text-sm">📂</span>
+                <span className="font-semibold text-blue-900 hover:text-white">Cargar Partida (.JSON)...</span>
+                <input
+                  type="file"
+                  accept=".json,.aureo"
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
+              </label>
+            )}
 
             <div className="border-t border-[#808080] my-1 border-b border-white" />
 
@@ -94,7 +183,7 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
                 sound.playClick();
                 handleToggleSound();
               }}
-              className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#000080] hover:text-white"
             >
               <span className="text-sm">{isMuted ? '🔇' : '🔊'}</span>
               <span>Sonido del Sistema: {isMuted ? 'Silenciado' : 'Activado'}</span>
@@ -102,8 +191,8 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
 
             <div className="border-t border-[#808080] my-1 border-b border-white" />
 
-            <div className="px-3 py-1.5 text-[11px] text-slate-600 bg-[#dfdfdf]">
-              Simulador Bancario y Empresarial v2.0
+            <div className="px-3 py-1 text-[10px] text-slate-600 bg-[#dfdfdf]">
+              Áureo Bank – Simulador Empresarial v2.0
             </div>
           </div>
         </div>
@@ -168,6 +257,21 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
             <span>▶</span>
             <span>1 Día</span>
           </button>
+
+          {/* Botón 7 Días (Semana) */}
+          {onAdvanceDays && (
+            <button
+              onClick={() => {
+                sound.playApprovalStamp();
+                onAdvanceDays(7);
+              }}
+              title="Avanzar 7 Días (1 Semana): Ventas semanales, progreso de cuadrillas y amortización"
+              className="h-7 px-2 bg-[#2b4c7e] hover:bg-[#1a3258] text-white font-bold text-xs flex items-center gap-1 border-t border-l border-white border-b border-r border-[#101e36] shadow-sm transition-colors"
+            >
+              <span>▶</span>
+              <span>7 Días</span>
+            </button>
+          )}
 
           {/* Botón 15 Días (Quincena) */}
           {onAdvanceDays && (

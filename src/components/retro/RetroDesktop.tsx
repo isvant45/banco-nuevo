@@ -4,7 +4,8 @@ import {
   RetailSectorId, 
   RetroRoleMode,
   RetailCustomerWalkIn, 
-  ConstructionMaterialId 
+  ConstructionMaterialId,
+  CommercialLoanType
 } from '../../game/retroSimTypes';
 import { 
   SECTOR_DEFAULT_PRODUCTS, 
@@ -50,7 +51,12 @@ import {
   negotiateLoanRate,
   makeExtraordinaryLoanPayment,
   processDailyLoanAmortization,
-  processBiweeklyCardEvaluation
+  processBiweeklyCardEvaluation,
+  requestFullCommercialCredit,
+  makeExtraordinaryLoanPaymentWithOptions,
+  pledgeRealEstateCollateralToLoan,
+  releaseRealEstateCollateral,
+  executeInvoiceFactoring
 } from '../../game/commercialBanksEngine';
 import {
   DEFAULT_MACHINERY_DEALERS,
@@ -72,6 +78,9 @@ import { MaterialTenderWindow } from './MaterialTenderWindow';
 import { ConstructionBidsWindow } from './ConstructionBidsWindow';
 import { ConstructionSupplyWindow } from './ConstructionSupplyWindow';
 import { SarTaxAuditWindow } from './SarTaxAuditWindow';
+import { FinancialStatementsWindow } from './FinancialStatementsWindow';
+import { LiabilitiesManagerWindow } from './LiabilitiesManagerWindow';
+import { CompetitorsMarketWindow } from './CompetitorsMarketWindow';
 import { DailyClosingModal } from './DailyClosingModal';
 import { RetroNewGameModal } from './RetroNewGameModal';
 
@@ -201,7 +210,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     staff_store: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     bank_docket: { isOpen: roleMode === 'banquero', isMinimized: false, isMaximized: false, zIndex: 10 },
     bank_vault: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
-    holding_board: { isOpen: roleMode === 'grupo_empresarial', isMinimized: false, isMaximized: false, zIndex: 10 }
+    holding_board: { isOpen: roleMode === 'grupo_empresarial', isMinimized: false, isMaximized: false, zIndex: 10 },
+    financial_statements: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    liabilities_manager: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    competitors_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
   });
 
   const [topZIndex, setTopZIndex] = useState(20);
@@ -445,6 +457,101 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     if (res.success) sound.playApprovalStamp();
     else sound.playRejectBuzzer();
     alert(res.message);
+  };
+
+  const handleRequestFullCredit = (
+    bankId: any,
+    productType: CommercialLoanType,
+    amount: number,
+    termMonths: number,
+    purpose: string,
+    graceMonths: number = 0,
+    collateralId?: string
+  ) => {
+    const res = requestFullCommercialCredit(simState, bankId, productType, amount, termMonths, purpose, graceMonths, collateralId);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    else sound.playRejectBuzzer();
+    alert(res.message);
+  };
+
+  const handleExtraordinaryPaymentWithOptions = (
+    bankId: any,
+    amount: number,
+    strategy: 'reducir_cuota' | 'reducir_plazo'
+  ) => {
+    const res = makeExtraordinaryLoanPaymentWithOptions(simState, bankId, amount, strategy);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    else sound.playRejectBuzzer();
+    alert(res.message);
+  };
+
+  const handlePledgeCollateral = (collateralId: string, bankId: any, loanId: string) => {
+    const res = pledgeRealEstateCollateralToLoan(simState, collateralId, bankId, loanId);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    alert(res.message);
+  };
+
+  const handleReleaseCollateral = (collateralId: string) => {
+    const res = releaseRealEstateCollateral(simState, collateralId);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    alert(res.message);
+  };
+
+  const handleExecuteFactoring = (bankId: any, invoiceAmount: number, desc: string) => {
+    const res = executeInvoiceFactoring(simState, bankId, invoiceAmount, desc);
+    setSimState(res.updatedState);
+    if (res.success) sound.playApprovalStamp();
+    else sound.playRejectBuzzer();
+    alert(res.message);
+  };
+
+  const handleSaveGameJson = () => {
+    sound.playApprovalStamp();
+    const savePayload = {
+      version: '2.0-retro',
+      savedAt: new Date().toISOString(),
+      roleMode,
+      retailSector,
+      entityName,
+      simState
+    };
+    const blob = new Blob([JSON.stringify(savePayload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aureo_bank_partida_${entityName.toLowerCase().replace(/\s+/g, '_')}_dia${simState.currentDay}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    alert('¡Partida guardada y descargada exitosamente en formato .JSON!');
+  };
+
+  const handleLoadGameJson = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const parsed = JSON.parse(text);
+        if (parsed.simState) {
+          setSimState(parsed.simState);
+          if (parsed.roleMode) setRoleMode(parsed.roleMode);
+          if (parsed.retailSector) setRetailSector(parsed.retailSector);
+          if (parsed.entityName) setEntityName(parsed.entityName);
+          sound.playApprovalStamp();
+          alert('¡Partida restaurada con éxito!');
+        } else {
+          sound.playRejectBuzzer();
+          alert('El archivo no contiene un estado de partida válido.');
+        }
+      } catch (err) {
+        sound.playRejectBuzzer();
+        alert('Error al leer el archivo de guardado.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   // -------------------------------------------------------------------------
@@ -862,7 +969,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       { id: 'pos_register', title: 'Supermercado del Holding', icon: '🏪', isOpen: !!openWindows.pos_register?.isOpen, isMinimized: !!openWindows.pos_register?.isMinimized },
       { id: 'bancos_comerciales', title: 'Tesorería & Bancos', icon: '🏦', isOpen: !!openWindows.bancos_comerciales?.isOpen, isMinimized: !!openWindows.bancos_comerciales?.isMinimized },
       { id: 'sar_audit', title: 'SAR - Consolidado', icon: '📋', isOpen: !!openWindows.sar_audit?.isOpen, isMinimized: !!openWindows.sar_audit?.isMinimized }
-    ] : [])
+    ] : []),
+    { id: 'financial_statements', title: 'Contabilidad: Balance & P&L', icon: '⚖️', isOpen: !!openWindows.financial_statements?.isOpen, isMinimized: !!openWindows.financial_statements?.isMinimized },
+    { id: 'liabilities_manager', title: 'Centro de Pasivos & Obligaciones', icon: '📑', isOpen: !!openWindows.liabilities_manager?.isOpen, isMinimized: !!openWindows.liabilities_manager?.isMinimized },
+    { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized }
   ];
 
   return (
@@ -1373,6 +1483,51 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </span>
         </button>
 
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('financial_statements');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            ⚖️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Balance & P&L
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('liabilities_manager');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📑
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Pasivos & Deudas
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('competitors_market');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🏢
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Mercado M&A
+          </span>
+        </button>
+
         {onReturnToTitle && (
           <button
             onClick={() => {
@@ -1691,12 +1846,17 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
             onPayLoan={handlePayLoan}
             onPayCard={handlePayCard}
             onExtraordinaryLoanPayment={handleExtraordinaryLoanPayment}
+            onExtraordinaryPaymentWithOptions={handleExtraordinaryPaymentWithOptions}
             onDepositCash={handleDepositCashToBank}
             onWithdrawCash={handleWithdrawCashFromBank}
             onNegotiateCheckingRate={handleNegotiateCheckingRate}
             onNegotiateLoanRate={handleNegotiateLoanRate}
             onLiquidateDpf={handleLiquidateDpf}
             onChargeCard={handleChargeCorporateCard}
+            onRequestFullCredit={handleRequestFullCredit}
+            onPledgeCollateral={handlePledgeCollateral}
+            onReleaseCollateral={handleReleaseCollateral}
+            onExecuteFactoring={handleExecuteFactoring}
           />
         </RetroWindow>
       )}
@@ -1864,6 +2024,69 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         </RetroWindow>
       )}
 
+      {/* Ventana: Contabilidad & Estados Financieros (Balance General, P&L, Flujo) */}
+      <RetroWindow
+        id="financial_statements"
+        title={`Estados Financieros & Contabilidad: ${entityName}`}
+        icon="⚖️"
+        initialX={85}
+        initialY={30}
+        isOpen={!!openWindows.financial_statements?.isOpen}
+        isMinimized={!!openWindows.financial_statements?.isMinimized}
+        isMaximized={!!openWindows.financial_statements?.isMaximized}
+        zIndex={openWindows.financial_statements?.zIndex || 5}
+        onFocus={() => bringToFront('financial_statements')}
+        onClose={() => handleCloseWindow('financial_statements')}
+        onMinimize={() => handleMinimizeWindow('financial_statements')}
+        onMaximize={() => handleMaximizeWindow('financial_statements')}
+      >
+        <FinancialStatementsWindow state={simState} />
+      </RetroWindow>
+
+      {/* Ventana: Centro de Pasivos & Obligaciones */}
+      <RetroWindow
+        id="liabilities_manager"
+        title={`Centro de Pasivos & Obligaciones Financieras: ${entityName}`}
+        icon="📑"
+        initialX={120}
+        initialY={50}
+        isOpen={!!openWindows.liabilities_manager?.isOpen}
+        isMinimized={!!openWindows.liabilities_manager?.isMinimized}
+        isMaximized={!!openWindows.liabilities_manager?.isMaximized}
+        zIndex={openWindows.liabilities_manager?.zIndex || 5}
+        onFocus={() => bringToFront('liabilities_manager')}
+        onClose={() => handleCloseWindow('liabilities_manager')}
+        onMinimize={() => handleMinimizeWindow('liabilities_manager')}
+        onMaximize={() => handleMaximizeWindow('liabilities_manager')}
+      >
+        <LiabilitiesManagerWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+        />
+      </RetroWindow>
+
+      {/* Ventana: Mercado Competidor & M&A */}
+      <RetroWindow
+        id="competitors_market"
+        title="Directorio de Competidores Locales & Fusiones / Adquisiciones (M&A)"
+        icon="🏢"
+        initialX={140}
+        initialY={60}
+        isOpen={!!openWindows.competitors_market?.isOpen}
+        isMinimized={!!openWindows.competitors_market?.isMinimized}
+        isMaximized={!!openWindows.competitors_market?.isMaximized}
+        zIndex={openWindows.competitors_market?.zIndex || 5}
+        onFocus={() => bringToFront('competitors_market')}
+        onClose={() => handleCloseWindow('competitors_market')}
+        onMinimize={() => handleMinimizeWindow('competitors_market')}
+        onMaximize={() => handleMaximizeWindow('competitors_market')}
+      >
+        <CompetitorsMarketWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+        />
+      </RetroWindow>
+
       {/* Barra de Tareas Inferior */}
       <RetroTaskbar
         windows={windowsInfo}
@@ -1878,6 +2101,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onAdvanceDays={handleAdvanceDays}
         onOpenNewGame={() => setIsNewGameModalOpen(true)}
         onOpenAuditReport={onOpenAuditReport}
+        onOpenFinancialStatements={() => bringToFront('financial_statements')}
+        onOpenLiabilitiesManager={() => bringToFront('liabilities_manager')}
+        onOpenCompetitorsMarket={() => bringToFront('competitors_market')}
+        onSaveGame={handleSaveGameJson}
+        onLoadGame={handleLoadGameJson}
       />
     </div>
   );

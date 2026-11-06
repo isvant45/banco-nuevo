@@ -4,13 +4,19 @@ import {
   CommercialBankProfile, 
   CommercialBankRelationship,
   BankCommercialLoan,
+  CommercialLoanType,
   BankCorporateCreditCard,
   BankCheckingAccount,
   BankGuaranteeDeposit,
   BankTermDeposit,
   CompanyCreditProfile,
   OwnedMachineryUnit,
-  MachineryCategory
+  MachineryCategory,
+  RealEstateCollateralItem,
+  SupplierCreditItem,
+  CompetitorFirm,
+  FinancialStatementsSummary,
+  RetailSectorId
 } from './retroSimTypes';
 
 /**
@@ -1983,3 +1989,1307 @@ export function financeEquipmentLoan(
     message: `¡FINANCIAMIENTO APROBADO! ${COMMERCIAL_BANKS_PROFILES[bankId].name} financió "${equipment.modelName}" a ${termYears} años (${apr}% anual). Prima pagada: L ${downPaymentAmount.toLocaleString()}. Cuota mensual: L ${monthlyPayment.toLocaleString()}. Unidad incorporada a tu flota.`
   };
 }
+
+// =========================================================================
+// 12+ PRODUCTOS DE CRÉDITO EMPRESARIAL COMPLETO & CONDICIONES BANCARIAS
+// =========================================================================
+
+export interface CreditProductConfig {
+  id: CommercialLoanType;
+  name: string;
+  category: 'operativo' | 'activos' | 'estructurado' | 'liquidez';
+  icon: string;
+  description: string;
+  minAmountHNL: number;
+  maxAmountMultiplier: number; // Multiplica la capacidad base
+  minTermMonths: number;
+  maxTermMonths: number;
+  rateSpreadPct: number; // Variación respecto a la tasa base del banco (+/- %)
+  requiresCollateral: boolean;
+  requiredCollateralCoveragePct: number; // 0 a 100%
+  admitsGracePeriod: boolean;
+  openingFeePct: number; // Comisión de apertura / desembolso
+  annualInsurancePct: number; // Seguro de saldo deudor
+}
+
+export const COMMERCIAL_LOAN_PRODUCTS: Record<CommercialLoanType, CreditProductConfig> = {
+  capital_trabajo: {
+    id: 'capital_trabajo',
+    name: 'Crédito para Capital de Trabajo',
+    category: 'operativo',
+    icon: '💼',
+    description: 'Financiamiento ágil para compra de inventario, pago de planillas y gastos operativos ordinarios.',
+    minAmountHNL: 50000,
+    maxAmountMultiplier: 1.0,
+    minTermMonths: 6,
+    maxTermMonths: 36,
+    rateSpreadPct: 0.0,
+    requiresCollateral: false,
+    requiredCollateralCoveragePct: 0,
+    admitsGracePeriod: true,
+    openingFeePct: 1.5,
+    annualInsurancePct: 0.25
+  },
+  linea_revolvente: {
+    id: 'linea_revolvente',
+    name: 'Línea de Crédito Revolvente',
+    category: 'liquidez',
+    icon: '🔄',
+    description: 'Cupo disponible continuo. Solo pagas intereses sobre el saldo efectivamente dispuesto día a día.',
+    minAmountHNL: 100000,
+    maxAmountMultiplier: 0.85,
+    minTermMonths: 12,
+    maxTermMonths: 24,
+    rateSpreadPct: 1.2,
+    requiresCollateral: false,
+    requiredCollateralCoveragePct: 0,
+    admitsGracePeriod: false,
+    openingFeePct: 1.0,
+    annualInsurancePct: 0.20
+  },
+  credito_inventario: {
+    id: 'credito_inventario',
+    name: 'Crédito para Abastecimiento de Inventario',
+    category: 'operativo',
+    icon: '📦',
+    description: 'Financiamiento estacional para compras al por mayor con descuentos por pronto pago de distribuidores.',
+    minAmountHNL: 40000,
+    maxAmountMultiplier: 0.75,
+    minTermMonths: 3,
+    maxTermMonths: 18,
+    rateSpreadPct: -0.5,
+    requiresCollateral: false,
+    requiredCollateralCoveragePct: 0,
+    admitsGracePeriod: true,
+    openingFeePct: 1.2,
+    annualInsurancePct: 0.20
+  },
+  credito_maquinaria: {
+    id: 'credito_maquinaria',
+    name: 'Crédito para Maquinaria & Equipo Pesado',
+    category: 'activos',
+    icon: '🚜',
+    description: 'Financiamiento a mediano y largo plazo para volquetas, excavadoras, grúas o líneas industriales.',
+    minAmountHNL: 250000,
+    maxAmountMultiplier: 1.8,
+    minTermMonths: 24,
+    maxTermMonths: 72,
+    rateSpreadPct: -1.0,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 70,
+    admitsGracePeriod: true,
+    openingFeePct: 2.0,
+    annualInsurancePct: 0.40
+  },
+  credito_vehicular: {
+    id: 'credito_vehicular',
+    name: 'Crédito Vehicular Comercial / Floor-Plan',
+    category: 'activos',
+    icon: '🚚',
+    description: 'Adquisición de furgones de reparto, flotas o fondeo de piso de venta para concesionarias y autolotes.',
+    minAmountHNL: 150000,
+    maxAmountMultiplier: 1.4,
+    minTermMonths: 18,
+    maxTermMonths: 60,
+    rateSpreadPct: -0.8,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 80,
+    admitsGracePeriod: false,
+    openingFeePct: 1.8,
+    annualInsurancePct: 0.35
+  },
+  vehicular_equipo: {
+    id: 'vehicular_equipo',
+    name: 'Crédito Vehicular & Equipo Concesionario',
+    category: 'activos',
+    icon: '🚜',
+    description: 'Financiamiento directo de maquinaria y vehículos en concesionarias autorizadas.',
+    minAmountHNL: 150000,
+    maxAmountMultiplier: 1.4,
+    minTermMonths: 18,
+    maxTermMonths: 60,
+    rateSpreadPct: -0.8,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 80,
+    admitsGracePeriod: false,
+    openingFeePct: 1.8,
+    annualInsurancePct: 0.35
+  },
+  financiamiento_inmobiliario: {
+    id: 'financiamiento_inmobiliario',
+    name: 'Financiamiento Inmobiliario & Hipotecario',
+    category: 'activos',
+    icon: '🏢',
+    description: 'Compra de locales comerciales, terrenos para desarrollo o bodegas con garantía hipotecaria de primer rango.',
+    minAmountHNL: 500000,
+    maxAmountMultiplier: 2.5,
+    minTermMonths: 36,
+    maxTermMonths: 180,
+    rateSpreadPct: -2.0, // Tasa más baja por garantía hipotecaria
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 100,
+    admitsGracePeriod: true,
+    openingFeePct: 1.5,
+    annualInsurancePct: 0.30
+  },
+  construccion_avances: {
+    id: 'construccion_avances',
+    name: 'Crédito Constructor por Avances de Obra',
+    category: 'estructurado',
+    icon: '🏗️',
+    description: 'Línea de desembolsos progresivos atados a hitos de avance físico e inspección técnica de ingeniería.',
+    minAmountHNL: 300000,
+    maxAmountMultiplier: 2.2,
+    minTermMonths: 12,
+    maxTermMonths: 48,
+    rateSpreadPct: -1.2,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 75,
+    admitsGracePeriod: true,
+    openingFeePct: 1.75,
+    annualInsurancePct: 0.30
+  },
+  adquisicion_competidores: {
+    id: 'adquisicion_competidores',
+    name: 'Financiamiento para Fusión & Adquisición (M&A)',
+    category: 'estructurado',
+    icon: '🤝',
+    description: 'Crédito corporativo sindicado para comprar o absorber competidores del sector comercial o industrial.',
+    minAmountHNL: 800000,
+    maxAmountMultiplier: 2.0,
+    minTermMonths: 24,
+    maxTermMonths: 84,
+    rateSpreadPct: 0.5,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 85,
+    admitsGracePeriod: true,
+    openingFeePct: 2.5,
+    annualInsurancePct: 0.45
+  },
+  tarjeta_empresarial: {
+    id: 'tarjeta_empresarial',
+    name: 'Tarjeta de Crédito Corporativa',
+    category: 'liquidez',
+    icon: '💳',
+    description: 'Medio de pago rotativo con beneficios de cashback, puntos de recompensa y hasta 30 días de crédito sin interés.',
+    minAmountHNL: 30000,
+    maxAmountMultiplier: 0.5,
+    minTermMonths: 12,
+    maxTermMonths: 12,
+    rateSpreadPct: 8.0,
+    requiresCollateral: false,
+    requiredCollateralCoveragePct: 0,
+    admitsGracePeriod: false,
+    openingFeePct: 0.0,
+    annualInsurancePct: 0.15
+  },
+  credito_proveedores: {
+    id: 'credito_proveedores',
+    name: 'Línea de Crédito con Proveedores Oficiales',
+    category: 'operativo',
+    icon: '📑',
+    description: 'Cuentas por pagar a 30 o 60 días para compra de insumos, cemento o mercadería con 0% interés si pagas a tiempo.',
+    minAmountHNL: 25000,
+    maxAmountMultiplier: 0.6,
+    minTermMonths: 1,
+    maxTermMonths: 3,
+    rateSpreadPct: -8.0, // Prácticamente 0% a 30 días
+    requiresCollateral: false,
+    requiredCollateralCoveragePct: 0,
+    admitsGracePeriod: false,
+    openingFeePct: 0.0,
+    annualInsurancePct: 0.0
+  },
+  leasing_financiero: {
+    id: 'leasing_financiero',
+    name: 'Arrendamiento Financiero (Leasing con Opción a Compra)',
+    category: 'activos',
+    icon: '📑',
+    description: 'Uso de vehículos o maquinaria mediante canon mensual 100% deducible de ISR con opción de compra residual del 5%.',
+    minAmountHNL: 200000,
+    maxAmountMultiplier: 1.6,
+    minTermMonths: 18,
+    maxTermMonths: 60,
+    rateSpreadPct: -0.5,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 60,
+    admitsGracePeriod: false,
+    openingFeePct: 1.5,
+    annualInsurancePct: 0.35
+  },
+  factoraje_facturas: {
+    id: 'factoraje_facturas',
+    name: 'Factoraje de Cuentas por Cobrar & Estimaciones',
+    category: 'liquidez',
+    icon: '⚡',
+    description: 'Liquidez inmediata vendiendo tus estimaciones de obra pendientes de cobro con anticipo del 90% y descuento del 6%.',
+    minAmountHNL: 80000,
+    maxAmountMultiplier: 1.2,
+    minTermMonths: 1,
+    maxTermMonths: 4,
+    rateSpreadPct: -2.0,
+    requiresCollateral: true, // Factura o estimación actúa como garantía
+    requiredCollateralCoveragePct: 100,
+    admitsGracePeriod: false,
+    openingFeePct: 2.0,
+    annualInsurancePct: 0.10
+  },
+  reestructurado: {
+    id: 'reestructurado',
+    name: 'Consolidación & Reestructuración Integral de Deuda',
+    category: 'estructurado',
+    icon: '🛡️',
+    description: 'Unificación de múltiples deudas y tarjetas en un solo crédito con plazo extendido y reducción de hasta 40% en la cuota.',
+    minAmountHNL: 150000,
+    maxAmountMultiplier: 2.0,
+    minTermMonths: 24,
+    maxTermMonths: 84,
+    rateSpreadPct: -1.5,
+    requiresCollateral: true,
+    requiredCollateralCoveragePct: 65,
+    admitsGracePeriod: true,
+    openingFeePct: 1.2,
+    annualInsurancePct: 0.25
+  }
+};
+
+// =========================================================================
+// HOJA DE LIQUIDACIÓN Y CONDICIONES PREVIAS (DISCLOSURE ANTES DE CONFIRMAR)
+// =========================================================================
+
+export interface CreditTermsDisclosure {
+  requestedAmountHNL: number;
+  approvedAmountHNL: number;
+  productConfig: CreditProductConfig;
+  bankName: string;
+  annualNominalRatePct: number;
+  annualEffectiveRatePct: number;
+  calculationMethod: string;
+  termMonths: number;
+  gracePeriodMonths: number;
+  monthlyPaymentHNL: number;
+  openingFeeHNL: number;
+  annualInsuranceHNL: number;
+  netDisbursementHNL: number; // Monto desembolsado líquido a cuenta (aprobado - comisión)
+  totalRepaymentHNL: number; // Total a pagar al vencimiento (capital + intereses)
+  totalInterestHNL: number;
+  requiredCollateralValueHNL: number;
+  collateralSatisfied: boolean;
+  amortizationPreview: {
+    monthNumber: number;
+    paymentHNL: number;
+    principalHNL: number;
+    interestHNL: number;
+    remainingBalanceHNL: number;
+  }[];
+  liquidityImpactSummary: string;
+}
+
+export function calculateCreditTermsDisclosure(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  productType: CommercialLoanType,
+  requestedAmount: number,
+  termMonths: number,
+  gracePeriodMonths: number = 0,
+  collateralAssetId?: string
+): CreditTermsDisclosure {
+  const capacity = evaluateContractorEconomicCapacity(state);
+  const bankProfile = COMMERCIAL_BANKS_PROFILES[bankId];
+  const prod = COMMERCIAL_LOAN_PRODUCTS[productType] || COMMERCIAL_LOAN_PRODUCTS.capital_trabajo;
+  const baseOffer = capacity.offersByBank[bankId];
+
+  // Capacidad máxima adaptada al producto
+  const maxProductCap = Math.round(baseOffer.maxLoanHNL * prod.maxAmountMultiplier);
+  const approvedAmount = Math.min(requestedAmount, maxProductCap);
+
+  // Tasa de interés calculada con política del banco y perfil
+  const rateNominal = Math.max(6.5, Number((bankProfile.baseInterestRateLoan + prod.rateSpreadPct - capacity.creditProfile.rateDiscountPct).toFixed(2)));
+  const rateEffective = Number((Math.pow(1 + (rateNominal / 100 / 12), 12) - 1) * 100).toFixed(2);
+
+  // Comisiones y seguros
+  const openingFee = Math.round(approvedAmount * (prod.openingFeePct / 100));
+  const annualInsurance = Math.round(approvedAmount * (prod.annualInsurancePct / 100));
+  const netDisbursement = approvedAmount - openingFee;
+
+  // Cuota mensual nivelada (Método Francés con posible período de gracia)
+  const monthlyRate = rateNominal / 100 / 12;
+  const amortizationTerm = Math.max(1, termMonths - gracePeriodMonths);
+  const monthlyPayment = Math.round((approvedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -amortizationTerm)));
+
+  // Total pagado
+  const totalRepayment = (monthlyPayment * amortizationTerm) + (gracePeriodMonths * Math.round(approvedAmount * monthlyRate));
+  const totalInterest = totalRepayment - approvedAmount;
+
+  // Evaluación de garantía requerida
+  const requiredCollateralValue = Math.round(approvedAmount * (prod.requiredCollateralCoveragePct / 100));
+  let collateralSatisfied = true;
+  if (prod.requiresCollateral && requiredCollateralValue > 0) {
+    if (collateralAssetId) {
+      const col = (state.realEstateCollaterals || []).find(c => c.id === collateralAssetId);
+      collateralSatisfied = !!col && !col.isPledged && (col.appraisalValueHNL * (col.ltvAcceptedPct / 100) >= requiredCollateralValue);
+    } else {
+      // Buscar si el jugador tiene colaterales libres suficientes
+      const totalAvailable = (state.realEstateCollaterals || [])
+        .filter(c => !c.isPledged)
+        .reduce((sum, c) => sum + (c.appraisalValueHNL * (c.ltvAcceptedPct / 100)), 0);
+      collateralSatisfied = totalAvailable >= requiredCollateralValue;
+    }
+  }
+
+  // Previsualización de primeras 3 cuotas
+  let curBalance = approvedAmount;
+  const preview: CreditTermsDisclosure['amortizationPreview'] = [];
+  for (let m = 1; m <= Math.min(3, termMonths); m++) {
+    const isGrace = m <= gracePeriodMonths;
+    const interest = Math.round(curBalance * monthlyRate);
+    const principal = isGrace ? 0 : monthlyPayment - interest;
+    const pay = isGrace ? interest : monthlyPayment;
+    curBalance = Math.max(0, curBalance - principal);
+    preview.push({
+      monthNumber: m,
+      paymentHNL: pay,
+      principalHNL: principal,
+      interestHNL: interest,
+      remainingBalanceHNL: curBalance
+    });
+  }
+
+  // Impacto en flujo de caja
+  const monthlySales = Math.max(state.monthlySalesAccumulated || 0, 300000);
+  const paymentRatio = Number(((monthlyPayment / monthlySales) * 100).toFixed(1));
+  const liquidityImpactSummary = paymentRatio <= 15
+    ? `Excelente: La cuota mensual (L ${monthlyPayment.toLocaleString()}) compromete únicamente el ${paymentRatio}% de tus ventas estimadas, dejando holgura operativa total.`
+    : paymentRatio <= 30
+    ? `Moderado: La cuota mensual representa el ${paymentRatio}% de tus ventas. Recomendamos monitorear los cobros a clientes.`
+    : `Ajustado: La cuota absorbe el ${paymentRatio}% de tu facturación mensual. Podría generar tensiones de liquidez en meses bajos.`;
+
+  return {
+    requestedAmountHNL: requestedAmount,
+    approvedAmountHNL: approvedAmount,
+    productConfig: prod,
+    bankName: bankProfile.name,
+    annualNominalRatePct: rateNominal,
+    annualEffectiveRatePct: Number(rateEffective),
+    calculationMethod: 'Amortización Francesa (Cuota Nivelada sobre Saldo Deudor)',
+    termMonths,
+    gracePeriodMonths,
+    monthlyPaymentHNL: monthlyPayment,
+    openingFeeHNL: openingFee,
+    annualInsuranceHNL: annualInsurance,
+    netDisbursementHNL: netDisbursement,
+    totalRepaymentHNL: totalRepayment,
+    totalInterestHNL: totalInterest,
+    requiredCollateralValueHNL: requiredCollateralValue,
+    collateralSatisfied,
+    amortizationPreview: preview,
+    liquidityImpactSummary
+  };
+}
+
+// =========================================================================
+// SOLICITUD Y DESEMBOLSO DE CUALQUIERA DE LOS 12+ PRODUCTOS DE CRÉDITO
+// =========================================================================
+
+export function requestFullCommercialCredit(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  productType: CommercialLoanType,
+  requestedAmount: number,
+  termMonths: number,
+  purpose: string,
+  gracePeriodMonths: number = 0,
+  collateralId?: string
+): { updatedState: DailySimulationState; success: boolean; message: string; disclosure: CreditTermsDisclosure } {
+  const disclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+
+  // Validaciones estrictas
+  if (requestedAmount > disclosure.approvedAmountHNL) {
+    return {
+      updatedState: state,
+      success: false,
+      disclosure,
+      message: `El monto solicitado (L ${requestedAmount.toLocaleString()}) excede el límite máximo aprobado por ${bank.name} para este producto (L ${disclosure.approvedAmountHNL.toLocaleString()}).`
+    };
+  }
+
+  if (disclosure.productConfig.requiresCollateral && !disclosure.collateralSatisfied) {
+    return {
+      updatedState: state,
+      success: false,
+      disclosure,
+      message: `Este financiamiento requiere respaldo colateral por al menos L ${disclosure.requiredCollateralValueHNL.toLocaleString()} en bienes libres de gravamen.`
+    };
+  }
+
+  const currentRel = state.commercialBanks[bankId] || {
+    bankId,
+    relationshipScore: 50,
+    guaranteeDeposits: [],
+    termDeposits: []
+  };
+
+  const newLoanId = `loan-${productType.slice(0, 4)}-${Date.now().toString().slice(-4)}`;
+
+  const newLoan: BankCommercialLoan = {
+    id: newLoanId,
+    bankId,
+    principalAmount: disclosure.approvedAmountHNL,
+    balanceRemaining: disclosure.approvedAmountHNL,
+    monthlyPayment: disclosure.monthlyPaymentHNL,
+    interestRateAnnual: disclosure.annualNominalRatePct,
+    termMonthsRemaining: termMonths,
+    purpose: purpose || disclosure.productConfig.name,
+    loanType: productType,
+    gracePeriodMonthsRemaining: gracePeriodMonths,
+    collateralIdRef: collateralId,
+    amortizedPrincipalTotal: 0,
+    revolvingLimit: productType === 'linea_revolvente' ? disclosure.approvedAmountHNL : undefined,
+    revolvingDrawn: productType === 'linea_revolvente' ? 0 : undefined
+  };
+
+  // Si se vinculó una garantía real, pignorarla
+  let updatedCollaterals = state.realEstateCollaterals || [];
+  if (collateralId) {
+    updatedCollaterals = updatedCollaterals.map(c => c.id === collateralId ? {
+      ...c,
+      isPledged: true,
+      pledgedToBankId: bankId,
+      linkedDebtId: newLoanId
+    } : c);
+  }
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 10),
+      activeLoan: newLoan
+    }
+  };
+
+  // Desembolso: se acredita el monto neto (monto aprobado menos comisión bancaria)
+  const netCashReceived = disclosure.netDisbursementHNL;
+
+  const nextState: DailySimulationState = {
+    ...state,
+    storeBankBalance: state.storeBankBalance + netCashReceived,
+    commercialBanks: updatedBanks,
+    realEstateCollaterals: updatedCollaterals
+  };
+
+  const newScore = calculateCompanyCreditScore(nextState);
+
+  return {
+    updatedState: {
+      ...nextState,
+      companyCreditProfile: newScore
+    },
+    success: true,
+    disclosure,
+    message: `¡FINANCIAMIENTO DESEMBOLSADO! ${bank.name} aprobó tu "${disclosure.productConfig.name}" por L ${disclosure.approvedAmountHNL.toLocaleString()} al ${disclosure.annualNominalRatePct}% anual. Desembolso neto acreditado a cuenta: L ${netCashReceived.toLocaleString()} (Comisión de apertura deducida: L ${disclosure.openingFeeHNL.toLocaleString()}). Cuota mensual: L ${disclosure.monthlyPaymentHNL.toLocaleString()}.`
+  };
+}
+
+// =========================================================================
+// ASESOR BANCARIO DETERMINISTA INTERACTIVO CON DIÁLOGOS Y CONTRAPROPUESTAS
+// =========================================================================
+
+export type BankAdvisorTopic = 
+  | 'negociar_tasa'
+  | 'negociar_plazo'
+  | 'negociar_monto'
+  | 'periodo_gracia'
+  | 'exonerar_comision'
+  | 'aportar_garantia'
+  | 'consolidar_deuda'
+  | 'mejorar_dpf';
+
+export interface BankAdvisorConsultation {
+  topic: BankAdvisorTopic;
+  bankName: string;
+  officerName: string;
+  officerRole: string;
+  verdict: 'aprobado' | 'contraoferta' | 'rechazado_explicado';
+  officerDialog: string;
+  keyFinancialData: {
+    label: string;
+    value: string;
+    benchmark: string;
+    isHealthy: boolean;
+  }[];
+  concessionOffered?: {
+    type: string;
+    value: string;
+    tradeOff: string;
+  };
+  recommendedPlayerAction: string;
+}
+
+export function consultBankAdvisor(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  topic: BankAdvisorTopic,
+  contextData?: {
+    targetRateDiscount?: number;
+    extraMonths?: number;
+    extraAmount?: number;
+    collateralId?: string;
+  }
+): BankAdvisorConsultation {
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+  const capacity = evaluateContractorEconomicCapacity(state);
+  const score = capacity.creditProfile.score;
+  const dti = capacity.creditProfile.dtiRatioPct;
+  const streak = capacity.creditProfile.onTimePaymentsStreak || 1;
+  const rel = state.commercialBanks[bankId];
+  const relScore = rel?.relationshipScore || 50;
+  const sarValid = state.fiscalSolvenciaActive;
+
+  const officerName = bankId === 'atlantida' ? 'Lic. Roberto Facussé' : bankId === 'ficohsa' ? 'Ing. Eduardo Atala' : bankId === 'bac' ? 'Licda. Marcela Kafati' : 'Don Jorge Bueso Arias';
+  const officerRole = `Vicepresidente de Crédito Empresarial - ${bank.name}`;
+
+  // Datos financieros clave auditados
+  const financialMetrics = [
+    { label: 'Score Crediticio', value: `${score} pts`, benchmark: '≥ 700 pts', isHealthy: score >= 700 },
+    { label: 'Ratio Deuda/Ingreso (DTI)', value: `${dti}%`, benchmark: '< 40%', isHealthy: dti < 40 },
+    { label: 'Racha de Pagos Puntuales', value: `${streak} cuotas`, benchmark: '≥ 6 cuotas', isHealthy: streak >= 6 },
+    { label: 'Relación Comercial', value: `${relScore}/100`, benchmark: '≥ 60 pts', isHealthy: relScore >= 60 },
+    { label: 'Solvencia Fiscal SAR', value: sarValid ? 'Al Día' : 'Pendiente', benchmark: 'Vigente', isHealthy: sarValid }
+  ];
+
+  if (topic === 'negociar_tasa') {
+    if (score >= 740 && dti <= 35 && streak >= 6) {
+      const discount = 1.5;
+      return {
+        topic,
+        bankName: bank.name,
+        officerName,
+        officerRole,
+        verdict: 'aprobado',
+        officerDialog: `"Estimado empresario: He revisado detalladamente sus libros contables. Su solvencia fiscal con el SAR y su racha de ${streak} pagos impecables demuestran una administración ejemplar. Podemos concederle una rebaja de tasa de ${discount}% anual de inmediato."`,
+        keyFinancialData: financialMetrics,
+        concessionOffered: {
+          type: 'Descuento de Tasa',
+          value: `-${discount}% Anual`,
+          tradeOff: 'Mantener débito automático activo en su cuenta de cheques principal.'
+        },
+        recommendedPlayerAction: 'Aceptar la reducción de tasa en el panel de negociación bancaria.'
+      };
+    } else if (score >= 640) {
+      const discount = 0.75;
+      return {
+        topic,
+        bankName: bank.name,
+        officerName,
+        officerRole,
+        verdict: 'contraoferta',
+        officerDialog: `"Su comportamiento de pagos es bueno, pero el DTI del ${dti}% nos exige prudencia según las normas de la CNBS. No puedo otorgarle el descuento completo solicitado, pero le ofrezco rebajar un ${discount}% si inmoviliza un depósito a plazo o aporta una fianza."`,
+        keyFinancialData: financialMetrics,
+        concessionOffered: {
+          type: 'Descuento Moderado de Tasa',
+          value: `-${discount}% Anual`,
+          tradeOff: 'Aportar un bien inmueble o DPF como respaldo adicional.'
+        },
+        recommendedPlayerAction: 'Constituir una garantía real o DPF para desbloquear la rebaja de tasa.'
+      };
+    } else {
+      return {
+        topic,
+        bankName: bank.name,
+        officerName,
+        officerRole,
+        verdict: 'rechazado_explicado',
+        officerDialog: `"En este momento no podemos rebajar la tasa de interés. Su DTI actual (${dti}%) y su score de ${score} puntos sitúan su expediente en tramo de vigilancia. Para acceder a tasas preferenciales, debe realizar abonos a capital y acumular al menos 6 cuotas consecutivas sin mora."`,
+        keyFinancialData: financialMetrics,
+        recommendedPlayerAction: 'Efectuar un abono extraordinario a capital para reducir el DTI por debajo del 40%.'
+      };
+    }
+  }
+
+  if (topic === 'periodo_gracia') {
+    if (relScore >= 60 || (state.realEstateCollaterals || []).some(c => c.isPledged)) {
+      return {
+        topic,
+        bankName: bank.name,
+        officerName,
+        officerRole,
+        verdict: 'aprobado',
+        officerDialog: `"Comprendemos el ciclo operativo de su negocio. Aprobamos concederle 3 meses de PERÍODO DE GRACIA sobre el capital. Durante estos 90 días únicamente pagará intereses corrientes, liberando flujo de caja para capital de trabajo."`,
+        keyFinancialData: financialMetrics,
+        concessionOffered: {
+          type: 'Período de Gracia',
+          value: '3 Meses (Solo Intereses)',
+          tradeOff: 'El plazo total del préstamo se extiende 3 meses.'
+        },
+        recommendedPlayerAction: 'Confirmar el período de gracia para preservar liquidez inmediata.'
+      };
+    } else {
+      return {
+        topic,
+        bankName: bank.name,
+        officerName,
+        officerRole,
+        verdict: 'contraoferta',
+        officerDialog: `"Para autorizar meses de gracia requerimos respaldo colateral. Si vincula un terreno, local comercial o maquinaria a la operación, el Comité Ejecutivo de ${bank.name} autorizará los 3 meses de gracia de inmediato."`,
+        keyFinancialData: financialMetrics,
+        concessionOffered: {
+          type: 'Gracia Condicionada',
+          value: '2 Meses de Gracia',
+          tradeOff: 'Vincular una garantía real hipotecaria o prendaria.'
+        },
+        recommendedPlayerAction: 'Ir a la pestaña de Garantías Reales y pignorar un bien patrimonial.'
+      };
+    }
+  }
+
+  if (topic === 'consolidar_deuda') {
+    return {
+      topic,
+      bankName: bank.name,
+      officerName,
+      officerRole,
+      verdict: 'aprobado',
+      officerDialog: `"Hemos simulado la unificación de todas sus obligaciones (préstamos y saldos de tarjetas). Al consolidar con ${bank.name} a un plazo de 60 meses, su cuota mensual agregada disminuirá hasta un 38%, mejorando radicalmente su índice de cobertura DSCR."`,
+      keyFinancialData: financialMetrics,
+      concessionOffered: {
+        type: 'Consolidación Integral',
+        value: 'Cuota unificada con 38% de alivio mensual',
+        tradeOff: 'Plazo extendido a 60 meses con garantía inmobiliaria.'
+      },
+      recommendedPlayerAction: 'Ejecutar la reestructuración y consolidación en el Centro de Obligaciones.'
+    };
+  }
+
+  // Default: Negociar Condiciones Generales
+  return {
+    topic,
+    bankName: bank.name,
+    officerName,
+    officerRole,
+    verdict: score >= 680 ? 'aprobado' : 'contraoferta',
+    officerDialog: `"Bienvenido a la oficina ejecutiva de ${bank.name}. Estamos analizando su solicitud con el Comité de Riesgos. Contamos con amplia liquidez institucional para respaldar el crecimiento de su empresa si mantenemos una política de garantías sólida."`,
+    keyFinancialData: financialMetrics,
+    recommendedPlayerAction: 'Mantener balances sanos y presentar avalúos recientes de propiedades.'
+  };
+}
+
+// =========================================================================
+// ABONOS EXTRAORDINARIOS CON ELECCIÓN (REDUCIR CUOTA VS REDUCIR PLAZO)
+// =========================================================================
+
+export function makeExtraordinaryLoanPaymentWithOptions(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  capitalAmount: number,
+  strategy: 'reducir_cuota' | 'reducir_plazo'
+): { 
+  updatedState: DailySimulationState; 
+  success: boolean; 
+  message: string;
+  interestSavedHNL: number;
+  newMonthlyPaymentHNL: number;
+  newMonthsRemaining: number;
+} {
+  if (capitalAmount <= 0) {
+    return { updatedState: state, success: false, message: 'Ingresa un monto válido a amortizar.', interestSavedHNL: 0, newMonthlyPaymentHNL: 0, newMonthsRemaining: 0 };
+  }
+
+  const currentRel = state.commercialBanks[bankId];
+  const loan = currentRel?.activeLoan;
+  if (!loan || loan.balanceRemaining <= 0) {
+    return { updatedState: state, success: false, message: 'No hay préstamo activo con saldo pendiente en este banco.', interestSavedHNL: 0, newMonthlyPaymentHNL: 0, newMonthsRemaining: 0 };
+  }
+
+  const totalFunds = state.storeBankBalance + state.storeCash;
+  if (totalFunds < capitalAmount) {
+    return { updatedState: state, success: false, message: `Fondos insuficientes para el abono a capital (Requerido: L ${capitalAmount.toLocaleString()}).`, interestSavedHNL: 0, newMonthlyPaymentHNL: 0, newMonthsRemaining: 0 };
+  }
+
+  let newBank = state.storeBankBalance;
+  let newCash = state.storeCash;
+  if (newBank >= capitalAmount) {
+    newBank -= capitalAmount;
+  } else {
+    const diff = capitalAmount - newBank;
+    newBank = 0;
+    newCash = Math.max(0, newCash - diff);
+  }
+
+  const effectiveAbono = Math.min(capitalAmount, loan.balanceRemaining);
+  const newBalance = Math.max(0, loan.balanceRemaining - effectiveAbono);
+  const monthlyRate = loan.interestRateAnnual / 100 / 12;
+
+  let newPayment = loan.monthlyPayment;
+  let newTermMonths = loan.termMonthsRemaining;
+  let interestSaved = 0;
+
+  if (newBalance <= 0) {
+    // Liquidación total
+    interestSaved = Math.round((loan.monthlyPayment * loan.termMonthsRemaining) - loan.balanceRemaining);
+    newPayment = 0;
+    newTermMonths = 0;
+  } else if (strategy === 'reducir_cuota') {
+    // Mantiene el plazo restante, recalcula cuota menor
+    newPayment = Math.round((newBalance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -newTermMonths)));
+    const oldFutureInterest = (loan.monthlyPayment * newTermMonths) - loan.balanceRemaining;
+    const newFutureInterest = (newPayment * newTermMonths) - newBalance;
+    interestSaved = Math.max(0, Math.round(oldFutureInterest - newFutureInterest));
+  } else {
+    // Mantiene la cuota mensual, reduce el plazo (número de meses)
+    // n = -ln(1 - (B * r / P)) / ln(1 + r)
+    const numerator = 1 - ((newBalance * monthlyRate) / loan.monthlyPayment);
+    if (numerator > 0) {
+      newTermMonths = Math.max(1, Math.ceil(-Math.log(numerator) / Math.log(1 + monthlyRate)));
+    } else {
+      newTermMonths = 1;
+    }
+    const oldFutureInterest = (loan.monthlyPayment * loan.termMonthsRemaining) - loan.balanceRemaining;
+    const newFutureInterest = (loan.monthlyPayment * newTermMonths) - newBalance;
+    interestSaved = Math.max(0, Math.round(oldFutureInterest - newFutureInterest));
+  }
+
+  let updatedLoan: BankCommercialLoan | undefined = undefined;
+  if (newBalance > 0) {
+    updatedLoan = {
+      ...loan,
+      balanceRemaining: newBalance,
+      monthlyPayment: newPayment,
+      termMonthsRemaining: newTermMonths,
+      amortizedPrincipalTotal: (loan.amortizedPrincipalTotal || 0) + effectiveAbono
+    };
+  } else {
+    // Si la deuda se cancela por completo, liberar automáticamente las garantías vinculadas
+    if (loan.collateralIdRef && state.realEstateCollaterals) {
+      state.realEstateCollaterals = state.realEstateCollaterals.map(c => c.id === loan.collateralIdRef ? {
+        ...c,
+        isPledged: false,
+        pledgedToBankId: undefined,
+        linkedDebtId: undefined
+      } : c);
+    }
+  }
+
+  const updatedBanks = {
+    ...state.commercialBanks,
+    [bankId]: {
+      ...currentRel,
+      relationshipScore: Math.min(100, currentRel.relationshipScore + 6),
+      activeLoan: updatedLoan
+    }
+  };
+
+  const nextState: DailySimulationState = {
+    ...state,
+    storeBankBalance: newBank,
+    storeCash: newCash,
+    commercialBanks: updatedBanks
+  };
+
+  const newProfile = calculateCompanyCreditScore(nextState);
+  newProfile.onTimePaymentsStreak = (newProfile.onTimePaymentsStreak || 1) + 1;
+
+  const strategyMsg = strategy === 'reducir_plazo'
+    ? `Plazo reducido a ${newTermMonths} meses (Ahorro estimado en intereses futuros: L ${interestSaved.toLocaleString()}). Cuota se mantiene en L ${newPayment.toLocaleString()}/mes.`
+    : `Cuota mensual reducida a L ${newPayment.toLocaleString()}/mes (Ahorro de cuota mensual: L ${(loan.monthlyPayment - newPayment).toLocaleString()}/mes, Ahorro total de intereses: L ${interestSaved.toLocaleString()}).`;
+
+  return {
+    updatedState: {
+      ...nextState,
+      companyCreditProfile: newProfile
+    },
+    success: true,
+    interestSavedHNL: interestSaved,
+    newMonthlyPaymentHNL: newPayment,
+    newMonthsRemaining: newTermMonths,
+    message: newBalance <= 0
+      ? `¡DEUDA TOTALMENTE CANCELADA CON ${COMMERCIAL_BANKS_PROFILES[bankId].name}! Garantías liberadas y score crediticio elevado.`
+      : `¡ABONO EXTRAORDINARIO APLICADO! Se amortizaron L ${effectiveAbono.toLocaleString()} de capital. ${strategyMsg}`
+  };
+}
+
+// =========================================================================
+// GESTIÓN DE GARANTÍAS REALES (PIGNORACIÓN Y LIBERACIÓN DE BIENES)
+// =========================================================================
+
+export function createDefaultRealEstateCollaterals(sector: RetailSectorId = 'constructora'): RealEstateCollateralItem[] {
+  return [
+    {
+      id: 'col_casa_palmas',
+      title: 'Residencia en Col. Las Palmas (Terreno 450 v²)',
+      assetType: 'casa_habitacion',
+      ownerName: 'Empresario Propietario',
+      location: 'Tegucigalpa, M.D.C.',
+      marketValueHNL: 4500000,
+      appraisalValueHNL: 3800000,
+      ltvAcceptedPct: 80, // 80% LTV
+      isPledged: false,
+      registrationNumber: 'MAT-FMI-2024-8891'
+    },
+    {
+      id: 'col_terreno_norte',
+      title: 'Lote Comercial en Bulevar del Norte (1,200 v²)',
+      assetType: 'terreno_comercial',
+      ownerName: 'Empresa Mercantil S.A.',
+      location: 'San Pedro Sula, Cortés',
+      marketValueHNL: 7200000,
+      appraisalValueHNL: 6200000,
+      ltvAcceptedPct: 75,
+      isPledged: false,
+      registrationNumber: 'MAT-FMI-2023-4109'
+    },
+    {
+      id: 'col_bodega_valle',
+      title: 'Bodega Industrial y Oficinas (800 m²)',
+      assetType: 'local_bodega',
+      ownerName: 'Empresa Mercantil S.A.',
+      location: 'El Progreso, Yoro',
+      marketValueHNL: 5800000,
+      appraisalValueHNL: 4900000,
+      ltvAcceptedPct: 70,
+      isPledged: false,
+      registrationNumber: 'MAT-FMI-2022-7734'
+    }
+  ];
+}
+
+export function pledgeRealEstateCollateralToLoan(
+  state: DailySimulationState,
+  collateralId: string,
+  bankId: CommercialBankId,
+  loanId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const collaterals = state.realEstateCollaterals || [];
+  const col = collaterals.find(c => c.id === collateralId);
+
+  if (!col) return { updatedState: state, success: false, message: 'Garantía patrimonial no encontrada.' };
+  if (col.isPledged) return { updatedState: state, success: false, message: `El bien "${col.title}" ya se encuentra pignorado a otra obligación bancaria.` };
+
+  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
+    ...c,
+    isPledged: true,
+    pledgedToBankId: bankId,
+    linkedDebtId: loanId
+  } : c);
+
+  return {
+    updatedState: {
+      ...state,
+      realEstateCollaterals: updatedCollaterals
+    },
+    success: true,
+    message: `¡GRAVAMEN INSCRITO! "${col.title}" (Valor avalúo: L ${col.appraisalValueHNL.toLocaleString()}) fue pignorado a favor de ${COMMERCIAL_BANKS_PROFILES[bankId].name} con un LTV de cobertura del ${col.ltvAcceptedPct}%.`
+  };
+}
+
+export function releaseRealEstateCollateral(
+  state: DailySimulationState,
+  collateralId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const collaterals = state.realEstateCollaterals || [];
+  const col = collaterals.find(c => c.id === collateralId);
+
+  if (!col) return { updatedState: state, success: false, message: 'Garantía patrimonial no encontrada.' };
+  if (!col.isPledged) return { updatedState: state, success: false, message: `El bien "${col.title}" ya está libre de gravamen.` };
+
+  // Verificar si la deuda asociada está completamente pagada
+  if (col.pledgedToBankId) {
+    const rel = state.commercialBanks[col.pledgedToBankId];
+    if (rel?.activeLoan && rel.activeLoan.id === col.linkedDebtId && rel.activeLoan.balanceRemaining > 0) {
+      return {
+        updatedState: state,
+        success: false,
+        message: `No se puede liberar la garantía: el préstamo vinculado aún tiene un saldo deudor de L ${rel.activeLoan.balanceRemaining.toLocaleString()}.`
+      };
+    }
+  }
+
+  const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
+    ...c,
+    isPledged: false,
+    pledgedToBankId: undefined,
+    linkedDebtId: undefined
+  } : c);
+
+  return {
+    updatedState: {
+      ...state,
+      realEstateCollaterals: updatedCollaterals
+    },
+    success: true,
+    message: `¡CARTA DE LIBERACIÓN EMITIDA! "${col.title}" ha sido liberado de todo gravamen. Disponibilidad restituida al 100%.`
+  };
+}
+
+// =========================================================================
+// FACTORAJE DE FACTURAS Y ESTIMACIONES DE OBRA
+// =========================================================================
+
+export function executeInvoiceFactoring(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  invoiceAmountHNL: number,
+  clientOrProjectName: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  if (invoiceAmountHNL < 50000) {
+    return { updatedState: state, success: false, message: 'El monto mínimo de factoraje es de L 50,000.' };
+  }
+
+  const advancePct = 90; // Anticipo 90%
+  const feePct = 6; // Descuento financiero 6%
+  const grossAdvance = Math.round(invoiceAmountHNL * (advancePct / 100));
+  const feeDeducted = Math.round(invoiceAmountHNL * (feePct / 100));
+  const netCashPaid = grossAdvance - feeDeducted;
+
+  const bank = COMMERCIAL_BANKS_PROFILES[bankId];
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: state.storeBankBalance + netCashPaid
+    },
+    success: true,
+    message: `¡FACTORAJE LIQUIDADO EN 24 HORAS! ${bank.name} anticipó el ${advancePct}% de la factura de "${clientOrProjectName}" (L ${invoiceAmountHNL.toLocaleString()}). Fondos líquidos acreditados: L ${netCashPaid.toLocaleString()} (Descuento financiero retenido: L ${feeDeducted.toLocaleString()}).`
+  };
+}
+
+// =========================================================================
+// GESTIÓN DE PASIVOS CON PROVEEDORES (CUENTAS POR PAGAR A 30 DÍAS)
+// =========================================================================
+
+export function paySupplierInvoice(
+  state: DailySimulationState,
+  invoiceId: string
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const credits = state.supplierCredits || [];
+  const inv = credits.find(c => c.id === invoiceId);
+
+  if (!inv) return { updatedState: state, success: false, message: 'Factura de proveedor no encontrada.' };
+  if (inv.isPaid) return { updatedState: state, success: false, message: 'Esta factura ya fue pagada con anterioridad.' };
+
+  const totalFunds = state.storeBankBalance + state.storeCash;
+  if (totalFunds < inv.amountHNL) {
+    return { updatedState: state, success: false, message: `Fondos insuficientes para cancelar la factura de proveedor (L ${inv.amountHNL.toLocaleString()}).` };
+  }
+
+  let newBank = state.storeBankBalance;
+  let newCash = state.storeCash;
+  if (newBank >= inv.amountHNL) {
+    newBank -= inv.amountHNL;
+  } else {
+    const diff = inv.amountHNL - newBank;
+    newBank = 0;
+    newCash = Math.max(0, newCash - diff);
+  }
+
+  const updatedCredits = credits.map(c => c.id === invoiceId ? { ...c, isPaid: true } : c);
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: newBank,
+      storeCash: newCash,
+      supplierCredits: updatedCredits
+    },
+    success: true,
+    message: `¡FACTURA CANCELADA! Se pagaron L ${inv.amountHNL.toLocaleString()} al proveedor "${inv.supplierName}". Récord de crédito comercial al día.`
+  };
+}
+
+// =========================================================================
+// COMPETIDORES ACTIVOS DEL MERCADO LOCAL & COMPRA/FUSIÓN (M&A)
+// =========================================================================
+
+export function createDefaultCompetitors(sector: RetailSectorId): CompetitorFirm[] {
+  if (sector === 'constructora') {
+    return [
+      {
+        id: 'comp_coninsa',
+        name: 'Constructora e Inversiones del Norte (CONINSA)',
+        sector: 'constructora',
+        marketSharePct: 24,
+        cashBalanceHNL: 1250000,
+        bankDebtHNL: 6800000,
+        inventoryValueHNL: 3400000,
+        monthlySalesHNL: 2800000,
+        pricingStrategy: 'agresiva',
+        isDistressed: false,
+        acquisitionPriceAssetDealHNL: 2200000,
+        acquisitionPriceSharePurchaseHNL: 4500000,
+        status: 'activo'
+      },
+      {
+        id: 'comp_vialtec',
+        name: 'Vialtec Infraestructura y Pavimentaciones S.A.',
+        sector: 'constructora',
+        marketSharePct: 18,
+        cashBalanceHNL: -350000, // En problemas de liquidez
+        bankDebtHNL: 9200000,
+        inventoryValueHNL: 4800000,
+        monthlySalesHNL: 1400000,
+        pricingStrategy: 'moderada',
+        isDistressed: true,
+        acquisitionPriceAssetDealHNL: 1800000, // Precio de remate de activos
+        acquisitionPriceSharePurchaseHNL: 2900000, // Adquisición con absorción de pasivos
+        status: 'activo'
+      },
+      {
+        id: 'comp_edifika',
+        name: 'Edifika Desarrollos Inmobiliarios',
+        sector: 'constructora',
+        marketSharePct: 28,
+        cashBalanceHNL: 4200000,
+        bankDebtHNL: 5100000,
+        inventoryValueHNL: 6500000,
+        monthlySalesHNL: 3900000,
+        pricingStrategy: 'calidad_premium',
+        isDistressed: false,
+        acquisitionPriceAssetDealHNL: 5500000,
+        acquisitionPriceSharePurchaseHNL: 11000000,
+        status: 'activo'
+      }
+    ];
+  }
+
+  // Competidores de comercio minorista / supermercados
+  return [
+    {
+      id: 'comp_super_rapido',
+      name: 'Supermercado El Rápido S. de R.L.',
+      sector,
+      marketSharePct: 25,
+      cashBalanceHNL: 450000,
+      bankDebtHNL: 1800000,
+      inventoryValueHNL: 950000,
+      monthlySalesHNL: 1100000,
+      pricingStrategy: 'agresiva',
+      isDistressed: false,
+      acquisitionPriceAssetDealHNL: 650000,
+      acquisitionPriceSharePurchaseHNL: 1400000,
+      status: 'activo'
+    },
+    {
+      id: 'comp_abastecedora_centro',
+      name: 'Abastecedora Central del Ahorro',
+      sector,
+      marketSharePct: 15,
+      cashBalanceHNL: -120000,
+      bankDebtHNL: 2600000,
+      inventoryValueHNL: 800000,
+      monthlySalesHNL: 520000,
+      pricingStrategy: 'moderada',
+      isDistressed: true,
+      acquisitionPriceAssetDealHNL: 480000,
+      acquisitionPriceSharePurchaseHNL: 850000,
+      status: 'activo'
+    }
+  ];
+}
+
+export function executeCompetitorAcquisition(
+  state: DailySimulationState,
+  competitorId: string,
+  dealType: 'asset_deal' | 'share_purchase'
+): { updatedState: DailySimulationState; success: boolean; message: string } {
+  const competitors = state.activeCompetitors || [];
+  const comp = competitors.find(c => c.id === competitorId);
+
+  if (!comp) return { updatedState: state, success: false, message: 'Empresa competidora no encontrada.' };
+  if (comp.status !== 'activo') return { updatedState: state, success: false, message: 'Esta empresa ya no está disponible para adquisición.' };
+
+  const price = dealType === 'asset_deal' ? comp.acquisitionPriceAssetDealHNL : comp.acquisitionPriceSharePurchaseHNL;
+  const totalFunds = state.storeBankBalance + state.storeCash;
+
+  if (totalFunds < price) {
+    return {
+      updatedState: state,
+      success: false,
+      message: `Fondos insuficientes para concretar el deal de M&A. Requerido: L ${price.toLocaleString()}, Disponibles: L ${totalFunds.toLocaleString()}. Puedes solicitar un financiamiento M&A con Banco Ficohsa o Atlántida.`
+    };
+  }
+
+  let newBank = state.storeBankBalance;
+  let newCash = state.storeCash;
+  if (newBank >= price) {
+    newBank -= price;
+  } else {
+    const diff = price - newBank;
+    newBank = 0;
+    newCash = Math.max(0, newCash - diff);
+  }
+
+  const updatedCompetitors = competitors.map(c => c.id === competitorId ? {
+    ...c,
+    status: 'adquirido_jugador' as const
+  } : c);
+
+  const bonusReputation = dealType === 'share_purchase' ? 12 : 6;
+  const newReputation = Math.min(100, (state.storeReputation || 75) + bonusReputation);
+
+  return {
+    updatedState: {
+      ...state,
+      storeBankBalance: newBank,
+      storeCash: newCash,
+      storeReputation: newReputation,
+      activeCompetitors: updatedCompetitors
+    },
+    success: true,
+    message: dealType === 'share_purchase'
+      ? `¡FUSIÓN & ADQUISICIÓN CONCRETADA! Has adquirido el 100% de las acciones de "${comp.name}". Su cuota de mercado (${comp.marketSharePct}%) y clientes pasan a tu empresa. Reputación empresarial +${bonusReputation} pts.`
+      : `¡COMPRA DE ACTIVOS CONCRETADA (Asset Deal)! Adquiriste el inventario y equipos de "${comp.name}" a precio de remate con descuento judicial.`
+  };
+}
+
+// =========================================================================
+// MOTOR CONTABLE CENTRAL: BALANCE GENERAL, P&L Y FLUJO DE EFECTIVO
+// =========================================================================
+
+export function calculateComprehensiveFinancialStatements(state: DailySimulationState): FinancialStatementsSummary {
+  // 1. Activo Circulante
+  const cashInHand = state.storeCash || 0;
+  const cashInBank = state.storeBankBalance || 0;
+  
+  // Garantías inmovilizadas y DPFs
+  let guaranteeDeposits = 0;
+  Object.values(state.commercialBanks || {}).forEach(rel => {
+    (rel.guaranteeDeposits || []).filter(g => g.status === 'activo').forEach(g => {
+      guaranteeDeposits += g.amountPledged;
+    });
+    (rel.termDeposits || []).forEach(d => {
+      guaranteeDeposits += (d.currentBalance || d.principalAmount);
+    });
+  });
+
+  // Inventario físico
+  let inventoryStock = 0;
+  if (state.retailSector === 'constructora') {
+    inventoryStock = (state.constructionMaterials || []).reduce((sum, m) => sum + (m.stock * m.unitCost), 0);
+  } else {
+    inventoryStock = (state.products || []).reduce((sum, p) => sum + (p.stock * p.unitCost), 0);
+  }
+
+  // Cuentas por cobrar de obras activas
+  const accountsReceivable = (state.activeWorks || []).reduce((sum, w) => sum + Math.max(0, (w.totalContractPrice * (w.progressPct / 100)) - w.billedMilestonesAmount), 0);
+
+  const totalCurrentAssets = cashInHand + cashInBank + guaranteeDeposits + inventoryStock + accountsReceivable;
+
+  // 2. Activo No Circulante (Fijo)
+  const machineryAndFleet = (state.ownedMachinery || []).reduce((sum, m) => sum + m.purchasePrice, 0);
+  const accumulatedDepreciation = Math.round(machineryAndFleet * 0.12); // Depreciación lineal estimada
+  const realEstateCollaterals = (state.realEstateCollaterals || []).reduce((sum, c) => sum + c.appraisalValueHNL, 0);
+
+  const totalNonCurrentAssets = Math.max(0, machineryAndFleet - accumulatedDepreciation) + realEstateCollaterals;
+  const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
+
+  // 3. Pasivo Circulante (Corto Plazo < 12 meses)
+  let shortTermLoans = 0;
+  let longTermLoans = 0;
+  let creditCardsBalance = 0;
+
+  Object.values(state.commercialBanks || {}).forEach(rel => {
+    if (rel.activeLoan && rel.activeLoan.balanceRemaining > 0) {
+      if (rel.activeLoan.termMonthsRemaining <= 12) {
+        shortTermLoans += rel.activeLoan.balanceRemaining;
+      } else {
+        // Porción corriente de 1 año en corto plazo, el resto en largo plazo
+        const currentYearPortion = Math.min(rel.activeLoan.balanceRemaining, rel.activeLoan.monthlyPayment * 12);
+        shortTermLoans += currentYearPortion;
+        longTermLoans += Math.max(0, rel.activeLoan.balanceRemaining - currentYearPortion);
+      }
+    }
+    if (rel.corporateCard && rel.corporateCard.currentBalance > 0) {
+      creditCardsBalance += rel.corporateCard.currentBalance;
+    }
+  });
+
+  // Proveedores por pagar
+  const supplierAccountsPayable = (state.supplierCredits || []).filter(c => !c.isPaid).reduce((sum, c) => sum + c.amountHNL, 0);
+
+  // Anticipos de clientes pendientes de entrega
+  const customerAdvancesLiability = (state.activeWorks || []).reduce((sum, w) => sum + Math.max(0, w.advancePaymentReceived - (w.totalContractPrice * (w.progressPct / 100))), 0);
+
+  // Impuestos SAR pendientes de pago
+  const sarTaxPayable = state.sarTaxRecord?.isPaid ? 0 : (state.sarTaxRecord?.isrTaxAmount || 0);
+
+  const totalCurrentLiabilities = shortTermLoans + creditCardsBalance + supplierAccountsPayable + customerAdvancesLiability + sarTaxPayable;
+  const totalNonCurrentLiabilities = longTermLoans;
+  const totalLiabilities = totalCurrentLiabilities + totalNonCurrentLiabilities;
+
+  // 4. Patrimonio Neto = Activos - Pasivos
+  const netEquity = totalAssets - totalLiabilities;
+
+  // 5. Estado de Resultados (P&L)
+  const grossRevenue = state.monthlySalesAccumulated || 450000;
+  const cogs = Math.round(grossRevenue * 0.58); // Costo directo al vender
+  const grossProfit = grossRevenue - cogs;
+  const operatingExpenses = ((state.staffCount || 3) * (state.dailyWages || 1200) * 30) + ((state.dailyRent || 500) * 30);
+  const ebitda = grossProfit - operatingExpenses;
+  
+  // Intereses pagados
+  let interestExpenses = 0;
+  Object.values(state.commercialBanks || {}).forEach(rel => {
+    if (rel.activeLoan && rel.activeLoan.balanceRemaining > 0) {
+      interestExpenses += Math.round(rel.activeLoan.balanceRemaining * (rel.activeLoan.interestRateAnnual / 100 / 12));
+    }
+  });
+
+  const taxExpenseSAR = Math.max(0, Math.round(Math.max(0, ebitda - interestExpenses) * 0.25));
+  const netIncome = ebitda - interestExpenses - taxExpenseSAR;
+
+  // 6. Flujo de Efectivo
+  const operatingCashFlow = netIncome + Math.round(accumulatedDepreciation / 12);
+  const investingCashFlow = -Math.round(machineryAndFleet * 0.05);
+  const financingCashFlow = -interestExpenses;
+  const netChangeInCash = operatingCashFlow + investingCashFlow + financingCashFlow;
+
+  return {
+    currentAssets: {
+      cashInHand,
+      cashInBank,
+      guaranteeDeposits,
+      inventoryStock,
+      accountsReceivable,
+      total: totalCurrentAssets
+    },
+    nonCurrentAssets: {
+      machineryAndFleet,
+      accumulatedDepreciation,
+      realEstateCollaterals,
+      total: totalNonCurrentAssets
+    },
+    totalAssets,
+    currentLiabilities: {
+      shortTermLoans,
+      creditCardsBalance,
+      supplierAccountsPayable,
+      customerAdvancesLiability,
+      sarTaxPayable,
+      total: totalCurrentLiabilities
+    },
+    nonCurrentLiabilities: {
+      longTermLoans,
+      total: totalNonCurrentLiabilities
+    },
+    totalLiabilities,
+    netEquity,
+    incomeStatement: {
+      grossRevenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      ebitda,
+      interestExpenses,
+      taxExpenseSAR,
+      netIncome
+    },
+    cashFlowStatement: {
+      operatingCashFlow,
+      investingCashFlow,
+      financingCashFlow,
+      netChangeInCash
+    }
+  };
+}
+

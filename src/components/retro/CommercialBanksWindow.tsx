@@ -2,11 +2,23 @@ import React, { useState } from 'react';
 import { 
   CommercialBankId, 
   CommercialBankRelationship,
-  DailySimulationState 
+  DailySimulationState,
+  CommercialLoanType,
+  RealEstateCollateralItem
 } from '../../game/retroSimTypes';
 import { 
   COMMERCIAL_BANKS_PROFILES, 
-  evaluateContractorEconomicCapacity 
+  evaluateContractorEconomicCapacity,
+  COMMERCIAL_LOAN_PRODUCTS,
+  calculateCreditTermsDisclosure,
+  CreditTermsDisclosure,
+  consultBankAdvisor,
+  BankAdvisorTopic,
+  BankAdvisorConsultation,
+  CORPORATE_CARD_TIERS,
+  CORPORATE_REWARDS_CATALOG,
+  calculateDpfTierBonus,
+  createDefaultRealEstateCollaterals
 } from '../../game/commercialBanksEngine';
 import { sound } from '../../game/audioFx';
 
@@ -17,6 +29,7 @@ interface CommercialBanksWindowProps {
   onOpenChecking: (bankId: CommercialBankId, deposit: number) => void;
   onPayLoan: (bankId: CommercialBankId, amount: number) => void;
   onExtraordinaryLoanPayment?: (bankId: CommercialBankId, amount: number) => void;
+  onExtraordinaryPaymentWithOptions?: (bankId: CommercialBankId, amount: number, strategy: 'reducir_cuota' | 'reducir_plazo') => void;
   onPayCard: (bankId: CommercialBankId, amount: number) => void;
   onPledgeGuarantee: (bankId: CommercialBankId, amount: number, purpose: string) => void;
   onReleaseGuarantee: (bankId: CommercialBankId, depositId: string) => void;
@@ -27,6 +40,10 @@ interface CommercialBanksWindowProps {
   onNegotiateLoanRate?: (bankId: CommercialBankId, discount: number) => void;
   onLiquidateDpf?: (bankId: CommercialBankId, depositId: string, isEarly: boolean) => void;
   onChargeCard?: (bankId: CommercialBankId, amount: number, concept: string) => void;
+  onRequestFullCredit?: (bankId: CommercialBankId, productType: CommercialLoanType, amount: number, termMonths: number, purpose: string, graceMonths: number, collateralId?: string) => void;
+  onPledgeCollateral?: (collateralId: string, bankId: CommercialBankId, loanId: string) => void;
+  onReleaseCollateral?: (collateralId: string) => void;
+  onExecuteFactoring?: (bankId: CommercialBankId, invoiceAmount: number, desc: string) => void;
 }
 
 export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
@@ -36,6 +53,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   onOpenChecking,
   onPayLoan,
   onExtraordinaryLoanPayment,
+  onExtraordinaryPaymentWithOptions,
   onPayCard,
   onPledgeGuarantee,
   onReleaseGuarantee,
@@ -45,10 +63,14 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   onNegotiateCheckingRate,
   onNegotiateLoanRate,
   onLiquidateDpf,
-  onChargeCard
+  onChargeCard,
+  onRequestFullCredit,
+  onPledgeCollateral,
+  onReleaseCollateral,
+  onExecuteFactoring
 }) => {
   const [selectedBankId, setSelectedBankId] = useState<CommercialBankId>('atlantida');
-  const [activeSubTab, setActiveSubTab] = useState<'prestamos' | 'tarjetas' | 'cuenta' | 'garantias' | 'dpf'>('prestamos');
+  const [activeSubTab, setActiveSubTab] = useState<'prestamos' | 'tarjetas' | 'cuenta' | 'garantias' | 'asesor' | 'dpf' | 'factoraje'>('prestamos');
 
   const capacity = evaluateContractorEconomicCapacity(state);
   const creditProfile = capacity.creditProfile;
@@ -61,29 +83,54 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
     termDeposits: []
   };
 
-  // Estados de formularios
+  // Bienes inmuebles y colaterales registrados
+  const collaterals: RealEstateCollateralItem[] = state.realEstateCollaterals && state.realEstateCollaterals.length > 0
+    ? state.realEstateCollaterals
+    : createDefaultRealEstateCollaterals(state.retailSector);
+
+  // Estados de formularios para 12+ productos de crédito
+  const [selectedProductType, setSelectedProductType] = useState<CommercialLoanType>('capital_trabajo');
   const [loanAmount, setLoanAmount] = useState<number>(Math.min(bankOffer.maxLoanHNL, 1000000));
   const [loanTerm, setLoanTerm] = useState<number>(24);
+  const [gracePeriodMonths, setGracePeriodMonths] = useState<number>(0);
+  const [selectedCollateralId, setSelectedCollateralId] = useState<string>('');
   const [loanPurpose, setLoanPurpose] = useState<string>('Capital de Trabajo y Compra de Insumos');
   
-  const [cardLimit, setCardLimit] = useState<number>(Math.min(bankOffer.maxCardHNL, 200000));
-  const [guaranteeAmount, setGuaranteeAmount] = useState<number>(500000);
-  const [guaranteePurpose, setGuaranteePurpose] = useState<string>('Fianza de Cumplimiento de Contrato');
+  // Modal de Hoja de Liquidación y Pre-Confirmación
+  const [showDisclosureModal, setShowDisclosureModal] = useState<boolean>(false);
+  const [currentDisclosure, setCurrentDisclosure] = useState<CreditTermsDisclosure | null>(null);
 
-  const [dpfAmount, setDpfAmount] = useState<number>(300000);
-  const [dpfDays, setDpfDays] = useState<number>(90);
-
-  const [loanPayAmount, setLoanPayAmount] = useState<number>(relationship.activeLoan?.monthlyPayment || 0);
+  // Abono Extraordinario
   const [extraordinaryPayAmount, setExtraordinaryPayAmount] = useState<number>(50000);
-  const [showExtraordinaryModal, setShowExtraordinaryModal] = useState<boolean>(false);
+  const [extraordinaryStrategy, setExtraordinaryStrategy] = useState<'reducir_cuota' | 'reducir_plazo'>('reducir_plazo');
+
+  // Tarjeta Corporativa
+  const [cardLimit, setCardLimit] = useState<number>(Math.min(bankOffer.maxCardHNL, 200000));
+  const [cardChargeAmount, setCardChargeAmount] = useState<number>(15000);
+  const [cardChargeConcept, setCardChargeConcept] = useState<string>('Compra de Combustible y Materiales');
   const [cardPayAmount, setCardPayAmount] = useState<number>(relationship.corporateCard?.currentBalance || 0);
 
-  // Estados para Cuentas
+  // Cuentas y Tasas
   const [depositAmount, setDepositAmount] = useState<number>(50000);
   const [withdrawAmount, setWithdrawAmount] = useState<number>(25000);
   const [requestedCheckingRate, setRequestedCheckingRate] = useState<number>(5.5);
-  const [showRateNegotiation, setShowRateNegotiation] = useState<boolean>(false);
   const [loanRateDiscount, setLoanRateDiscount] = useState<number>(1.0);
+
+  // Fianzas & DPF
+  const [guaranteeAmount, setGuaranteeAmount] = useState<number>(500000);
+  const [guaranteePurpose, setGuaranteePurpose] = useState<string>('Fianza de Cumplimiento de Contrato');
+  const [dpfAmount, setDpfAmount] = useState<number>(300000);
+  const [dpfDays, setDpfDays] = useState<number>(90);
+
+  // Factoraje
+  const [factoringInvoiceAmount, setFactoringInvoiceAmount] = useState<number>(250000);
+  const [factoringProjectName, setFactoringProjectName] = useState<string>('Estimación No. 3 - SIT Obras Públicas');
+
+  // Asesor Bancario Interactivo
+  const [advisorTopic, setAdvisorTopic] = useState<BankAdvisorTopic>('negociar_tasa');
+  const [advisorConsultation, setAdvisorConsultation] = useState<BankAdvisorConsultation | null>(null);
+
+  const formatHNL = (amount: number) => `L ${Math.round(amount).toLocaleString()}`;
 
   const handleSelectBank = (id: CommercialBankId) => {
     sound.playClick();
@@ -91,6 +138,66 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
     const newOffer = capacity.offersByBank[id];
     setLoanAmount(Math.min(newOffer.maxLoanHNL, 1000000));
     setCardLimit(Math.min(newOffer.maxCardHNL, 200000));
+    setAdvisorConsultation(null);
+  };
+
+  const handleOpenDisclosure = () => {
+    sound.playClick();
+    const disclosure = calculateCreditTermsDisclosure(
+      state,
+      selectedBankId,
+      selectedProductType,
+      loanAmount,
+      loanTerm,
+      gracePeriodMonths,
+      selectedCollateralId || undefined
+    );
+    setCurrentDisclosure(disclosure);
+    setShowDisclosureModal(true);
+  };
+
+  const handleConfirmAndDisburse = () => {
+    sound.playApprovalStamp();
+    setShowDisclosureModal(false);
+    if (onRequestFullCredit) {
+      onRequestFullCredit(
+        selectedBankId,
+        selectedProductType,
+        loanAmount,
+        loanTerm,
+        loanPurpose,
+        gracePeriodMonths,
+        selectedCollateralId || undefined
+      );
+    } else {
+      onRequestLoan(selectedBankId, loanAmount, loanTerm, loanPurpose);
+    }
+  };
+
+  const handleConsultAdvisor = () => {
+    sound.playClick();
+    const consultation = consultBankAdvisor(state, selectedBankId, advisorTopic);
+    setAdvisorConsultation(consultation);
+  };
+
+  const handleExecuteExtraordinaryPayment = () => {
+    sound.playApprovalStamp();
+    if (onExtraordinaryPaymentWithOptions) {
+      onExtraordinaryPaymentWithOptions(selectedBankId, extraordinaryPayAmount, extraordinaryStrategy);
+    } else if (onExtraordinaryLoanPayment) {
+      onExtraordinaryLoanPayment(selectedBankId, extraordinaryPayAmount);
+    } else {
+      onPayLoan(selectedBankId, extraordinaryPayAmount);
+    }
+  };
+
+  const handleFactoring = () => {
+    sound.playApprovalStamp();
+    if (onExecuteFactoring) {
+      onExecuteFactoring(selectedBankId, factoringInvoiceAmount, factoringProjectName);
+    } else {
+      alert(`Factoraje solicitado por L ${factoringInvoiceAmount.toLocaleString()} a ${COMMERCIAL_BANKS_PROFILES[selectedBankId].name}.`);
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -105,7 +212,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
       {/* Selector de Bancos */}
       <div className="bg-[#dfdfdf] border-b-2 border-[#808080] p-1.5 flex items-center justify-between gap-1.5 overflow-x-auto">
         <div className="flex items-center gap-1.5">
-          <span className="font-bold text-[11px] text-slate-700 px-1 hidden sm:inline">BANCOS:</span>
+          <span className="font-bold text-[11px] text-slate-700 px-1 hidden sm:inline">BANCO:</span>
           {(Object.keys(COMMERCIAL_BANKS_PROFILES) as CommercialBankId[]).map((bankId) => {
             const profile = COMMERCIAL_BANKS_PROFILES[bankId];
             const isSelected = selectedBankId === bankId;
@@ -155,53 +262,71 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
         </div>
 
         <div className="text-right text-[11px] font-mono bg-black/25 px-2.5 py-1 border border-white/20">
-          <div>Tasa Préstamo: <strong>{bankOffer.recommendedRatePct}% anual</strong></div>
-          <div>Tasa DPF: <strong>{selectedProfile.baseDpfRate}% anual</strong></div>
+          <div>Tasa Base: <strong>{bankOffer.recommendedRatePct}% anual</strong></div>
+          <div>DPF Rendimiento: <strong>{selectedProfile.baseDpfRate}% anual</strong></div>
         </div>
       </div>
 
       {/* Barra de Sub-Pestañas de Productos Financieros */}
-      <div className="flex gap-1 border-b border-[#808080] p-1 bg-[#d8d8d8]">
+      <div className="flex gap-1 border-b border-[#808080] p-1 bg-[#d8d8d8] overflow-x-auto">
         <button
           onClick={() => { sound.playClick(); setActiveSubTab('prestamos'); }}
-          className={`px-2.5 py-1 font-bold border ${
-            activeSubTab === 'prestamos' ? 'bg-white border-[#404040] text-blue-950' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'prestamos' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
           }`}
         >
-          💰 Préstamos Comerciales
+          💰 Créditos (12+ Productos)
         </button>
 
         <button
           onClick={() => { sound.playClick(); setActiveSubTab('tarjetas'); }}
-          className={`px-2.5 py-1 font-bold border ${
-            activeSubTab === 'tarjetas' ? 'bg-white border-[#404040] text-blue-950' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'tarjetas' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
           }`}
         >
-          💳 Tarjeta Corporativa
-        </button>
-
-        <button
-          onClick={() => { sound.playClick(); setActiveSubTab('cuenta'); }}
-          className={`px-2.5 py-1 font-bold border ${
-            activeSubTab === 'cuenta' ? 'bg-white border-[#404040] text-blue-950' : 'bg-[#c0c0c0] border-transparent text-slate-700'
-          }`}
-        >
-          📄 Cuenta Corriente & Chequera
+          💳 Tarjetas (3 Tiers)
         </button>
 
         <button
           onClick={() => { sound.playClick(); setActiveSubTab('garantias'); }}
-          className={`px-2.5 py-1 font-bold border ${
-            activeSubTab === 'garantias' ? 'bg-white border-[#404040] text-blue-950' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'garantias' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
           }`}
         >
-          🛡️ Fianzas & Depósitos en Garantía
+          🛡️ Garantías Reales ({collaterals.length})
+        </button>
+
+        <button
+          onClick={() => { sound.playClick(); setActiveSubTab('asesor'); }}
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'asesor' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          }`}
+        >
+          🗣️ Asesor Bancario (Negociación)
+        </button>
+
+        <button
+          onClick={() => { sound.playClick(); setActiveSubTab('factoraje'); }}
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'factoraje' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          }`}
+        >
+          ⚡ Factoraje
+        </button>
+
+        <button
+          onClick={() => { sound.playClick(); setActiveSubTab('cuenta'); }}
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'cuenta' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          }`}
+        >
+          📄 Cuenta Corriente
         </button>
 
         <button
           onClick={() => { sound.playClick(); setActiveSubTab('dpf'); }}
-          className={`px-2.5 py-1 font-bold border ${
-            activeSubTab === 'dpf' ? 'bg-white border-[#404040] text-blue-950' : 'bg-[#c0c0c0] border-transparent text-slate-700'
+          className={`px-2.5 py-1 font-bold border whitespace-nowrap ${
+            activeSubTab === 'dpf' ? 'bg-white border-[#404040] text-blue-950 font-black' : 'bg-[#c0c0c0] border-transparent text-slate-700'
           }`}
         >
           📈 Inversión DPF
@@ -209,18 +334,23 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
       </div>
 
       {/* Contenido Principal por Sub-Pestaña */}
-      <div className="flex-1 p-2.5 overflow-y-auto bg-white border-t border-[#808080]">
-        {/* SUBTAB 1: PRÉSTAMOS COMERCIALES */}
+      <div className="flex-1 p-3 overflow-y-auto bg-white border-t border-[#808080]">
+        {/* ========================================================= */}
+        {/* SUBTAB 1: PRÉSTAMOS COMERCIALES (12+ PRODUCTOS)          */}
+        {/* ========================================================= */}
         {activeSubTab === 'prestamos' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {relationship.activeLoan && relationship.activeLoan.balanceRemaining > 0 ? (
               <div className="bg-slate-50 border-2 border-blue-900 p-3 shadow-sm space-y-3">
                 <div className="flex justify-between items-center border-b pb-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-blue-950">Préstamo Comercial Activo</span>
-                    {relationship.activeLoan.loanType === 'vehicular_equipo' && (
+                    <span className="bg-blue-100 text-blue-900 text-[10px] font-bold px-1.5 py-0.5 border border-blue-300">
+                      {relationship.activeLoan.loanType?.toUpperCase() || 'COMERCIAL'}
+                    </span>
+                    {relationship.activeLoan.isRestructured && (
                       <span className="bg-purple-100 text-purple-900 text-[10px] font-bold px-1.5 py-0.5 border border-purple-300">
-                        🚜 CRÉDITO VEHICULAR / EQUIPO
+                        REESTRUCTURADO
                       </span>
                     )}
                   </div>
@@ -229,72 +359,33 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                   </span>
                 </div>
 
-                {relationship.activeLoan.equipmentModel && (
-                  <div className="bg-amber-50 border border-amber-300 p-1.5 text-[11px] text-amber-900 font-semibold flex items-center justify-between">
-                    <span>Unidad Financiada: <strong>{relationship.activeLoan.equipmentModel}</strong></span>
-                    <span className="text-[10px] text-amber-800">Garantía Prendaria Inscrita</span>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
                   <div className="bg-white p-2 border">
                     <span className="text-slate-500 block">Monto Original:</span>
-                    <span className="font-bold">L {relationship.activeLoan.principalAmount.toLocaleString()}</span>
+                    <span className="font-bold">{formatHNL(relationship.activeLoan.principalAmount)}</span>
                   </div>
                   <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Saldo Pendiente:</span>
-                    <span className="font-bold text-rose-800">L {relationship.activeLoan.balanceRemaining.toLocaleString()}</span>
+                    <span className="text-slate-500 block">Saldo Deudor:</span>
+                    <span className="font-bold text-rose-800">{formatHNL(relationship.activeLoan.balanceRemaining)}</span>
                   </div>
                   <div className="bg-white p-2 border">
                     <span className="text-slate-500 block">Cuota Mensual:</span>
-                    <span className="font-bold text-blue-900">L {relationship.activeLoan.monthlyPayment.toLocaleString()}</span>
+                    <span className="font-bold text-blue-900">{formatHNL(relationship.activeLoan.monthlyPayment)}</span>
                   </div>
                   <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Tasa / Meses:</span>
+                    <span className="text-slate-500 block">Tasa / Plazo:</span>
                     <span className="font-bold">{relationship.activeLoan.interestRateAnnual}% · {relationship.activeLoan.termMonthsRemaining}m</span>
                   </div>
                 </div>
 
-                {/* Barra de Progreso de Amortización */}
-                <div className="bg-white p-2 border space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span>Amortizado a Capital: L {(relationship.activeLoan.amortizedPrincipalTotal || (relationship.activeLoan.principalAmount - relationship.activeLoan.balanceRemaining)).toLocaleString()}</span>
-                    <span className="font-bold text-blue-900">
-                      {Math.round(((relationship.activeLoan.principalAmount - relationship.activeLoan.balanceRemaining) / relationship.activeLoan.principalAmount) * 100)}% cancelado
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden border">
-                    <div 
-                      className="bg-emerald-600 h-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, Math.max(5, Math.round(((relationship.activeLoan.principalAmount - relationship.activeLoan.balanceRemaining) / relationship.activeLoan.principalAmount) * 100)))}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Controles de Pago de Cuota y Abono Extraordinario a Capital */}
-                <div className="mt-2 pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-white p-2 border space-y-1.5">
-                    <span className="font-bold text-xs text-slate-800 block">1. Pago de Cuota Mensual Ordinaria:</span>
-                    <p className="text-[10px] text-slate-500">
-                      La cuota se debita automáticamente de tus cuentas cada quincena/mes, o puedes pagarla de inmediato.
-                    </p>
-                    <button
-                      onClick={() => {
-                        sound.playApprovalStamp();
-                        onPayLoan(selectedBankId, relationship.activeLoan!.monthlyPayment);
-                      }}
-                      className="w-full py-1.5 bg-blue-700 hover:bg-blue-800 text-white font-bold border-t border-l border-blue-300 border-b border-r border-blue-950 shadow cursor-pointer text-xs"
-                    >
-                      Pagar Cuota Mensual (L {relationship.activeLoan!.monthlyPayment.toLocaleString()})
-                    </button>
-                  </div>
-
-                  <div className="bg-white p-2 border space-y-1.5">
-                    <span className="font-bold text-xs text-emerald-900 block">2. Abono Extraordinario a Capital:</span>
-                    <p className="text-[10px] text-slate-500">
-                      Amortiza capital directamente para reducir tu saldo deudor y bajar la cuota mensual.
-                    </p>
-                    <div className="flex gap-1.5">
+                {/* Abono Extraordinario con Opción Reducir Plazo vs Reducir Cuota */}
+                <div className="border border-slate-300 p-3 bg-white space-y-2">
+                  <span className="font-bold text-xs text-slate-800 block">
+                    Abono Extraordinario a Capital (Amortización Directa):
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Monto a amortizar:</label>
                       <input
                         type="number"
                         min={5000}
@@ -302,510 +393,494 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                         max={relationship.activeLoan.balanceRemaining}
                         value={extraordinaryPayAmount}
                         onChange={(e) => setExtraordinaryPayAmount(Math.max(1000, Number(e.target.value)))}
-                        className="flex-1 bg-slate-50 border border-slate-400 px-2 py-1 font-mono font-bold text-xs"
+                        className="w-full bg-slate-50 border border-slate-400 px-2 py-1 font-mono font-bold text-xs"
                       />
-                      <button
-                        onClick={() => {
-                          sound.playApprovalStamp();
-                          if (onExtraordinaryLoanPayment) {
-                            onExtraordinaryLoanPayment(selectedBankId, extraordinaryPayAmount);
-                          } else {
-                            onPayLoan(selectedBankId, extraordinaryPayAmount);
-                          }
-                        }}
-                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-t border-l border-emerald-300 border-b border-r border-emerald-950 shadow cursor-pointer text-xs whitespace-nowrap"
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Estrategia Financiera:</label>
+                      <select
+                        value={extraordinaryStrategy}
+                        onChange={(e) => setExtraordinaryStrategy(e.target.value as any)}
+                        className="w-full bg-white border border-slate-400 px-2 py-1 font-sans text-xs"
                       >
-                        Abonar a Capital
+                        <option value="reducir_plazo">Reducir Plazo (Ahorra Intereses)</option>
+                        <option value="reducir_cuota">Reducir Cuota Mensual</option>
+                      </select>
+                    </div>
+                    <div className="pt-3">
+                      <button
+                        onClick={handleExecuteExtraordinaryPayment}
+                        className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border shadow cursor-pointer"
+                      >
+                        Aplicar Abono 💰
                       </button>
                     </div>
-                  </div>
-                </div>
-
-                {/* Negociación de Tasa Activa del Préstamo */}
-                <div className="bg-blue-50 border border-blue-200 p-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-[11px]">
-                    <span className="font-bold text-blue-950 block">Negociar Tasa con el Banco:</span>
-                    <span className="text-[10px] text-slate-600">
-                      Tu Score Crediticio ({creditProfile.score} pts · {creditProfile.tierLabel.split('·')[0]}) califica para descuentos de tasa.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={loanRateDiscount}
-                      onChange={(e) => setLoanRateDiscount(Number(e.target.value))}
-                      className="bg-white border border-slate-400 px-2 py-1 font-bold text-xs"
-                    >
-                      <option value={0.5}>-0.5% Rebaja</option>
-                      <option value={1.0}>-1.0% Rebaja</option>
-                      <option value={1.5}>-1.5% Rebaja</option>
-                      <option value={2.0}>-2.0% Rebaja (Score AAA/AA)</option>
-                    </select>
-                    <button
-                      onClick={() => {
-                        sound.playApprovalStamp();
-                        onNegotiateLoanRate && onNegotiateLoanRate(selectedBankId, loanRateDiscount);
-                      }}
-                      className="px-3 py-1 bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs border cursor-pointer"
-                    >
-                      Solicitar Rebaja
-                    </button>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="bg-slate-50 border border-slate-300 p-3 space-y-3">
-                <div className="flex justify-between items-center border-b pb-1">
+                <div className="border-b pb-2 flex justify-between items-center">
                   <div>
-                    <h4 className="font-bold text-sm text-slate-900">Solicitud de Financiamiento Comercial</h4>
-                    <span className="text-[10px] text-slate-500">Disponible para Supermercados, Restaurantes y Constructoras</span>
+                    <h4 className="font-bold text-sm text-slate-900">Catálogo de Financiamiento Empresarial (12 Productos)</h4>
+                    <span className="text-[10px] text-slate-500">
+                      Selecciona el producto específico para tu rubro ({state.retailSector})
+                    </span>
                   </div>
-                  <span className="text-[11px] text-slate-500">
-                    Capacidad pre-aprobada: <strong className="text-blue-900">L {bankOffer.maxLoanHNL.toLocaleString()}</strong>
+                  <span className="text-xs font-mono font-bold text-blue-900 bg-blue-50 px-2 py-1 border border-blue-200">
+                    Cupo Base: {formatHNL(bankOffer.maxLoanHNL)}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Selector de Producto */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Producto de Crédito Requerido:</label>
+                  <select
+                    value={selectedProductType}
+                    onChange={(e) => setSelectedProductType(e.target.value as CommercialLoanType)}
+                    className="w-full bg-white border-2 border-slate-400 p-2 font-sans font-bold text-xs text-slate-900"
+                  >
+                    {Object.values(COMMERCIAL_LOAN_PRODUCTS).map(prod => (
+                      <option key={prod.id} value={prod.id}>
+                        {prod.icon} {prod.name} (Tasa: {bankOffer.recommendedRatePct + prod.rateSpreadPct}% · Hasta {prod.maxTermMonths}m)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-600 mt-1 font-sans italic">
+                    {COMMERCIAL_LOAN_PRODUCTS[selectedProductType]?.description}
+                  </p>
+                </div>
+
+                {/* Formulario de Solicitud */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Monto del Préstamo (HNL):</label>
+                    <label className="font-semibold text-slate-700 block mb-1">Monto Solicitado (HNL):</label>
                     <input
                       type="number"
-                      min={50000}
-                      max={bankOffer.maxLoanHNL}
+                      min={COMMERCIAL_LOAN_PRODUCTS[selectedProductType]?.minAmountHNL || 50000}
                       step={25000}
                       value={loanAmount}
                       onChange={(e) => setLoanAmount(Number(e.target.value))}
-                      className="w-full bg-white border border-slate-400 px-2 py-1.5 font-mono font-bold text-slate-900"
+                      className="w-full bg-white border border-slate-400 p-1.5 font-mono font-bold text-xs"
                     />
-                    <span className="text-[10px] text-slate-500 block mt-0.5">
-                      Máximo con {selectedProfile.shortName}: L {bankOffer.maxLoanHNL.toLocaleString()}
-                    </span>
                   </div>
 
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Plazo de Amortización:</label>
+                    <label className="font-semibold text-slate-700 block mb-1">Plazo de Pago (Meses):</label>
                     <select
                       value={loanTerm}
                       onChange={(e) => setLoanTerm(Number(e.target.value))}
-                      className="w-full bg-white border border-slate-400 px-2 py-1.5 font-sans font-semibold text-slate-900"
+                      className="w-full bg-white border border-slate-400 p-1.5 font-sans font-semibold text-xs"
                     >
-                      <option value={12}>12 Meses (1 Año) · Tasa {bankOffer.recommendedRatePct}%</option>
-                      <option value={24}>24 Meses (2 Años) · Tasa {bankOffer.recommendedRatePct}%</option>
-                      <option value={36}>36 Meses (3 Años) · Tasa {bankOffer.recommendedRatePct + 0.5}%</option>
-                      <option value={48}>48 Meses (4 Años) · Tasa {bankOffer.recommendedRatePct + 1.0}%</option>
-                      <option value={60}>60 Meses (5 Años) · Tasa {bankOffer.recommendedRatePct + 1.5}%</option>
+                      <option value={12}>12 Meses (1 Año)</option>
+                      <option value={24}>24 Meses (2 Años)</option>
+                      <option value={36}>36 Meses (3 Años)</option>
+                      <option value={48}>48 Meses (4 Años)</option>
+                      <option value={60}>60 Meses (5 Años)</option>
+                      <option value={84}>84 Meses (7 Años)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">Período de Gracia (Meses):</label>
+                    <select
+                      value={gracePeriodMonths}
+                      onChange={(e) => setGracePeriodMonths(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-400 p-1.5 font-sans font-semibold text-xs"
+                      disabled={!COMMERCIAL_LOAN_PRODUCTS[selectedProductType]?.admitsGracePeriod}
+                    >
+                      <option value={0}>Sin período de gracia</option>
+                      <option value={3}>3 Meses (Solo intereses)</option>
+                      <option value={6}>6 Meses (Solo intereses)</option>
                     </select>
                   </div>
                 </div>
 
+                {/* Garantía Requerida / Vinculada */}
+                {COMMERCIAL_LOAN_PRODUCTS[selectedProductType]?.requiresCollateral && (
+                  <div className="border border-amber-300 p-2.5 bg-amber-50">
+                    <label className="font-bold text-amber-900 block mb-1">
+                      🛡️ Respaldar con Garantía Real / Inmueble Patrimonial:
+                    </label>
+                    <select
+                      value={selectedCollateralId}
+                      onChange={(e) => setSelectedCollateralId(e.target.value)}
+                      className="w-full bg-white border border-amber-400 p-1 font-sans text-xs"
+                    >
+                      <option value="">Seleccionar de mis propiedades...</option>
+                      {collaterals.map(col => (
+                        <option key={col.id} value={col.id} disabled={col.isPledged}>
+                          {col.title} — Avalúo: {formatHNL(col.appraisalValueHNL)} (LTV {col.ltvAcceptedPct}%) {col.isPledged ? '· [PIGNORADA]' : '· [DISPONIBLE]'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Destino */}
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Destino de los Fondos:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Destino Oficial del Crédito:</label>
                   <input
                     type="text"
                     value={loanPurpose}
                     onChange={(e) => setLoanPurpose(e.target.value)}
-                    className="w-full bg-white border border-slate-400 px-2 py-1 text-slate-900"
+                    className="w-full bg-white border border-slate-400 p-1.5 text-xs text-slate-900 font-sans"
                   />
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 p-2 font-mono text-[11px] flex justify-between">
-                  <span>Tasa Anual con descuento de Score: <strong>{bankOffer.recommendedRatePct}%</strong></span>
-                  <span>Cuota Estimada: <strong>~L {Math.round((loanAmount * (bankOffer.recommendedRatePct / 100 / 12)) / (1 - Math.pow(1 + (bankOffer.recommendedRatePct / 100 / 12), -loanTerm))).toLocaleString()}/mes</strong></span>
-                </div>
-
+                {/* Botón para Abrir Hoja de Pre-Confirmación y Términos */}
                 <button
-                  onClick={() => {
-                    sound.playApprovalStamp();
-                    onRequestLoan(selectedBankId, loanAmount, loanTerm, loanPurpose);
-                  }}
-                  className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border-t border-l border-emerald-300 border-b-2 border-r-2 border-emerald-950 shadow flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={handleOpenDisclosure}
+                  className="w-full py-2.5 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border shadow flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>💰</span>
-                  <span>SOLICITAR Y DESEMBOLSAR PRÉSTAMO COMERCIAL</span>
+                  <span>📋</span>
+                  <span>VER CONDICIONES FINANCIERAS & HOJA DE LIQUIDACIÓN PREVIA</span>
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* SUBTAB 2: TARJETA DE CRÉDITO CORPORATIVA */}
+        {/* ========================================================= */}
+        {/* SUBTAB 2: TARJETAS CORPORATIVAS (3 TIERS)                 */}
+        {/* ========================================================= */}
         {activeSubTab === 'tarjetas' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {relationship.corporateCard ? (
-              <div className="bg-slate-50 border-2 border-slate-700 p-3 shadow-sm space-y-3">
-                <div className="flex justify-between items-center border-b pb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">💳</span>
+              <div className="space-y-3">
+                <div className="border-2 border-slate-700 p-3 bg-slate-50 space-y-2">
+                  <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-black text-sm text-slate-900">{relationship.corporateCard.brand}</h4>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        Tasa Rotativa: {relationship.corporateCard.interestRateAnnual}% anual · Cashback: {relationship.corporateCard.cashbackPct || 1.5}%
+                      <div className="text-[11px] text-slate-600 font-mono">
+                        Límite: <strong className="text-blue-900">{formatHNL(relationship.corporateCard.creditLimit)}</strong> | Saldo: <strong className="text-rose-900">{formatHNL(relationship.corporateCard.currentBalance)}</strong>
+                      </div>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-900 text-xs px-2 py-0.5 border font-bold">
+                      {relationship.corporateCard.rewardPoints || 0} PUNTOS DE RECOMPENSA
+                    </span>
+                  </div>
+
+                  {/* Simulador de Compras Rápidas con Tarjeta */}
+                  <div className="border p-2 bg-white space-y-2">
+                    <span className="font-bold text-xs text-slate-800 block">Efectuar Compra de Insumos con Tarjeta:</span>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={500}
+                        value={cardChargeAmount}
+                        onChange={(e) => setCardChargeAmount(Number(e.target.value))}
+                        className="w-32 p-1 border font-mono font-bold text-xs"
+                      />
+                      <input
+                        type="text"
+                        value={cardChargeConcept}
+                        onChange={(e) => setCardChargeConcept(e.target.value)}
+                        className="flex-1 p-1 border font-sans text-xs"
+                      />
+                      <button
+                        onClick={() => {
+                          if (onChargeCard) onChargeCard(selectedBankId, cardChargeAmount, cardChargeConcept);
+                        }}
+                        className="px-3 py-1 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border shadow cursor-pointer whitespace-nowrap"
+                      >
+                        Cargar Tarjeta 💳
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 border border-slate-300 space-y-3">
+                <h4 className="font-bold text-sm text-slate-900">Solicitud de Tarjeta de Crédito Corporativa</h4>
+                <p className="text-[11px] text-slate-600 font-sans">
+                  Hasta 30 días de crédito sin interés para compras ordinarias con 1.5% a 4.5% de cashback.
+                </p>
+                <button
+                  onClick={() => onRequestCard(selectedBankId, cardLimit)}
+                  className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border shadow cursor-pointer"
+                >
+                  Solicitar Tarjeta Corporativa con Cupo {formatHNL(cardLimit)}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUBTAB 3: GARANTÍAS REALES (BIENES PATRIMONIALES)         */}
+        {/* ========================================================= */}
+        {activeSubTab === 'garantias' && (
+          <div className="space-y-4">
+            <div className="border-b pb-2 flex justify-between items-center">
+              <div>
+                <h4 className="font-bold text-sm text-slate-900">Registro de Bienes Patrimoniales & Garantías Reales</h4>
+                <p className="text-[11px] text-slate-500 font-sans">
+                  Casas, terrenos y bodegas inscritos para respaldar líneas de crédito y licitaciones de gran escala.
+                </p>
+              </div>
+              <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-1 border border-emerald-300">
+                Valor Total: {formatHNL(collaterals.reduce((s, c) => s + c.appraisalValueHNL, 0))}
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {collaterals.map(col => (
+                <div key={col.id} className="border border-slate-300 p-3 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-slate-900">{col.title}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 border font-bold ${
+                        col.isPledged 
+                          ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}>
+                        {col.isPledged ? '🔒 PIGNORADO A CRÉDITO' : '✅ LIBRE DE GRAVAMEN'}
                       </span>
                     </div>
-                  </div>
-                  <span className="bg-emerald-100 text-emerald-900 text-[10px] font-bold px-2 py-0.5 border border-emerald-300">
-                    TARJETA ACTIVA
-                  </span>
-                </div>
-
-                {/* Banner de Revisión Quincenal */}
-                <div className="bg-emerald-50 border border-emerald-200 p-2 text-[11px] text-emerald-900 flex items-center justify-between">
-                  <div>
-                    <strong>🔄 Revisión Quincenal de Aumento de Límite:</strong>
-                    <span className="block text-[10px] text-emerald-800">
-                      Evaluada automáticamente los días 15 y 30. Pagos puntuales y bajo saldo desbloquean aumentos del +15% al +25%.
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold bg-white px-2 py-0.5 border border-emerald-300 text-xs">
-                    {relationship.corporateCard.limitIncreasesCount ? `${relationship.corporateCard.limitIncreasesCount} aumentos` : 'Próxima evaluación: D15'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Límite Total:</span>
-                    <span className="font-bold text-blue-950">L {relationship.corporateCard.creditLimit.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Saldo Utilizado:</span>
-                    <span className="font-bold text-rose-800">L {relationship.corporateCard.currentBalance.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Cupo Disponible:</span>
-                    <span className="font-bold text-emerald-800">
-                      L {(relationship.corporateCard.creditLimit - relationship.corporateCard.currentBalance).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                {relationship.corporateCard.currentBalance > 0 && (
-                  <div className="mt-2 pt-2 border-t flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Monto a pagar:</span>
-                      <input
-                        type="number"
-                        min={100}
-                        max={relationship.corporateCard.currentBalance}
-                        value={cardPayAmount}
-                        onChange={(e) => setCardPayAmount(Number(e.target.value))}
-                        className="w-32 bg-slate-100 border border-slate-400 px-2 py-1 font-mono font-bold"
-                      />
+                    <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                      Avalúo Oficial: <strong>{formatHNL(col.appraisalValueHNL)}</strong> | Cobertura LTV: <strong>{col.ltvAcceptedPct}%</strong> (Capacidad: {formatHNL(col.appraisalValueHNL * (col.ltvAcceptedPct / 100))})
                     </div>
-                    <button
-                      onClick={() => {
-                        sound.playApprovalStamp();
-                        onPayCard(selectedBankId, cardPayAmount || relationship.corporateCard!.currentBalance);
-                      }}
-                      className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold border"
-                    >
-                      Pagar Saldo Tarjeta
-                    </button>
+                    <div className="text-[10px] text-slate-500 font-sans">
+                      Ubicación: {col.location} | Matrícula: {col.registrationNumber}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {col.isPledged ? (
+                      <button
+                        onClick={() => {
+                          if (onReleaseCollateral) onReleaseCollateral(col.id);
+                        }}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs border shadow cursor-pointer whitespace-nowrap"
+                      >
+                        Liberar Gravamen 🔓
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-emerald-700 font-bold bg-white px-2 py-1 border border-slate-300">
+                        Disponible para Garantía
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUBTAB 4: ASESOR BANCARIO DETERMINISTA INTERACTIVO        */}
+        {/* ========================================================= */}
+        {activeSubTab === 'asesor' && (
+          <div className="space-y-4 max-w-3xl mx-auto">
+            <div className="border-b pb-2">
+              <h4 className="font-black text-sm text-slate-900 uppercase">
+                DESPACHO EJECUTIVO DE NEGOCIACIÓN BANCARIA
+              </h4>
+              <p className="text-[11px] text-slate-600 font-sans">
+                Dialoga directamente con el Vicepresidente de Crédito de {selectedProfile.name}. Presenta solicitudes de menor tasa, períodos de gracia o consolidación.
+              </p>
+            </div>
+
+            {/* Selector de Asunto */}
+            <div className="bg-slate-50 border p-3 space-y-2">
+              <label className="font-bold text-slate-800 block text-xs">¿Qué condición deseas negociar con el Banco?</label>
+              <div className="flex gap-2">
+                <select
+                  value={advisorTopic}
+                  onChange={(e) => setAdvisorTopic(e.target.value as BankAdvisorTopic)}
+                  className="flex-1 bg-white border border-slate-400 p-2 font-sans font-bold text-xs"
+                >
+                  <option value="negociar_tasa">Solicitar menor tasa de interés (-1.5% APR)</option>
+                  <option value="periodo_gracia">Solicitar 3 meses de período de gracia (solo intereses)</option>
+                  <option value="consolidar_deuda">Consolidar múltiples deudas en una sola cuota</option>
+                  <option value="exonerar_comision">Exonerar comisión de apertura y desembolso</option>
+                  <option value="aportar_garantia">Aportar garantía real para ampliar capacidad</option>
+                </select>
+
+                <button
+                  onClick={handleConsultAdvisor}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border shadow cursor-pointer whitespace-nowrap"
+                >
+                  Consultar al Comité 🗣️
+                </button>
+              </div>
+            </div>
+
+            {/* Resultado de la Negociación con el Asesor */}
+            {advisorConsultation && (
+              <div className="bg-white border-2 border-[#808080] p-4 shadow-inner space-y-3 font-sans">
+                <div className="flex items-center gap-3 border-b pb-2">
+                  <span className="text-3xl">👨‍💼</span>
+                  <div>
+                    <strong className="text-slate-900 text-sm block">{advisorConsultation.officerName}</strong>
+                    <span className="text-[11px] text-slate-500 block">{advisorConsultation.officerRole}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-100 border border-slate-300 italic text-slate-800 leading-relaxed text-xs">
+                  {advisorConsultation.officerDialog}
+                </div>
+
+                {/* Métricas Auditadas */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
+                  {advisorConsultation.keyFinancialData.map(m => (
+                    <div key={m.label} className={`p-1.5 border ${m.isHealthy ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-rose-50 border-rose-300 text-rose-950'}`}>
+                      <span className="text-[9px] block text-slate-500 font-sans">{m.label}:</span>
+                      <strong className="font-bold">{m.value}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                {advisorConsultation.concessionOffered && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-400 text-emerald-950 text-xs">
+                    <strong className="font-bold block">✨ CONTRAPROPUESTA CONCEDIDA POR EL BANCO:</strong>
+                    <span>{advisorConsultation.concessionOffered.type}: <strong>{advisorConsultation.concessionOffered.value}</strong> ({advisorConsultation.concessionOffered.tradeOff})</span>
                   </div>
                 )}
-
-                {/* Simulador de Compra con Tarjeta Corporativa */}
-                <div className="bg-white p-2.5 border space-y-2 mt-2">
-                  <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
-                    <span>🛍️</span>
-                    <span>Realizar Pago o Compra Inmediata con Tarjeta:</span>
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <button
-                      onClick={() => {
-                        sound.playCashChime();
-                        onChargeCard && onChargeCard(selectedBankId, 15000, 'Compra de Insumos y Repuestos');
-                      }}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border text-left text-[11px] font-bold"
-                    >
-                      <span>📦 Insumos / Repuestos</span>
-                      <span className="block font-mono text-blue-900 text-[10px]">L 15,000</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        sound.playCashChime();
-                        onChargeCard && onChargeCard(selectedBankId, 35000, 'Lote de Mercancía / Suministros');
-                      }}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border text-left text-[11px] font-bold"
-                    >
-                      <span>🛒 Lote de Suministros</span>
-                      <span className="block font-mono text-blue-900 text-[10px]">L 35,000</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        sound.playCashChime();
-                        onChargeCard && onChargeCard(selectedBankId, 75000, 'Combustible y Mantenimiento');
-                      }}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 border text-left text-[11px] font-bold"
-                    >
-                      <span>⛽ Combustible y Flota</span>
-                      <span className="block font-mono text-blue-900 text-[10px]">L 75,000</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-50 border border-slate-300 p-3 space-y-3">
-                <div className="flex justify-between items-center border-b pb-1">
-                  <h4 className="font-bold text-sm text-slate-900">Emisión de Tarjeta de Crédito Empresarial</h4>
-                  <span className="text-[11px] text-slate-500">
-                    Límite pre-aprobado: <strong className="text-blue-900">L {bankOffer.maxCardHNL.toLocaleString()}</strong>
-                  </span>
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Límite de Crédito Solicitado (HNL):</label>
-                  <input
-                    type="number"
-                    min={50000}
-                    max={bankOffer.maxCardHNL}
-                    step={10000}
-                    value={cardLimit}
-                    onChange={(e) => setCardLimit(Number(e.target.value))}
-                    className="w-full bg-white border border-slate-400 px-2 py-1.5 font-mono font-bold text-slate-900"
-                  />
-                </div>
-
-                <div className="text-[10px] text-slate-600 bg-white p-2 border space-y-0.5">
-                  <div>✓ Compras sin interés hasta por 54 días (corte y pago).</div>
-                  <div>✓ Aceptada por distribuidores de abarrotes, restaurantes, canteras y concesionarias.</div>
-                  <div>✓ Evaluación quincenal para aumento de límite y beneficios automáticos.</div>
-                  <div>✓ Membresía corporativa anual de L {selectedProfile.creditCardFeeAnnual.toLocaleString()}.</div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    sound.playApprovalStamp();
-                    onRequestCard(selectedBankId, cardLimit);
-                  }}
-                  className="w-full py-2 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border shadow flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>💳</span>
-                  <span>SOLICITAR Y EMITIR TARJETA CORPORATIVA</span>
-                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* SUBTAB 3: CUENTA CORRIENTE, CHEQUERA & RENDIMIENTO */}
-        {activeSubTab === 'cuenta' && (
-          <div className="space-y-3">
-            {relationship.checkingAccount ? (
-              <div className="bg-slate-50 border border-slate-300 p-3 space-y-3">
-                <div className="flex justify-between items-center border-b pb-1">
-                  <div>
-                    <span className="font-bold text-sm text-slate-900">Cuenta Corriente Comercial & Ahorro Empresarial</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">
-                      No. {relationship.checkingAccount.accountNumber} · Rendimiento Anual: <strong>{relationship.checkingAccount.interestRateAnnual || 4.5}%</strong>
-                    </span>
-                  </div>
-                  <span className="font-mono text-xs bg-emerald-100 text-emerald-900 px-2 py-0.5 border border-emerald-300 font-bold">
-                    CUENTA ACTIVA
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Saldo en Banco:</span>
-                    <span className="font-bold text-blue-900 text-sm">L {relationship.checkingAccount.balance.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Línea Sobregiro:</span>
-                    <span className="font-bold text-slate-700">L {relationship.checkingAccount.overdraftLimit.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-white p-2 border">
-                    <span className="text-slate-500 block">Cheques Emitidos:</span>
-                    <span className="font-bold">{relationship.checkingAccount.checksUsedCount} cheques</span>
-                  </div>
-                </div>
-
-                {/* Transferencias entre Caja y Banco */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t">
-                  {/* Depositar Efectivo de Caja a Banco */}
-                  <div className="bg-white p-2 border space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-bold text-slate-800">➕ Agregar Fondos (Depositar de Caja):</span>
-                      <span className="font-mono text-[10px] text-slate-500">Caja: L {state.storeCash.toLocaleString()}</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="number"
-                        min={1000}
-                        step={5000}
-                        max={state.storeCash}
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(Math.max(0, Number(e.target.value)))}
-                        className="flex-1 bg-slate-50 border border-slate-400 px-2 py-1 font-mono font-bold text-xs"
-                      />
-                      <button
-                        onClick={() => {
-                          sound.playApprovalStamp();
-                          onDepositCash && onDepositCash(selectedBankId, depositAmount);
-                        }}
-                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border cursor-pointer whitespace-nowrap"
-                      >
-                        Depositar a Banco
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Retirar Efectivo de Banco a Caja */}
-                  <div className="bg-white p-2 border space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-bold text-slate-800">➖ Retirar Efectivo (Banco a Caja):</span>
-                      <span className="font-mono text-[10px] text-slate-500">Banco: L {relationship.checkingAccount.balance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="number"
-                        min={1000}
-                        step={5000}
-                        max={relationship.checkingAccount.balance}
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(Math.max(0, Number(e.target.value)))}
-                        className="flex-1 bg-slate-50 border border-slate-400 px-2 py-1 font-mono font-bold text-xs"
-                      />
-                      <button
-                        onClick={() => {
-                          sound.playApprovalStamp();
-                          onWithdrawCash && onWithdrawCash(selectedBankId, withdrawAmount);
-                        }}
-                        className="px-3 py-1 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border cursor-pointer whitespace-nowrap"
-                      >
-                        Retirar a Caja
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Negociación de Rendimiento / Tasa de la Cuenta */}
-                <div className="bg-amber-50 border border-amber-300 p-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-[11px]">
-                    <span className="font-bold text-amber-950 block">Negociar Tasa de Interés Pasiva:</span>
-                    <span className="text-[10px] text-amber-900">
-                      Tasa actual: {relationship.checkingAccount.interestRateAnnual || 4.5}% anual. Negocia un mayor rendimiento según tu Score y saldo depositado.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      step={0.25}
-                      min={4.0}
-                      max={7.5}
-                      value={requestedCheckingRate}
-                      onChange={(e) => setRequestedCheckingRate(Number(e.target.value))}
-                      className="w-16 bg-white border border-slate-400 px-1.5 py-1 text-xs font-mono font-bold"
-                    />
-                    <span className="text-xs font-bold">%</span>
-                    <button
-                      onClick={() => {
-                        sound.playApprovalStamp();
-                        onNegotiateCheckingRate && onNegotiateCheckingRate(selectedBankId, requestedCheckingRate);
-                      }}
-                      className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs border cursor-pointer"
-                    >
-                      Negociar Tasa
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-50 border border-slate-300 p-3 space-y-2">
-                <h4 className="font-bold text-sm text-slate-900">Apertura de Cuenta Corriente Comercial</h4>
-                <p className="text-xs text-slate-600">
-                  Abre una cuenta corriente con chequera en {selectedProfile.name} para realizar transferencias ACH, depósitos y pago a proveedores de cualquier rubro.
-                </p>
-
-                <button
-                  onClick={() => {
-                    sound.playApprovalStamp();
-                    onOpenChecking(selectedBankId, 100000);
-                  }}
-                  className="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold border shadow flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>📄</span>
-                  <span>APERTURAR CUENTA CORRIENTE (Depósito inicial L 100,000)</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* SUBTAB 4: FIANZAS Y GARANTÍAS */}
-        {activeSubTab === 'garantias' && (
-          <div className="space-y-3">
-            <div className="bg-slate-50 border border-slate-300 p-3 space-y-2">
-              <h4 className="font-bold text-sm text-slate-900">Constituir Fianza / Depósito en Garantía</h4>
-              <p className="text-[11px] text-slate-600">
-                Las instituciones públicas (SIT, SEFIN) exigen fianzas bancarias de cumplimiento de contrato o de sostenimiento de oferta.
+        {/* ========================================================= */}
+        {/* SUBTAB 5: FACTORAJE                                       */}
+        {/* ========================================================= */}
+        {activeSubTab === 'factoraje' && (
+          <div className="space-y-4 max-w-2xl mx-auto bg-slate-50 border border-slate-300 p-4">
+            <div className="border-b pb-2">
+              <h4 className="font-bold text-sm text-slate-900">Línea de Factoraje de Facturas & Estimaciones</h4>
+              <p className="text-[11px] text-slate-600 font-sans">
+                Convierte tus facturas comerciales o estimaciones de obra pendientes de cobro en efectivo líquido inmediato con anticipo del 90%.
               </p>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-0.5">Monto de la Fianza (HNL):</label>
-                  <input
-                    type="number"
-                    min={50000}
-                    step={25000}
-                    value={guaranteeAmount}
-                    onChange={(e) => setGuaranteeAmount(Number(e.target.value))}
-                    className="w-full bg-white border border-slate-400 px-2 py-1 font-mono font-bold text-slate-900"
-                  />
+            <div className="space-y-3">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Monto de la Factura / Estimación a Factorizar (HNL):</label>
+                <input
+                  type="number"
+                  min={50000}
+                  step={25000}
+                  value={factoringInvoiceAmount}
+                  onChange={(e) => setFactoringInvoiceAmount(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-400 p-2 font-mono font-bold text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Descripción del Proyecto o Cliente Deudor:</label>
+                <input
+                  type="text"
+                  value={factoringProjectName}
+                  onChange={(e) => setFactoringProjectName(e.target.value)}
+                  className="w-full bg-white border border-slate-400 p-2 font-sans text-xs"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-2.5 font-mono text-xs text-blue-950 space-y-1">
+                <div className="flex justify-between">
+                  <span>Anticipo Inmediato (90%):</span>
+                  <strong>{formatHNL(factoringInvoiceAmount * 0.90)}</strong>
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-0.5">Propósito de la Fianza:</label>
-                  <input
-                    type="text"
-                    value={guaranteePurpose}
-                    onChange={(e) => setGuaranteePurpose(e.target.value)}
-                    className="w-full bg-white border border-slate-400 px-2 py-1 text-slate-900"
-                  />
+                <div className="flex justify-between text-rose-700">
+                  <span>Comisión Financiera de Factoraje (6%):</span>
+                  <strong>-{formatHNL(factoringInvoiceAmount * 0.06)}</strong>
+                </div>
+                <div className="border-t pt-1 flex justify-between font-bold text-emerald-800 text-sm">
+                  <span>Efectivo Neto a Recibir:</span>
+                  <span>{formatHNL((factoringInvoiceAmount * 0.90) - (factoringInvoiceAmount * 0.06))}</span>
                 </div>
               </div>
 
               <button
-                onClick={() => {
-                  sound.playApprovalStamp();
-                  onPledgeGuarantee(selectedBankId, guaranteeAmount, guaranteePurpose);
-                }}
-                className="w-full py-1.5 bg-blue-700 hover:bg-blue-800 text-white font-bold border shadow"
+                onClick={handleFactoring}
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border shadow cursor-pointer"
               >
-                Inmovilizar Fondos y Emitir Fianza Bancaria
+                Ejecutar Factoraje y Recibir Efectivo Inmediato ⚡
               </button>
-            </div>
-
-            {/* Lista de Fianzas Constituidas */}
-            <div className="space-y-1">
-              <span className="font-bold text-[11px] text-slate-700 block">Fianzas Activas:</span>
-              {relationship.guaranteeDeposits.length === 0 ? (
-                <div className="p-2 bg-slate-50 border text-center text-slate-500 text-[11px]">
-                  No tienes depósitos inmovilizados en garantía con este banco.
-                </div>
-              ) : (
-                relationship.guaranteeDeposits.map((dep) => (
-                  <div key={dep.id} className="p-2 bg-slate-50 border flex items-center justify-between text-[11px]">
-                    <div>
-                      <span className="font-bold text-blue-950">{dep.purpose}</span>
-                      <span className="font-mono text-slate-500 block">Monto: L {dep.amountPledged.toLocaleString()}</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        sound.playApprovalStamp();
-                        onReleaseGuarantee(selectedBankId, dep.id);
-                      }}
-                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 font-semibold border"
-                    >
-                      Liberar Fondos
-                    </button>
-                  </div>
-                ))
-              )}
             </div>
           </div>
         )}
 
-        {/* SUBTAB 5: INVERSION DPF */}
+        {/* SUBTAB 6: CUENTA CORRIENTE */}
+        {activeSubTab === 'cuenta' && (
+          <div className="space-y-4">
+            {relationship.checkingAccount ? (
+              <div className="bg-slate-50 border border-slate-300 p-3 space-y-3">
+                <div className="flex justify-between items-center border-b pb-1">
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900">{relationship.checkingAccount.accountNumber}</h4>
+                    <span className="text-[10px] text-slate-500 font-sans">Cuenta Comercial Activa</span>
+                  </div>
+                  <span className="font-mono text-base font-bold text-blue-900">
+                    {formatHNL(relationship.checkingAccount.balance)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="border p-2 bg-white space-y-2">
+                    <span className="font-bold text-xs text-slate-800 block">Depositar Efectivo de Caja:</span>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={1000}
+                        step={5000}
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(Number(e.target.value))}
+                        className="flex-1 p-1 border font-mono font-bold text-xs"
+                      />
+                      <button
+                        onClick={() => {
+                          if (onDepositCash) onDepositCash(selectedBankId, depositAmount);
+                        }}
+                        className="px-3 py-1 bg-emerald-700 text-white font-bold text-xs border cursor-pointer"
+                      >
+                        Depositar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border p-2 bg-white space-y-2">
+                    <span className="font-bold text-xs text-slate-800 block">Retirar Efectivo a Caja:</span>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={1000}
+                        step={5000}
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                        className="flex-1 p-1 border font-mono font-bold text-xs"
+                      />
+                      <button
+                        onClick={() => {
+                          if (onWithdrawCash) onWithdrawCash(selectedBankId, withdrawAmount);
+                        }}
+                        className="px-3 py-1 bg-blue-800 text-white font-bold text-xs border cursor-pointer"
+                      >
+                        Retirar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-50 border text-center space-y-3">
+                <p className="text-slate-700 font-sans">Aún no posees una cuenta corriente aperturada en {selectedProfile.name}.</p>
+                <button
+                  onClick={() => onOpenChecking(selectedBankId, 50000)}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs border shadow cursor-pointer"
+                >
+                  Aperturar Cuenta Corriente con L 50,000 📄
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SUBTAB 7: INVERSIÓN DPF */}
         {activeSubTab === 'dpf' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="bg-slate-50 border border-slate-300 p-3 space-y-2">
               <div className="flex justify-between items-center border-b pb-1">
                 <h4 className="font-bold text-sm text-slate-900">Apertura de Depósito a Plazo Fijo (DPF)</h4>
@@ -842,69 +917,124 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
               </div>
 
               <button
-                onClick={() => {
-                  sound.playApprovalStamp();
-                  onOpenDpf(selectedBankId, dpfAmount, dpfDays);
-                }}
-                className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold border shadow"
+                onClick={() => onOpenDpf(selectedBankId, dpfAmount, dpfDays)}
+                className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold border shadow cursor-pointer"
               >
                 Invertir y Constituir Certificado DPF
               </button>
             </div>
-
-            {/* Certificados DPF Activos */}
-            <div className="space-y-1">
-              <span className="font-bold text-[11px] text-slate-700 block">Certificados DPF Activos:</span>
-              {relationship.termDeposits.length === 0 ? (
-                <div className="p-2 bg-slate-50 border text-center text-slate-500 text-[11px]">
-                  No tienes certificados de inversión a plazo fijo vigentes con este banco.
-                </div>
-              ) : (
-                relationship.termDeposits.map((dpf) => {
-                  const daysElapsed = Math.max(1, dpf.termDays - dpf.daysRemaining);
-                  const dailyRate = (dpf.annualRatePct / 100) / 365;
-                  const estimatedInterest = Math.round(dpf.principalAmount * dailyRate * daysElapsed);
-                  const isMatured = dpf.daysRemaining <= 0;
-
-                  return (
-                    <div key={dpf.id} className="p-2.5 bg-slate-50 border border-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-emerald-900">DPF No. {dpf.id}</span>
-                          <span className={`px-1.5 py-0.2 text-[9px] font-bold border ${
-                            isMatured ? 'bg-emerald-100 text-emerald-950 border-emerald-400' : 'bg-blue-100 text-blue-900 border-blue-300'
-                          }`}>
-                            {isMatured ? '✓ VENCIDO Y LISTO PARA COBRO' : `⏳ ${dpf.daysRemaining} DÍAS RESTANTES`}
-                          </span>
-                        </div>
-                        <span className="font-mono text-slate-600 block mt-0.5">
-                          Capital: L {dpf.principalAmount.toLocaleString()} · Tasa: {dpf.annualRatePct}% anual · Ganancia: <strong className="text-emerald-800 font-bold">+L {estimatedInterest.toLocaleString()}</strong>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            sound.playApprovalStamp();
-                            onLiquidateDpf && onLiquidateDpf(selectedBankId, dpf.id, !isMatured);
-                          }}
-                          className={`px-3 py-1 font-bold text-xs border shadow cursor-pointer whitespace-nowrap ${
-                            isMatured
-                              ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-950'
-                              : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-400'
-                          }`}
-                        >
-                          {isMatured ? '💰 Liquidar y Cobrar Total' : '⚠️ Retiro Anticipado'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
           </div>
         )}
       </div>
+
+      {/* ========================================================= */}
+      {/* MODAL DE HOJA DE LIQUIDACIÓN Y CONDICIONES PREVIAS        */}
+      {/* ========================================================= */}
+      {showDisclosureModal && currentDisclosure && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-3 z-50">
+          <div className="bg-[#c0c0c0] border-2 border-white shadow-2xl max-w-2xl w-full p-1 space-y-2 text-slate-900 font-sans">
+            {/* Barra de Título Modal */}
+            <div className="bg-blue-900 text-white font-bold px-2 py-1 flex justify-between items-center text-xs">
+              <span>📋 HOJA DE LIQUIDACIÓN Y CONDICIONES PREVIAS AL DESEMBOLSO</span>
+              <button 
+                onClick={() => setShowDisclosureModal(false)}
+                className="px-1.5 bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-white border border-[#808080] max-h-[80vh] overflow-y-auto space-y-3 text-xs font-mono">
+              <div className="text-center border-b pb-2">
+                <h3 className="font-sans font-black text-sm text-slate-900">
+                  {currentDisclosure.bankName}
+                </h3>
+                <p className="font-sans text-[11px] text-slate-600">
+                  {currentDisclosure.productConfig.name} | Destino: {loanPurpose}
+                </p>
+              </div>
+
+              {/* Parámetros Financieros Clave */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Monto Aprobado:</span>
+                  <strong className="text-slate-900 text-sm">{formatHNL(currentDisclosure.approvedAmountHNL)}</strong>
+                </div>
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Desembolso Neto a Cuenta:</span>
+                  <strong className="text-emerald-800 text-sm">{formatHNL(currentDisclosure.netDisbursementHNL)}</strong>
+                </div>
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Tasa Nominal Anual:</span>
+                  <strong className="text-slate-900">{currentDisclosure.annualNominalRatePct}% APR</strong>
+                </div>
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Cuota Mensual Estimada:</span>
+                  <strong className="text-blue-900 font-bold">{formatHNL(currentDisclosure.monthlyPaymentHNL)} / mes</strong>
+                </div>
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Comisión por Desembolso (1.5%):</span>
+                  <span className="text-rose-800">{formatHNL(currentDisclosure.openingFeeHNL)}</span>
+                </div>
+                <div className="border p-2 bg-slate-50">
+                  <span className="text-slate-500 block font-sans">Total a Pagar (Capital + Intereses):</span>
+                  <strong className="text-slate-900">{formatHNL(currentDisclosure.totalRepaymentHNL)}</strong>
+                </div>
+              </div>
+
+              {/* Amortización Primeras Cuotas */}
+              <div>
+                <span className="font-sans font-bold text-slate-800 text-[11px] block mb-1">
+                  CALENDARIO RESUMIDO DE AMORTIZACIÓN (PRIMERAS CUOTAS):
+                </span>
+                <table className="w-full text-center border text-[10px]">
+                  <thead className="bg-slate-200">
+                    <tr>
+                      <th className="p-1 border">Mes</th>
+                      <th className="p-1 border">Cuota</th>
+                      <th className="p-1 border">Capital</th>
+                      <th className="p-1 border">Interés</th>
+                      <th className="p-1 border">Saldo Deudor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentDisclosure.amortizationPreview.map(row => (
+                      <tr key={row.monthNumber} className="bg-slate-50">
+                        <td className="p-1 border font-bold">Mes {row.monthNumber}</td>
+                        <td className="p-1 border">{formatHNL(row.paymentHNL)}</td>
+                        <td className="p-1 border text-emerald-800">{formatHNL(row.principalHNL)}</td>
+                        <td className="p-1 border text-rose-800">{formatHNL(row.interestHNL)}</td>
+                        <td className="p-1 border font-bold">{formatHNL(row.remainingBalanceHNL)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Impacto de Liquidez */}
+              <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-950 font-sans text-xs">
+                <strong>💡 Impacto sobre la Liquidez Futura:</strong> {currentDisclosure.liquidityImpactSummary}
+              </div>
+
+              {/* Botón de Confirmación Definitiva */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowDisclosureModal(false)}
+                  className="flex-1 py-2 bg-slate-200 border border-slate-400 font-sans font-bold text-xs cursor-pointer hover:bg-slate-300"
+                >
+                  Modificar Condiciones
+                </button>
+                <button
+                  onClick={handleConfirmAndDisburse}
+                  className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-black text-xs border border-emerald-950 shadow cursor-pointer"
+                >
+                  CONFIRMAR Y DESEMBOLSAR FONDOS 💰
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
