@@ -756,7 +756,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       collateralIds?: string[];
       requestedCollateralIds?: string[];
     }
-  ) => {
+  ): BankOfferNegotiationResult => {
     const offerId = typeof offerOrId === 'string' ? offerOrId : offerOrId.id;
     const res = negotiateBankOfferFromEmail(simState, offerId, {
       ...proposal,
@@ -769,6 +769,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       sound.playRejectBuzzer();
     }
     return {
+      outcome: res.outcome,
+      reason: res.reason,
       success: res.outcome !== 'rechazado',
       message: res.message,
       dialogue: res.dialogue,

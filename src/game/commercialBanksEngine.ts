@@ -1265,7 +1265,7 @@ export function chargeCorporateCard(
     return { updatedState: state, success: false, message: 'No dispones de tarjeta corporativa con este banco.' };
   }
 
-  const availableCredit = card.creditLimit - card.currentBalance;
+  const availableCredit = card.availableCredit ?? Math.max(0, card.creditLimit - card.currentBalance);
   if (amount > availableCredit) {
     return {
       updatedState: state,
@@ -1274,7 +1274,8 @@ export function chargeCorporateCard(
     };
   }
 
-  const newBalance = card.currentBalance + amount;
+  const newUsedBalance = card.currentBalance + amount;
+  const newAvailableCredit = Math.max(0, card.creditLimit - newUsedBalance);
   const cashbackEarned = Math.round(amount * ((card.cashbackPct || 1.5) / 100));
 
   const updatedBanks = {
@@ -1283,8 +1284,9 @@ export function chargeCorporateCard(
       ...currentRel,
       corporateCard: {
         ...card,
-        currentBalance: newBalance,
-        minPaymentMonthly: Math.round(newBalance * 0.05)
+        currentBalance: newUsedBalance,
+        availableCredit: newAvailableCredit,
+        minPaymentMonthly: Math.round(newUsedBalance * 0.05)
       }
     }
   };
@@ -1302,7 +1304,7 @@ export function chargeCorporateCard(
       companyCreditProfile: newProfile
     },
     success: true,
-    message: `¡COMPRA APROBADA! Se cargaron L ${amount.toLocaleString()} a tu ${card.brand} por concepto de "${concept}". Cashback acreditado: L ${cashbackEarned.toLocaleString()}. Saldo en tarjeta: L ${newBalance.toLocaleString()}.`
+    message: `¡COMPRA APROBADA! Se cargaron L ${amount.toLocaleString()} a tu ${card.brand} por concepto de "${concept}". Cashback acreditado: L ${cashbackEarned.toLocaleString()}. Saldo utilizado: L ${newUsedBalance.toLocaleString()}. Disponible restante: L ${newAvailableCredit.toLocaleString()}.`
   };
 }
 
@@ -1518,36 +1520,48 @@ export function payCommercialLoan(
 export function payCorporateCreditCard(
   state: DailySimulationState,
   bankId: CommercialBankId,
-  amount: number
+  amount: number,
+  payFromAccount: 'checking' | 'cash' = 'checking'
 ): { updatedState: DailySimulationState; success: boolean; message: string } {
   const currentRel = state.commercialBanks[bankId];
   const card = currentRel?.corporateCard;
   if (!card) return { updatedState: state, success: false, message: 'No dispones de tarjeta con este banco.' };
 
-  const available = state.storeBankBalance + state.storeCash;
-  if (available < amount) {
-    return { updatedState: state, success: false, message: 'Fondos insuficientes para pagar la tarjeta.' };
+  if (amount <= 0) {
+    return { updatedState: state, success: false, message: 'El importe a pagar debe ser mayor a cero.' };
   }
 
-  let newBank = state.storeBankBalance;
-  let newCash = state.storeCash;
-  if (newBank >= amount) {
-    newBank -= amount;
-  } else {
-    const rem = amount - newBank;
-    newBank = 0;
-    newCash = Math.max(0, newCash - rem);
+  if (card.currentBalance <= 0) {
+    return { updatedState: state, success: false, message: 'La tarjeta corporativa no tiene saldo pendiente por pagar.' };
   }
 
-  const newCardBalance = Math.max(0, card.currentBalance - amount);
+  const actualPayment = Math.min(amount, card.currentBalance);
+  const isCash = payFromAccount === 'cash';
+  const availableFunds = isCash ? (state.storeCash || 0) : (state.storeBankBalance || 0);
+
+  if (availableFunds < actualPayment) {
+    return { 
+      updatedState: state, 
+      success: false, 
+      message: `Fondos insuficientes en ${isCash ? 'caja' : 'cuenta bancaria'} para pagar L ${actualPayment.toLocaleString()} (disponible: L ${availableFunds.toLocaleString()}).` 
+    };
+  }
+
+  const newBank = !isCash ? state.storeBankBalance - actualPayment : state.storeBankBalance;
+  const newCash = isCash ? state.storeCash - actualPayment : state.storeCash;
+
+  const newUsedBalance = Math.max(0, card.currentBalance - actualPayment);
+  const newAvailableCredit = Math.min(card.creditLimit, card.creditLimit - newUsedBalance);
+
   const updatedBanks = {
     ...state.commercialBanks,
     [bankId]: {
       ...currentRel,
       corporateCard: {
         ...card,
-        currentBalance: newCardBalance,
-        minPaymentMonthly: Math.round(newCardBalance * 0.05)
+        currentBalance: newUsedBalance,
+        availableCredit: newAvailableCredit,
+        minPaymentMonthly: Math.round(newUsedBalance * 0.05)
       }
     }
   };
@@ -1560,7 +1574,7 @@ export function payCorporateCreditCard(
       commercialBanks: updatedBanks
     },
     success: true,
-    message: `Pago de L ${amount.toLocaleString()} a la tarjeta corporativa procesado. Saldo actual: L ${newCardBalance.toLocaleString()}.`
+    message: `Pago de L ${actualPayment.toLocaleString()} procesado exitosamente. Saldo utilizado restante: L ${newUsedBalance.toLocaleString()}. Disponible restablecido: L ${newAvailableCredit.toLocaleString()}.`
   };
 }
 
@@ -2595,11 +2609,11 @@ export function calculateCreditTermsDisclosure(
     ? 0 
     : Math.round(baseOffer.maxLoanHNL * 0.45);
 
-  // 3. Límite de producto y exposición bancaria CNBS
+  // 3. Límite de producto según multiplicador y límite prudencial no topado a 15M
   const productCapHNL = Math.round(baseOffer.maxLoanHNL * prod.maxAmountMultiplier);
-  const bankExposureLimitHNL = 15000000;
+  const bankExposureLimitHNL = Math.max(100000000, collateralBackedMaxHNL * 1.5);
 
-  // 4. Límite por capacidad de pago real (Requisito 5: ventas reales, costos, planillas, alquileres y deudas)
+  // 4. Límite por capacidad de pago real (basado estrictamente en ventas operativas reales, sin sustitutos de caja)
   const realMonthlySales = state.monthlySalesAccumulated || 0;
   const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + (r.totalHNL ?? 0), 0) * 30;
   const monthlySales = realMonthlySales > 0 ? realMonthlySales : (receiptsSales > 0 ? receiptsSales : 0);
@@ -2607,9 +2621,7 @@ export function calculateCreditTermsDisclosure(
   const existingMonthlyDebt = Object.values(state.commercialBanks || {}).reduce((s, b) => s + (b.activeLoan?.monthlyPayment || 0), 0);
   
   // Flujo operativo neto disponible mensual
-  const netFlow = monthlySales > 0 
-    ? Math.max(0, monthlySales - monthlyOperatingCosts - existingMonthlyDebt)
-    : Math.max(0, ((state.storeBankBalance || 0) + (state.storeCash || 0)) * 0.35 - monthlyOperatingCosts - existingMonthlyDebt);
+  const netFlow = Math.max(0, monthlySales - monthlyOperatingCosts - existingMonthlyDebt);
   
   // Máxima cuota mensual permitida: 40% del flujo neto operativo disponible.
   // Sin mínimo artificial: Si el flujo neto es cero, la capacidad de cuota es cero.
@@ -2623,15 +2635,15 @@ export function calculateCreditTermsDisclosure(
       : maxMonthlyPaymentAllowed * amortizationTerm;
   }
 
-  // 5. Cálculo del Máximo Final Aprobado (Requisito 5)
+  // 5. Cálculo del Máximo Final Aprobado (respaldo real de garantías sin topes artificiales de 15M)
   let finalMaxApprovedHNL: number;
   if (collateralCoverageProvidedHNL > 0) {
     if (prod.requiresCollateral) {
-      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, paymentCapacityMaxHNL, productCapHNL, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, paymentCapacityMaxHNL > 0 ? paymentCapacityMaxHNL : collateralBackedMaxHNL, productCapHNL, bankExposureLimitHNL);
     } else {
       // Las garantías amplían la capacidad de endeudamiento sobre la línea limpia
       const combinedCap = unsecuredLimitHNL + collateralBackedMaxHNL;
-      finalMaxApprovedHNL = Math.min(combinedCap, paymentCapacityMaxHNL, productCapHNL, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(combinedCap, paymentCapacityMaxHNL > 0 ? paymentCapacityMaxHNL : combinedCap, productCapHNL, bankExposureLimitHNL);
     }
   } else {
     // Sin garantías
@@ -2869,7 +2881,7 @@ export function requestFullCommercialCredit(
           updatedState: state,
           success: false,
           disclosure: fallbackDisclosure,
-          message: `La garantía "${col.propertyName}" está gravada al 100%. Presente condiciones revisadas para una nueva confirmación.`
+          message: `La garantía "${col.title}" está gravada al 100%. Presente condiciones revisadas para una nueva confirmación.`
         };
       }
     }

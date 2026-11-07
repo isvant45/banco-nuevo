@@ -739,6 +739,7 @@ export interface TransactionVoucher {
   authStamp: string;
   notes?: string;
   description?: string;
+  disclaimer?: string;
 }
 
 export type EmailCategory = 
