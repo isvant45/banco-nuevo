@@ -6,7 +6,8 @@ import {
   CommercialBankId, 
   CommercialLoanType,
   TransactionVoucher,
-  DynamicBankOffer
+  DynamicBankOffer,
+  BankOfferNegotiationResult
 } from '../../game/retroSimTypes';
 import { CustomAmountInput, formatHNLAmount } from '../common/CustomAmountInput';
 import { 
@@ -15,6 +16,7 @@ import {
   negotiateBankOfferFromEmail, 
   calculateCollateralAvailableCoverage 
 } from '../../game/commercialBanksEngine';
+import { isSimOfferExpired } from '../../game/simCalendar';
 import { sound } from '../../game/audioFx';
 
 interface BusinessEmailWindowProps {
@@ -26,12 +28,12 @@ interface BusinessEmailWindowProps {
   onOpenRegister?: () => void;
   onOpenLoanTerms?: (bankId: CommercialBankId, productType: CommercialLoanType, amount: number, termMonths: number, offerId?: string) => void;
   onPayLoanFromEmail?: (bankId: CommercialBankId, amount: number, payFromAccount: 'checking' | 'cash') => { success: boolean; message: string; remainingBalance?: number };
-  onPaySarFromEmail?: (amount: number, payFromAccount: 'checking' | 'cash') => { success: boolean; message: string; remainingDebt?: number };
+  onPaySarFromEmail?: (amount: number, payFromAccount: 'checking' | 'cash', selectedBankId?: CommercialBankId, emailId?: string, fiscalYear?: number) => { success: boolean; message: string; remainingDebt?: number };
   onOpenWindow?: (windowId: string) => void;
   onViewVoucher?: (voucher: TransactionVoucher) => void;
   onUpdateEmailState?: (emailId: string, updates: Partial<SimulatedEmail>) => void;
   onRespondEmail?: (originalEmail: SimulatedEmail, replyText: string) => void;
-  onNegotiateOffer?: (offerOrId: DynamicBankOffer | string, proposal: { requestedAmount?: number; requestedRate?: number; requestedTerm?: number; requestedFee?: number; collateralIds?: string[]; requestedCollateralIds?: string[] }) => { outcome?: 'aprobado' | 'contraoferta' | 'rechazado'; success?: boolean; reason?: string; message?: string; dialogue?: string; updatedOffer?: DynamicBankOffer };
+  onNegotiateOffer?: (offerOrId: DynamicBankOffer | string, proposal: { requestedAmount?: number; requestedRate?: number; requestedTerm?: number; requestedFee?: number; collateralIds?: string[]; requestedCollateralIds?: string[] }) => BankOfferNegotiationResult;
   onAcceptOfferFromEmail?: (offerOrId: DynamicBankOffer | string, destinationAccount?: 'checking' | 'cash' | CommercialBankId, destinationAccountType?: 'checking' | 'cash', collateralIds?: string[]) => { success: boolean; message: string; voucher?: TransactionVoucher };
 }
 
@@ -72,6 +74,8 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   const [paymentTarget, setPaymentTarget] = useState<{
     type: 'loan' | 'sar' | 'supplier';
     bankId?: CommercialBankId;
+    selectedBankId?: CommercialBankId;
+    fiscalYear?: number;
     title: string;
     amountDue: number;
     accountSource: 'checking' | 'cash';
@@ -92,9 +96,15 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   const [negotiateFee, setNegotiateFee] = useState<number>(1.0);
   const [selectedCollateralsForOffer, setSelectedCollateralsForOffer] = useState<string[]>([]);
   const [negotiationResultFeedback, setNegotiationResultFeedback] = useState<{
-    outcome: 'aprobado' | 'contraoferta' | 'rechazado';
+    outcome: 'aprobado' | 'contraoferta' | 'rechazado' | 'error_tecnico';
     message: string;
   } | null>(null);
+
+  const availableBanksWithAccounts = useMemo(() => {
+    return (Object.keys(state.commercialBanks || {}) as CommercialBankId[]).filter(bId => {
+      return state.commercialBanks[bId]?.checkingAccount !== undefined;
+    });
+  }, [state.commercialBanks]);
 
   // Modal de desembolso y aceptación de oferta
   const [acceptModalOpen, setAcceptModalOpen] = useState<boolean>(false);
@@ -232,9 +242,12 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   ) => {
     sound.playClick();
     setPaymentError(null);
+    const chosenBank = bankId || (availableBanksWithAccounts.length > 0 ? availableBanksWithAccounts[0] : undefined);
     setPaymentTarget({
       type,
-      bankId,
+      bankId: chosenBank,
+      selectedBankId: chosenBank,
+      fiscalYear: state.currentYear || 2026,
       title: title || (type === 'loan' ? 'Pago de Cuota Bancaria' : 'Pago de Impuestos SAR'),
       amountDue,
       accountSource: 'checking'
@@ -275,7 +288,14 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       }
     } else if (paymentTarget.type === 'sar') {
       if (onPaySarFromEmail) {
-        const res = onPaySarFromEmail(directPayAmount, paymentTarget.accountSource);
+        const targetBank = paymentTarget.accountSource === 'checking' ? paymentTarget.selectedBankId : undefined;
+        const res = onPaySarFromEmail(
+          directPayAmount, 
+          paymentTarget.accountSource, 
+          targetBank,
+          selectedEmail?.id,
+          paymentTarget.fiscalYear
+        );
         if (!res.success) {
           setPaymentError(res.message);
           return;
@@ -339,22 +359,56 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       collateralIds: selectedCollateralsForOffer
     };
 
-    let result;
-    if (onNegotiateOffer) {
-      result = onNegotiateOffer(offer, proposal);
-    } else {
-      result = negotiateBankOfferFromEmail(state, offer, proposal);
+    let result: BankOfferNegotiationResult | undefined;
+    try {
+      if (onNegotiateOffer) {
+        result = onNegotiateOffer(offer, proposal);
+      } else {
+        const engineRes = negotiateBankOfferFromEmail(state, offer, proposal);
+        result = {
+          outcome: engineRes.outcome,
+          reason: engineRes.reason,
+          dialogue: engineRes.dialogue,
+          message: engineRes.message,
+          updatedOffer: engineRes.updatedOffer,
+          success: engineRes.outcome !== 'rechazado'
+        };
+      }
+    } catch (err: any) {
+      setNegotiationResultFeedback({
+        outcome: 'error_tecnico',
+        message: `Fallo en el servicio bancario: ${err?.message || 'Error de comunicación'}. Las condiciones pactadas se mantienen sin alteraciones.`
+      });
+      return;
+    }
+
+    if (!result || !result.outcome) {
+      setNegotiationResultFeedback({
+        outcome: 'error_tecnico',
+        message: 'Respuesta inválida del servidor bancario. Las condiciones de la oferta se mantienen sin alteraciones.'
+      });
+      return;
     }
 
     setNegotiationResultFeedback({
-      outcome: result.outcome || 'rechazado',
-      message: result.reason || result.message || 'Evaluación completada.'
+      outcome: result.outcome,
+      message: result.reason || result.message || 'Evaluación crediticia completada.'
     });
+
+    const resultingOffer = result.updatedOffer || offer;
+
+    // Si es contraoferta, actualizar los campos en el drawer para reflejar las nuevas condiciones
+    if (result.outcome === 'contraoferta' && result.updatedOffer) {
+      setNegotiateAmount(result.updatedOffer.amountOrLimitHNL);
+      setNegotiateRate(result.updatedOffer.annualRatePct);
+      setNegotiateTerm(result.updatedOffer.termMonths);
+      setNegotiateFee(result.updatedOffer.openingFeePct);
+    }
 
     if (onUpdateEmailState) {
       onUpdateEmailState(selectedEmail.id, {
-        bankOfferPayload: result.updatedOffer,
-        statusTag: result.outcome === 'aprobado' || result.outcome === 'contraoferta' ? 'Pre-Aprobado' : selectedEmail.statusTag
+        bankOfferPayload: resultingOffer,
+        statusTag: (result.outcome === 'aprobado' || result.outcome === 'contraoferta') ? 'Pre-Aprobado' : selectedEmail.statusTag
       });
     }
 
@@ -380,10 +434,10 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     if (!offerToAccept) return;
     setAcceptError(null);
 
-    // Validar vigencia
-    const isExpired = offerToAccept.expiresDay < state.currentDay && offerToAccept.expiresMonth <= state.currentMonth;
+    // Validar vigencia con simCalendar
+    const isExpired = isSimOfferExpired(state, offerToAccept);
     if (isExpired) {
-      setAcceptError(`La oferta venció el Día ${offerToAccept.expiresDay} y no puede ser contratada.`);
+      setAcceptError(`La oferta venció el Día ${offerToAccept.expiresDay}, Mes ${offerToAccept.expiresMonth} (${offerToAccept.expiresYear || state.currentYear || 2026}) y ya no puede ser contratada.`);
       return;
     }
 
@@ -806,18 +860,18 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                             ? 'bg-blue-100 text-blue-900 border-blue-300'
                             : selectedEmail.bankOfferPayload.status === 'rechazada'
                             ? 'bg-rose-100 text-rose-900 border-rose-300'
-                            : selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth
+                            : isSimOfferExpired(state, selectedEmail.bankOfferPayload)
                             ? 'bg-slate-200 text-slate-700 border-slate-300'
                             : 'bg-amber-100 text-amber-900 border-amber-300'
                         }`}>
-                          Estado: {selectedEmail.bankOfferPayload.status.toUpperCase()}
+                          Estado: {isSimOfferExpired(state, selectedEmail.bankOfferPayload) && selectedEmail.bankOfferPayload.status !== 'aceptada' ? 'VENCIDA' : selectedEmail.bankOfferPayload.status.toUpperCase()}
                         </span>
                       </div>
                       <h3 className="font-black text-sm text-blue-950 mt-1">
                         {selectedEmail.bankOfferPayload.title}
                       </h3>
                       <p className="text-[11px] text-slate-600">
-                        Entidad Emisora: <strong>{COMMERCIAL_BANKS_PROFILES[selectedEmail.bankOfferPayload.bankId]?.name || selectedEmail.bankOfferPayload.bankId}</strong> | Vence el Día {selectedEmail.bankOfferPayload.expiresDay}, Mes {selectedEmail.bankOfferPayload.expiresMonth}
+                        Entidad Emisora: <strong>{COMMERCIAL_BANKS_PROFILES[selectedEmail.bankOfferPayload.bankId]?.name || selectedEmail.bankOfferPayload.bankId}</strong> | Vence el Día {selectedEmail.bankOfferPayload.expiresDay}, Mes {selectedEmail.bankOfferPayload.expiresMonth} ({selectedEmail.bankOfferPayload.expiresYear || state.currentYear || 2026})
                       </p>
                     </div>
                     <span className="text-2xl">🏛️</span>
@@ -879,7 +933,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
 
                     <button
                       onClick={() => handleStartNegotiateOffer(selectedEmail.bankOfferPayload!)}
-                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || (selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth)}
+                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || isSimOfferExpired(state, selectedEmail.bankOfferPayload)}
                       className="px-3 py-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-slate-950 font-bold text-xs border border-amber-700 cursor-pointer active:scale-95"
                     >
                       💬 Negociar Condiciones
@@ -887,7 +941,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
 
                     <button
                       onClick={() => handleOpenAcceptOfferModal(selectedEmail.bankOfferPayload!)}
-                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || (selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth)}
+                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || isSimOfferExpired(state, selectedEmail.bankOfferPayload)}
                       className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:bg-slate-400 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
                     >
                       {selectedEmail.bankOfferPayload.status === 'aceptada' ? 'Oferta Ya Contratada ✅' : 'Aceptar y Desembolsar ✍️'}
@@ -1316,6 +1370,36 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     <span className="text-[10px] text-slate-600">{formatHNLAmount(state.storeCash)}</span>
                   </button>
                 </div>
+
+                {/* Si paga con cuenta corriente, permitir elegir el banco de origen explícitamente */}
+                {paymentTarget.accountSource === 'checking' && availableBanksWithAccounts.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-200">
+                    <label className="block font-bold text-slate-700 text-[11px] mb-1">Seleccionar Banco Emisor:</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {availableBanksWithAccounts.map(bId => {
+                        const bRel = state.commercialBanks[bId];
+                        const bProfile = COMMERCIAL_BANKS_PROFILES[bId];
+                        const isSelected = paymentTarget.selectedBankId === bId;
+                        const bal = bRel?.checkingAccount?.balance ?? 0;
+                        return (
+                          <button
+                            key={bId}
+                            type="button"
+                            onClick={() => setPaymentTarget({ ...paymentTarget, selectedBankId: bId })}
+                            className={`p-1.5 border text-left text-xs cursor-pointer ${
+                              isSelected ? 'bg-blue-100 border-blue-700 ring-1 ring-blue-600 font-bold' : 'bg-white border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span>{bProfile?.shortName || bId}</span>
+                              <span className="font-mono text-[10px] text-slate-700">{formatHNLAmount(bal)}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Campo con CustomAmountInput */}
@@ -1323,7 +1407,13 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 label="Monto a Aplicar (HNL):"
                 value={directPayAmount}
                 onChange={setDirectPayAmount}
-                availableBalance={paymentTarget.accountSource === 'checking' ? state.storeBankBalance : state.storeCash}
+                availableBalance={
+                  paymentTarget.accountSource === 'checking'
+                    ? (paymentTarget.selectedBankId 
+                        ? (state.commercialBanks[paymentTarget.selectedBankId]?.checkingAccount?.balance ?? 0)
+                        : state.storeBankBalance)
+                    : state.storeCash
+                }
                 maxAllowed={paymentTarget.amountDue}
                 minAllowed={1}
                 operationType="pago_cuota"

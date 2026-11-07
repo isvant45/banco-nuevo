@@ -197,8 +197,20 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   // Garantías reales: usar únicamente activos persistidos pertenecientes al prestatario (Requisito 5)
   const collaterals = state.realEstateCollaterals || [];
 
+  const activeOffer = React.useMemo(() => {
+    if (!currentOfferId) return undefined;
+    return (state.dynamicBankOffers || []).find(o => o.id === currentOfferId)
+      || (state.simulatedEmails || []).find(e => e.bankOfferPayload?.id === currentOfferId)?.bankOfferPayload;
+  }, [currentOfferId, state.dynamicBankOffers, state.simulatedEmails]);
+
   // Evaluación en tiempo real de los términos del crédito (Requisito 5 y 6)
   const liveDisclosure = React.useMemo(() => {
+    const customTerms = activeOffer ? {
+      rateAnnualPct: activeOffer.annualRatePct ?? activeOffer.interestRateAnnual,
+      openingFeePct: activeOffer.openingFeePct,
+      offerId: activeOffer.id
+    } : undefined;
+
     return calculateCreditTermsDisclosure(
       state,
       selectedBankId,
@@ -206,9 +218,10 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
       loanAmount,
       loanTermMonths,
       loanGraceMonths,
-      selectedCollateralIds
+      selectedCollateralIds,
+      customTerms
     );
-  }, [state, selectedBankId, selectedProductType, loanAmount, loanTermMonths, loanGraceMonths, selectedCollateralIds]);
+  }, [state, selectedBankId, selectedProductType, loanAmount, loanTermMonths, loanGraceMonths, selectedCollateralIds, activeOffer]);
 
   // Manejo de Solicitud de Desembolso
   const handleOpenDisclosureModal = () => {

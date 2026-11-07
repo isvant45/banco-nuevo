@@ -79,6 +79,9 @@ import {
   orderFromMaterialManufacturer
 } from '../../game/machineryAndSuppliersEngine';
 import { restoreDailySimulationState } from '../../game/savedState';
+import { paySarTaxObligation } from '../../game/sarFiscalEngine';
+import { isSimOfferExpired } from '../../game/simCalendar';
+import { BankOfferNegotiationResult } from '../../game/retroSimTypes';
 import { sound } from '../../game/audioFx';
 import { RetroWindow } from './RetroWindow';
 import { RetroTaskbar, WindowInfo } from './RetroTaskbar';

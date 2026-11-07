@@ -121,16 +121,16 @@ export function restoreDailySimulationState(saved: any): DailySimulationState {
   const retailSector = result.retailSector || 'minimarket';
   const storeBank = result.storeBankBalance ?? 120000;
 
-  if (!result.realEstateCollaterals || result.realEstateCollaterals.length === 0) {
+  if (!Array.isArray(result.realEstateCollaterals)) {
     result.realEstateCollaterals = createDefaultRealEstateCollaterals(storeName, retailSector);
   }
-  if (!result.simulatedEmails || result.simulatedEmails.length === 0) {
+  if (!Array.isArray(result.simulatedEmails)) {
     result.simulatedEmails = createInitialSimulatedEmails(storeName, retailSector, storeBank);
   }
   if (!Array.isArray(result.transactionVouchers)) {
     result.transactionVouchers = [];
   }
-  if (!Array.isArray(result.dynamicBankOffers) || result.dynamicBankOffers.length === 0) {
+  if (!Array.isArray(result.dynamicBankOffers)) {
     result.dynamicBankOffers = (result.simulatedEmails || [])
       .filter((e: any) => e.bankOfferPayload)
       .map((e: any) => e.bankOfferPayload!);

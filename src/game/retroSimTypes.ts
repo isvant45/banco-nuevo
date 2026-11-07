@@ -299,6 +299,14 @@ export interface BankCommercialLoan {
   remainingBalance?: number;
   paidInstallments?: number;
   status?: 'activo' | 'al_dia' | 'en_mora' | 'cancelado' | 'reestructurado';
+  contractedOfferId?: string;
+  contractedTerms?: {
+    amount: number;
+    rate: number;
+    fee: number;
+    term: number;
+  };
+  openingFeePct?: number;
 }
 
 export type CorporateCardTierId = 'business_standard' | 'corporate_gold' | 'infinite_black';
@@ -762,6 +770,7 @@ export interface DynamicBankOffer {
   estimatedMonthlyPaymentHNL: number;
   expiresDay: number;
   expiresMonth: number;
+  expiresYear?: number;
   isPreApproved: boolean;
   status: 'disponible' | 'en_negociacion' | 'aceptada' | 'rechazada' | 'vencida' | 'vigente' | 'negociando' | 'expirada';
   negotiatedRateDiscountPct?: number;
@@ -787,6 +796,17 @@ export interface DynamicBankOffer {
   }[];
   acceptedDate?: string;
   disbursedVoucherId?: string;
+}
+
+export type NegotiationOutcome = 'aprobado' | 'contraoferta' | 'rechazado';
+
+export interface BankOfferNegotiationResult {
+  outcome: NegotiationOutcome;
+  reason: string;
+  message?: string;
+  dialogue?: string;
+  updatedOffer?: DynamicBankOffer;
+  success?: boolean;
 }
 
 export interface SimulatedEmail {

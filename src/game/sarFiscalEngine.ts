@@ -122,63 +122,106 @@ export function paySarTaxObligation(
   state: DailySimulationState,
   amountToPay: number,
   payFromAccount: 'checking' | 'cash' | 'cuenta_bancaria' | 'caja' = 'checking',
-  selectedBankId?: CommercialBankId
-): { updatedState: DailySimulationState; success: boolean; message: string; voucher?: TransactionVoucher } {
-  if (amountToPay <= 0) {
-    return { updatedState: state, success: false, message: 'El importe a pagar debe ser mayor a cero.' };
+  selectedBankId?: CommercialBankId,
+  options?: {
+    emailId?: string;
+    fiscalYear?: number;
+    obligationType?: string;
+    paymentKey?: string;
   }
-
-  const period = getOrCreateCurrentFiscalPeriod(state);
-  const remainingDebt = period.isPaid ? 0 : Math.max(0, period.calculatedTaxAmount - period.paidAmountHNL);
-
-  const pendingRecord = state.sarTaxRecord?.pendingTaxDue ?? remainingDebt;
-  const effectiveDebt = Math.max(remainingDebt, pendingRecord);
-
-  if (effectiveDebt <= 0 && state.sarTaxRecord?.isPaid) {
-    return { updatedState: state, success: false, message: 'No existen saldos pendientes de pago para este periodo fiscal.' };
-  }
-
-  const actualPayment = Math.min(amountToPay, effectiveDebt > 0 ? effectiveDebt : amountToPay);
-
-  const isCash = payFromAccount === 'cash' || payFromAccount === 'caja';
-
-  // Verificar fondos disponibles
-  const availableFunds = isCash ? state.storeCash : state.storeBankBalance;
-  if (availableFunds < actualPayment) {
-    return {
-      updatedState: state,
-      success: false,
-      message: `Fondos insuficientes en ${isCash ? 'caja chica' : 'cuenta bancaria'} para realizar el pago al SAR. Disponibles: L ${availableFunds.toLocaleString()}.`
+): { updatedState: DailySimulationState; success: boolean; message: string; voucher?: TransactionVoucher; remainingDebt: number } {
+  // 1. Validar importe positivo y finito
+  if (!Number.isFinite(amountToPay) || amountToPay <= 0) {
+    return { 
+      updatedState: state, 
+      success: false, 
+      message: 'El importe a pagar debe ser un valor numérico positivo y válido.',
+      remainingDebt: state.sarTaxRecord?.pendingTaxDue ?? 0
     };
   }
 
-  const newPeriodPaidAmount = period.paidAmountHNL + actualPayment;
-  const isFullyPaid = newPeriodPaidAmount >= period.calculatedTaxAmount;
-  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
-  const receiptNumber = `SAR-BOL-${state.currentYear || 2026}-${Math.floor(100000 + Math.random() * 900000)}`;
+  // 2. Identificar período fiscal exacto (sin inventar deudas)
+  const targetYear = options?.fiscalYear || state.currentYear || 2026;
+  const existingPeriod = (state.fiscalPeriods || []).find(p => p.fiscalYear === targetYear);
+  const period = existingPeriod || getOrCreateCurrentFiscalPeriod(state);
 
-  // Actualizar fondos
+  const pendingPeriodDebt = period.isPaid ? 0 : Math.max(0, period.calculatedTaxAmount - (period.paidAmountHNL || 0));
+  const effectiveDebt = pendingPeriodDebt > 0 
+    ? pendingPeriodDebt 
+    : (state.sarTaxRecord?.pendingTaxDue && targetYear === (state.currentYear || 2026) ? state.sarTaxRecord.pendingTaxDue : 0);
+
+  if (effectiveDebt <= 0) {
+    return { 
+      updatedState: state, 
+      success: false, 
+      message: `No existen saldos pendientes de pago para el ejercicio fiscal ${targetYear}. La obligación ya se encuentra liquidada.`,
+      remainingDebt: 0
+    };
+  }
+
+  const actualPayment = Math.min(amountToPay, effectiveDebt);
+  const isCash = payFromAccount === 'cash' || payFromAccount === 'caja';
+
+  // 3. Validar fondos suficientes en la cuenta de origen seleccionada
   let newCash = state.storeCash;
   let newBank = state.storeBankBalance;
   let updatedCommercialBanks = { ...state.commercialBanks };
+  let sourceAccountLabel = 'Caja Chica (Efectivo)';
+  let selectedBankName = 'Caja Chica';
 
-  if (payFromAccount === 'cash') {
-    newCash -= actualPayment;
-  } else {
-    newBank -= actualPayment;
-    // Si se especificó banco o buscar el primer banco con saldo
-    const bankKey = selectedBankId || (Object.keys(updatedCommercialBanks)[0] as CommercialBankId);
-    if (bankKey && updatedCommercialBanks[bankKey]?.checkingAccount) {
-      const chk = updatedCommercialBanks[bankKey].checkingAccount!;
-      updatedCommercialBanks[bankKey] = {
-        ...updatedCommercialBanks[bankKey],
-        checkingAccount: {
-          ...chk,
-          balance: Math.max(0, chk.balance - actualPayment)
-        }
+  if (isCash) {
+    if (state.storeCash < actualPayment) {
+      return {
+        updatedState: state,
+        success: false,
+        message: `Fondos insuficientes en Caja Chica para realizar el pago al SAR. Saldo disponible: L ${state.storeCash.toLocaleString()}, Importe requerido: L ${actualPayment.toLocaleString()}.`,
+        remainingDebt: effectiveDebt
       };
     }
+    newCash -= actualPayment;
+  } else {
+    // Para pagos en cuenta, no elegir silenciosamente: exigir o validar el banco seleccionado
+    if (!selectedBankId) {
+      return {
+        updatedState: state,
+        success: false,
+        message: 'Debe seleccionar explícitamente la cuenta bancaria de origen para autorizar el débito tributario al SAR.',
+        remainingDebt: effectiveDebt
+      };
+    }
+
+    const bankRel = state.commercialBanks[selectedBankId];
+    const checkingBalance = bankRel?.checkingAccount?.balance ?? 0;
+    const bankProfile = bankRel ? state.commercialBanks[selectedBankId] : undefined;
+
+    if (checkingBalance < actualPayment) {
+      return {
+        updatedState: state,
+        success: false,
+        message: `Fondos insuficientes en la cuenta corriente de ${selectedBankId.toUpperCase()}. Saldo disponible: L ${checkingBalance.toLocaleString()}, Importe requerido: L ${actualPayment.toLocaleString()}.`,
+        remainingDebt: effectiveDebt
+      };
+    }
+
+    newBank -= actualPayment;
+    const currentChk = bankRel.checkingAccount!;
+    updatedCommercialBanks[selectedBankId] = {
+      ...bankRel,
+      checkingAccount: {
+        ...currentChk,
+        balance: currentChk.balance - actualPayment
+      }
+    };
+    sourceAccountLabel = `Cuenta Corriente ${selectedBankId.toUpperCase()} (${currentChk.accountNumber})`;
+    selectedBankName = selectedBankId.toUpperCase();
   }
+
+  // 4. Actualizar la obligación exacta del período fiscal
+  const newPeriodPaidAmount = (period.paidAmountHNL || 0) + actualPayment;
+  const newRemainingDebt = Math.max(0, period.calculatedTaxAmount - newPeriodPaidAmount);
+  const isFullyPaid = newRemainingDebt === 0;
+  const timestampStr = `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`;
+  const receiptNumber = `SAR-BOL-${state.currentYear || 2026}-${Math.floor(100000 + Math.random() * 900000)}`;
 
   const updatedPeriod: SarFiscalPeriodRecord = {
     ...period,
@@ -193,31 +236,83 @@ export function paySarTaxObligation(
     ? currentPeriods.map(p => p.fiscalYear === updatedPeriod.fiscalYear ? updatedPeriod : p)
     : [...currentPeriods, updatedPeriod];
 
-  // Generar Comprobante Oficial de Pago Tributario
+  // 5. Generar Comprobante Oficial de Pago Tributario
   const voucher: TransactionVoucher = {
     id: `vch-sar-${Date.now()}`,
     voucherNumber: receiptNumber,
     operationType: 'pago_impuesto_sar',
-    title: 'Boleta de Liquidación de Impuesto Sobre la Renta (SAR)',
+    title: `Boleta Oficial de Pago Tributario SAR (Ejercicio ${targetYear})`,
     timestamp: timestampStr,
     simDay: state.currentDay,
     simMonth: state.currentMonth,
     simYear: state.currentYear || 2026,
     companyName: state.storeName,
-    accountNumber: payFromAccount === 'checking' ? 'Cuenta Corriente Empresarial' : 'Caja Chica',
+    accountNumber: sourceAccountLabel,
     destinationAccountNumber: 'TESORERÍA GENERAL DE LA REPÚBLICA (TGR-SAR)',
     grossAmountHNL: actualPayment,
     deductionsHNL: 0,
     netDisbursedOrPaidHNL: actualPayment,
-    priorBalanceHNL: availableFunds,
-    newBalanceHNL: availableFunds - actualPayment,
-    loanBalancePriorHNL: remainingDebt,
-    loanBalanceNewHNL: remainingDebt - actualPayment,
+    priorBalanceHNL: effectiveDebt,
+    newBalanceHNL: newRemainingDebt,
+    loanBalancePriorHNL: effectiveDebt,
+    loanBalanceNewHNL: newRemainingDebt,
     referenceCode: `SAR-TX-${Math.floor(100000 + Math.random() * 900000)}`,
-    authStamp: `SAR-VALID-ISR-${state.currentYear || 2026}`
+    authStamp: `SAR-VALID-ISR-${state.currentYear || 2026}`,
+    disclaimer: 'Simulación Financiera y Fiscal - Sin Validez Legal Oficial'
   };
 
-  // Generar correo de confirmación de pago
+  // 6. Actualizar ÚNICAMENTE los avisos y correos relacionados con esta obligación
+  const targetEmailId = options?.emailId;
+  const updatedEmails = (state.simulatedEmails || []).map(em => {
+    // Si se especificó el email ID, actualizar solo ese
+    if (targetEmailId && em.id === targetEmailId) {
+      if (isFullyPaid) {
+        return {
+          ...em,
+          isResolved: true,
+          statusTag: 'Resuelto' as const,
+          actionRequired: false
+        };
+      } else {
+        return {
+          ...em,
+          statusTag: 'Pendiente' as const,
+          paymentNoticePayload: em.paymentNoticePayload ? {
+            ...em.paymentNoticePayload,
+            amountDueHNL: newRemainingDebt
+          } : undefined
+        };
+      }
+    }
+
+    // Si no se pasó emailId, actualizar solo el correo que coincida con el formulario o año fiscal
+    if (!targetEmailId && em.category === 'sar_tributario') {
+      const isMatchingNotice = em.relatedEntityId === period.declarationFormNumber || em.subject.includes(String(targetYear));
+      if (isMatchingNotice) {
+        if (isFullyPaid) {
+          return {
+            ...em,
+            isResolved: true,
+            statusTag: 'Resuelto' as const,
+            actionRequired: false
+          };
+        } else {
+          return {
+            ...em,
+            statusTag: 'Pendiente' as const,
+            paymentNoticePayload: em.paymentNoticePayload ? {
+              ...em.paymentNoticePayload,
+              amountDueHNL: newRemainingDebt
+            } : undefined
+          };
+        }
+      }
+    }
+
+    return em;
+  });
+
+  // Generar correo de confirmación de pago para la bitácora
   const paymentEmail: SimulatedEmail = {
     id: `email-sar-pay-${Date.now()}`,
     category: 'sar_tributario',
@@ -226,7 +321,7 @@ export function paySarTaxObligation(
     recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
     companyName: state.storeName,
     subject: `Recibo de Pago Acreditado: Boleta SAR No. ${receiptNumber} (L ${actualPayment.toLocaleString()})`,
-    body: `Comprobante de Pago Oficial - SAR Honduras:\n\nSe ha acreditado satisfactoriamente el pago de su obligación tributaria de ISR:\n\n• Monto Pagado: L ${actualPayment.toLocaleString()}\n• Boleta Oficial No.: ${receiptNumber}\n• Medio de Pago: ${payFromAccount === 'checking' ? 'Débito en Cuenta Bancaria' : 'Efectivo en Ventanilla'}\n• Saldo Tributario Restante del Ejercicio: L ${(remainingDebt - actualPayment).toLocaleString()}\n• Estado de Liquidación: ${isFullyPaid ? '100% CANCELADO Y AL DÍA' : 'ABONO PARCIAL APLICADO'}\n\n${isFullyPaid ? 'Su empresa se encuentra ahora habilitada para solicitar la Constancia de Solvencia Fiscal.' : ''}`,
+    body: `Comprobante de Pago Oficial - SAR Honduras:\n\nSe ha acreditado satisfactoriamente el pago de su obligación tributaria de ISR (Ejercicio ${targetYear}):\n\n• Monto Pagado: L ${actualPayment.toLocaleString()}\n• Boleta Oficial No.: ${receiptNumber}\n• Medio de Pago: ${sourceAccountLabel}\n• Saldo Tributario Restante del Ejercicio ${targetYear}: L ${newRemainingDebt.toLocaleString()}\n• Estado de Liquidación: ${isFullyPaid ? '100% CANCELADO Y AL DÍA' : 'ABONO PARCIAL APLICADO'}\n\n${isFullyPaid ? 'Su empresa se encuentra ahora habilitada para solicitar la Constancia de Solvencia Fiscal del ejercicio.' : ''}\n\n[Simulación Financiera y Fiscal - Sin Validez Legal Oficial]`,
     sentDate: timestampStr,
     simDay: state.currentDay,
     simMonth: state.currentMonth,
@@ -240,25 +335,34 @@ export function paySarTaxObligation(
     voucherPayload: voucher
   };
 
+  // 7. Evaluar elegibilidad general de solvencia fiscal
+  const allCurrentPeriodsPaid = nextPeriods.every(p => p.isPaid || (p.calculatedTaxAmount - p.paidAmountHNL <= 0));
+
+  const updatedState: DailySimulationState = {
+    ...state,
+    storeCash: newCash,
+    storeBankBalance: newBank,
+    commercialBanks: updatedCommercialBanks,
+    fiscalPeriods: nextPeriods,
+    transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
+    simulatedEmails: [paymentEmail, ...updatedEmails],
+    sarTaxRecord: {
+      ...state.sarTaxRecord,
+      pendingTaxDue: newRemainingDebt,
+      isrTaxAmount: newRemainingDebt,
+      isPaid: allCurrentPeriodsPaid,
+      totalTaxPaidYtd: (state.sarTaxRecord?.totalTaxPaidYtd || 0) + actualPayment
+    }
+  };
+
   return {
-    updatedState: {
-      ...state,
-      storeCash: newCash,
-      storeBankBalance: newBank,
-      commercialBanks: updatedCommercialBanks,
-      fiscalPeriods: nextPeriods,
-      transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
-      simulatedEmails: [paymentEmail, ...(state.simulatedEmails || [])],
-      sarTaxRecord: {
-        ...state.sarTaxRecord,
-        pendingTaxDue: Math.max(0, (state.sarTaxRecord?.pendingTaxDue ?? period.calculatedTaxAmount) - actualPayment),
-        isrTaxAmount: Math.max(0, period.calculatedTaxAmount - newPeriodPaidAmount),
-        isPaid: isFullyPaid || Math.max(0, (state.sarTaxRecord?.pendingTaxDue ?? period.calculatedTaxAmount) - actualPayment) === 0
-      }
-    },
+    updatedState,
     success: true,
-    message: `¡Pago de L ${actualPayment.toLocaleString()} acreditado al SAR! Boleta No. ${receiptNumber}.`,
-    voucher
+    message: isFullyPaid
+      ? `¡Obligación fiscal SAR del ejercicio ${targetYear} cancelada al 100%! Boleta No. ${receiptNumber}. Saldo L 0.00.`
+      : `¡Abono parcial de L ${actualPayment.toLocaleString()} acreditado al SAR! Saldo pendiente: L ${newRemainingDebt.toLocaleString()}. Boleta No. ${receiptNumber}.`,
+    voucher,
+    remainingDebt: newRemainingDebt
   };
 }
 

@@ -22,6 +22,7 @@ import {
   CollateralLien,
   DynamicBankOffer
 } from './retroSimTypes';
+import { isSimOfferExpired, advanceSimCalendar } from './simCalendar';
 
 /**
  * Perfiles Institucionales de los Bancos Comerciales de Honduras
@@ -2539,6 +2540,9 @@ export interface CreditTermsDisclosure {
   selectedCollateralIds?: string[];
   collateralCoverageRequiredForApprovedHNL?: number;
   effectiveInterestRateAnnual?: number;
+  limitingConstraint: 'flujo_disponible' | 'garantias' | 'limite_producto' | 'exposicion_bancaria' | 'ninguna';
+  openingFeePct: number;
+  isFromNegotiatedOffer?: boolean;
 }
 
 export function calculateCreditTermsDisclosure(
@@ -2548,18 +2552,30 @@ export function calculateCreditTermsDisclosure(
   requestedAmount: number,
   termMonths: number,
   gracePeriodMonths: number = 0,
-  collateralAssetId?: string | string[]
+  collateralAssetId?: string | string[],
+  customTerms?: {
+    rateAnnualPct?: number;
+    openingFeePct?: number;
+    offerId?: string;
+  }
 ): CreditTermsDisclosure {
   const capacity = evaluateContractorEconomicCapacity(state);
   const bankProfile = COMMERCIAL_BANKS_PROFILES[bankId];
   const prod = COMMERCIAL_LOAN_PRODUCTS[productType] || COMMERCIAL_LOAN_PRODUCTS.capital_trabajo;
-  const baseOffer = capacity.offersByBank[bankId];
+  const baseOffer = capacity.offersByBank[bankId] || { maxLoanHNL: 1000000 };
 
-  // Tasa de interés calculada con política del banco y perfil
-  const rateNominal = Math.max(6.5, Number((bankProfile.baseInterestRateLoan + prod.rateSpreadPct - capacity.creditProfile.rateDiscountPct).toFixed(2)));
+  // Tasa de interés calculada con política del banco o términos acordados en oferta negociada
+  const rateNominal = customTerms?.rateAnnualPct !== undefined
+    ? customTerms.rateAnnualPct
+    : Math.max(6.5, Number((bankProfile.baseInterestRateLoan + prod.rateSpreadPct - capacity.creditProfile.rateDiscountPct).toFixed(2)));
   const rateEffective = Number((Math.pow(1 + (rateNominal / 100 / 12), 12) - 1) * 100).toFixed(2);
   const monthlyRate = rateNominal / 100 / 12;
   const amortizationTerm = Math.max(1, termMonths - gracePeriodMonths);
+
+  // Comisión de apertura pactada o de producto
+  const effectiveOpeningFeePct = customTerms?.openingFeePct !== undefined
+    ? customTerms.openingFeePct
+    : prod.openingFeePct;
 
   // 1. Cobertura neta de las garantías seleccionadas (Requisito 5)
   const normalizedCollateralIds = Array.isArray(collateralAssetId) 
@@ -2583,7 +2599,7 @@ export function calculateCreditTermsDisclosure(
   const productCapHNL = Math.round(baseOffer.maxLoanHNL * prod.maxAmountMultiplier);
   const bankExposureLimitHNL = 15000000;
 
-  // 4. Límite por capacidad de pago real (Requisito 6: ventas reales, gastos operativos y deudas)
+  // 4. Límite por capacidad de pago real (Requisito 5: ventas reales, costos, planillas, alquileres y deudas)
   const realMonthlySales = state.monthlySalesAccumulated || 0;
   const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + (r.totalHNL ?? 0), 0) * 30;
   const monthlySales = realMonthlySales > 0 ? realMonthlySales : (receiptsSales > 0 ? receiptsSales : 0);
@@ -2595,12 +2611,19 @@ export function calculateCreditTermsDisclosure(
     ? Math.max(0, monthlySales - monthlyOperatingCosts - existingMonthlyDebt)
     : Math.max(0, ((state.storeBankBalance || 0) + (state.storeCash || 0)) * 0.35 - monthlyOperatingCosts - existingMonthlyDebt);
   
-  // Máxima cuota mensual permitida: 40% del flujo neto operativo disponible
-  const maxMonthlyPaymentAllowed = Math.max(1500, Math.round(netFlow * 0.40));
-  const paymentCapacityMaxHNL = Math.round((maxMonthlyPaymentAllowed * (1 - Math.pow(1 + monthlyRate, -amortizationTerm))) / monthlyRate);
+  // Máxima cuota mensual permitida: 40% del flujo neto operativo disponible.
+  // Sin mínimo artificial: Si el flujo neto es cero, la capacidad de cuota es cero.
+  let maxMonthlyPaymentAllowed = 0;
+  let paymentCapacityMaxHNL = 0;
+
+  if (netFlow > 0) {
+    maxMonthlyPaymentAllowed = Math.round(netFlow * 0.40);
+    paymentCapacityMaxHNL = monthlyRate > 0
+      ? Math.round((maxMonthlyPaymentAllowed * (1 - Math.pow(1 + monthlyRate, -amortizationTerm))) / monthlyRate)
+      : maxMonthlyPaymentAllowed * amortizationTerm;
+  }
 
   // 5. Cálculo del Máximo Final Aprobado (Requisito 5)
-  // Para crédito garantizado, calcular el monto con las restricciones aplicables sin dejar como techo automático el límite no garantizado
   let finalMaxApprovedHNL: number;
   if (collateralCoverageProvidedHNL > 0) {
     if (prod.requiresCollateral) {
@@ -2621,8 +2644,28 @@ export function calculateCreditTermsDisclosure(
 
   const approvedAmount = Math.max(0, Math.min(requestedAmount, finalMaxApprovedHNL));
 
+  // Identificar qué restricción limita el crédito:
+  // • flujo_disponible | garantias | limite_producto | exposicion_bancaria | ninguna
+  let limitingConstraint: 'flujo_disponible' | 'garantias' | 'limite_producto' | 'exposicion_bancaria' | 'ninguna' = 'ninguna';
+
+  if (approvedAmount >= requestedAmount && requestedAmount > 0) {
+    limitingConstraint = 'ninguna';
+  } else if (prod.requiresCollateral && collateralCoverageProvidedHNL === 0) {
+    limitingConstraint = 'garantias';
+  } else if (paymentCapacityMaxHNL <= finalMaxApprovedHNL && paymentCapacityMaxHNL < requestedAmount) {
+    limitingConstraint = 'flujo_disponible';
+  } else if (collateralCoverageProvidedHNL > 0 && collateralBackedMaxHNL <= finalMaxApprovedHNL && collateralBackedMaxHNL < requestedAmount) {
+    limitingConstraint = 'garantias';
+  } else if (productCapHNL <= finalMaxApprovedHNL && productCapHNL < requestedAmount) {
+    limitingConstraint = 'limite_producto';
+  } else if (bankExposureLimitHNL <= finalMaxApprovedHNL && bankExposureLimitHNL < requestedAmount) {
+    limitingConstraint = 'exposicion_bancaria';
+  } else if (!prod.requiresCollateral && collateralCoverageProvidedHNL === 0 && unsecuredLimitHNL <= finalMaxApprovedHNL && unsecuredLimitHNL < requestedAmount) {
+    limitingConstraint = 'garantias';
+  }
+
   // Comisiones y seguros sobre el monto aprobado
-  const openingFee = Math.round(approvedAmount * (prod.openingFeePct / 100));
+  const openingFee = Math.round(approvedAmount * (effectiveOpeningFeePct / 100));
   const annualInsurance = Math.round(approvedAmount * (prod.annualInsurancePct / 100));
   const netDisbursement = approvedAmount - openingFee;
 
@@ -2662,18 +2705,24 @@ export function calculateCreditTermsDisclosure(
 
   // 6. Explicación precisa y pedagógica del motivo del límite (Requisito 6)
   let limitReasonExplanation = '';
-  if (approvedAmount >= requestedAmount) {
+  if (approvedAmount >= requestedAmount && requestedAmount > 0) {
     limitReasonExplanation = `Aprobado íntegro: Tu perfil crediticio, flujo operativo disponible y coberturas aportadas respaldan el monto solicitado de L ${requestedAmount.toLocaleString()}.`;
-  } else if (collateralCoverageProvidedHNL === 0 && prod.requiresCollateral) {
-    limitReasonExplanation = `El producto "${prod.name}" exige garantía hipotecaria/prendaria obligatoria con cobertura mínima del ${prod.requiredCollateralCoveragePct}%. Selecciona garantías reales elegibles para aprobar el financiamiento.`;
-  } else if (collateralCoverageProvidedHNL > 0 && collateralBackedMaxHNL >= requestedAmount && paymentCapacityMaxHNL < requestedAmount) {
-    limitReasonExplanation = `La garantía respalda el monto solicitado (L ${Math.min(requestedAmount, collateralBackedMaxHNL).toLocaleString()}), pero tu flujo disponible solo permite una cuota de L ${monthlyPayment.toLocaleString()}/mes, limitando el crédito a L ${approvedAmount.toLocaleString()}.`;
-  } else if (collateralCoverageProvidedHNL > 0 && collateralBackedMaxHNL < requestedAmount && paymentCapacityMaxHNL >= collateralBackedMaxHNL) {
-    limitReasonExplanation = `Tu capacidad de pago permite mayor financiamiento, pero la cobertura neta aportada (L ${collateralCoverageProvidedHNL.toLocaleString()}) solo respalda hasta L ${collateralBackedMaxHNL.toLocaleString()} al ratio exigido del ${prod.requiredCollateralCoveragePct}%.`;
-  } else if (collateralCoverageProvidedHNL === 0 && requestedAmount > unsecuredLimitHNL) {
-    limitReasonExplanation = `Límite sin garantía alcanzado (L ${unsecuredLimitHNL.toLocaleString()}). Para solicitar hasta L ${requestedAmount.toLocaleString()}, vincula una o más garantías reales (inmuebles o maquinaria).`;
+  } else if (monthlySales === 0 && (state.storeBankBalance || 0) + (state.storeCash || 0) <= 0) {
+    limitReasonExplanation = `Empresa nueva sin historial de ventas ni reservas líquidas verificables: la capacidad de cuota mensual es L 0/mes (flujo_disponible). Se requiere generar ventas operativas o constituir depósitos previos.`;
+  } else if (limitingConstraint === 'flujo_disponible') {
+    limitReasonExplanation = `Capacidad de pago insuficiente (flujo_disponible): Tu flujo operativo neto mensual (L ${netFlow.toLocaleString()}) solo permite una cuota máxima de L ${maxMonthlyPaymentAllowed.toLocaleString()}/mes, limitando el monto a L ${paymentCapacityMaxHNL.toLocaleString()}.`;
+  } else if (limitingConstraint === 'garantias') {
+    if (prod.requiresCollateral && collateralCoverageProvidedHNL === 0) {
+      limitReasonExplanation = `Garantías requeridas (garantias): El producto "${prod.name}" exige garantía hipotecaria/prendaria obligatoria con cobertura mínima del ${prod.requiredCollateralCoveragePct}%. Selecciona garantías reales elegibles.`;
+    } else {
+      limitReasonExplanation = `Garantías insuficientes (garantias): La cobertura neta aportada (L ${collateralCoverageProvidedHNL.toLocaleString()}) solo respalda hasta L ${collateralBackedMaxHNL.toLocaleString()} al ratio exigido del ${prod.requiredCollateralCoveragePct}%. Vincula garantías adicionales.`;
+    }
+  } else if (limitingConstraint === 'limite_producto') {
+    limitReasonExplanation = `Techo de producto alcanzado (limite_producto): El producto "${prod.name}" tiene un tope reglamentario de L ${productCapHNL.toLocaleString()} para la categoría actual de la empresa.`;
+  } else if (limitingConstraint === 'exposicion_bancaria') {
+    limitReasonExplanation = `Exposición bancaria CNBS (exposicion_bancaria): Se ha alcanzado el límite prudencial de concentración crediticia con ${bankProfile.name} (L ${bankExposureLimitHNL.toLocaleString()}).`;
   } else {
-    limitReasonExplanation = `El monto ha sido ajustado a L ${approvedAmount.toLocaleString()} por límites prudenciales de exposición del banco y capacidad de endeudamiento.`;
+    limitReasonExplanation = `El monto ha sido ajustado a L ${approvedAmount.toLocaleString()} por límites prudenciales de capacidad de pago y garantías reales.`;
   }
 
   // Impacto en flujo de caja
@@ -2713,9 +2762,13 @@ export function calculateCreditTermsDisclosure(
     bankExposureLimitHNL,
     finalMaxApprovedHNL,
     limitReasonExplanation,
-    selectedCollateralIds: normalizedCollateralIds
+    selectedCollateralIds: normalizedCollateralIds,
+    limitingConstraint,
+    openingFeePct: effectiveOpeningFeePct,
+    isFromNegotiatedOffer: !!customTerms?.offerId
   };
 }
+
 
 // =========================================================================
 // SOLICITUD Y DESEMBOLSO DE CUALQUIERA DE LOS PRODUCTOS DE CRÉDITO
@@ -2734,33 +2787,104 @@ export function requestFullCommercialCredit(
   destinationAccountType: 'checking' | 'cash' = 'checking',
   offerId?: string
 ): { updatedState: DailySimulationState; success: boolean; message: string; disclosure: CreditTermsDisclosure; voucher?: TransactionVoucher } {
-  const disclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
   const bank = COMMERCIAL_BANKS_PROFILES[bankId];
 
-  // Si proviene de una oferta pre-aprobada, validar vigencia y estado único de contratación (Requisito 3)
+  // Si proviene de una oferta pre-aprobada, validar contra el estado central (Requisitos 2 y 4)
+  let customTerms: { rateAnnualPct?: number; openingFeePct?: number; offerId?: string } | undefined;
+  let effectiveCollateralIds = collateralId 
+    ? (Array.isArray(collateralId) ? collateralId : [collateralId])
+    : [];
+
   if (offerId) {
-    const existingOffer = (state.dynamicBankOffers || []).find(o => o.id === offerId) 
+    const centralOffer = (state.dynamicBankOffers || []).find(o => o.id === offerId) 
       || (state.simulatedEmails || []).find(e => e.bankOfferPayload?.id === offerId)?.bankOfferPayload;
 
-    if (existingOffer) {
-      if (existingOffer.status === 'aceptada') {
+    if (!centralOffer) {
+      const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
+      return {
+        updatedState: state,
+        success: false,
+        disclosure: fallbackDisclosure,
+        message: 'La oferta comercial no fue localizada en el registro oficial del banco o ya no es válida.'
+      };
+    }
+
+    if (centralOffer.bankId !== bankId) {
+      const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
+      return {
+        updatedState: state,
+        success: false,
+        disclosure: fallbackDisclosure,
+        message: `Inconsistencia de entidad: La oferta pre-aprobada corresponde a ${centralOffer.bankId} y no a ${bankId}.`
+      };
+    }
+
+    if (centralOffer.status === 'aceptada') {
+      const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
+      return {
+        updatedState: state,
+        success: false,
+        disclosure: fallbackDisclosure,
+        message: 'Esta oferta pre-aprobada ya fue contratada y desembolsada anteriormente. No se puede contratar dos veces.'
+      };
+    }
+
+    if (centralOffer.status === 'vencida' || isSimOfferExpired(state, centralOffer)) {
+      const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, collateralId);
+      return {
+        updatedState: state,
+        success: false,
+        disclosure: fallbackDisclosure,
+        message: `Esta oferta pre-aprobada venció el Día ${centralOffer.expiresDay}, Mes ${centralOffer.expiresMonth} (${centralOffer.expiresYear || state.currentYear || 2026}) y ya no se encuentra vigente para contratación.`
+      };
+    }
+
+    // Usar términos negociados acordados
+    customTerms = {
+      rateAnnualPct: centralOffer.annualRatePct ?? centralOffer.interestRateAnnual,
+      openingFeePct: centralOffer.openingFeePct,
+      offerId: centralOffer.id
+    };
+
+    if (effectiveCollateralIds.length === 0 && centralOffer.linkedCollateralIds && centralOffer.linkedCollateralIds.length > 0) {
+      effectiveCollateralIds = centralOffer.linkedCollateralIds;
+    }
+
+    // Verificar que las garantías acordadas sigan disponibles y no hayan sido transferidas o bloqueadas
+    for (const cid of effectiveCollateralIds) {
+      const col = (state.realEstateCollaterals || []).find(c => c.id === cid);
+      if (!col) {
+        const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, effectiveCollateralIds, customTerms);
         return {
           updatedState: state,
           success: false,
-          disclosure,
-          message: 'Esta oferta pre-aprobada ya fue contratada y desembolsada anteriormente. No se puede contratar dos veces.'
+          disclosure: fallbackDisclosure,
+          message: `La garantía real ID "${cid}" ya no está disponible en su patrimonio. Se requiere revisar y confirmar las condiciones actualizadas.`
         };
       }
-      if (existingOffer.status === 'vencida' || (existingOffer.expiresDay < state.currentDay && existingOffer.expiresMonth <= state.currentMonth)) {
+      const avail = calculateCollateralAvailableCoverage(col);
+      if (avail <= 0 && col.isLockedForSale) {
+        const fallbackDisclosure = calculateCreditTermsDisclosure(state, bankId, productType, requestedAmount, termMonths, gracePeriodMonths, effectiveCollateralIds, customTerms);
         return {
           updatedState: state,
           success: false,
-          disclosure,
-          message: `Esta oferta pre-aprobada venció el Día ${existingOffer.expiresDay} y ya no se encuentra vigente para contratación.`
+          disclosure: fallbackDisclosure,
+          message: `La garantía "${col.propertyName}" está gravada al 100%. Presente condiciones revisadas para una nueva confirmación.`
         };
       }
     }
   }
+
+  const disclosure = calculateCreditTermsDisclosure(
+    state, 
+    bankId, 
+    productType, 
+    requestedAmount, 
+    termMonths, 
+    gracePeriodMonths, 
+    effectiveCollateralIds, 
+    customTerms
+  );
 
   // Prevenir deuda activa duplicada en el mismo banco
   const currentRel = state.commercialBanks[bankId] || {
@@ -2779,7 +2903,7 @@ export function requestFullCommercialCredit(
     };
   }
 
-  // Validaciones estrictas
+  // Validaciones estrictas de capacidad y cobertura
   if (requestedAmount > disclosure.approvedAmountHNL) {
     return {
       updatedState: state,
@@ -2814,13 +2938,21 @@ export function requestFullCommercialCredit(
     purpose: purpose || disclosure.productConfig.name,
     loanType: productType,
     gracePeriodMonthsRemaining: gracePeriodMonths,
-    collateralIdRef: Array.isArray(collateralId) ? collateralId[0] : collateralId,
+    collateralIdRef: effectiveCollateralIds.length > 0 ? effectiveCollateralIds[0] : undefined,
     amortizedPrincipalTotal: 0,
     revolvingLimit: productType === 'linea_revolvente' ? disclosure.approvedAmountHNL : undefined,
-    revolvingDrawn: productType === 'linea_revolvente' ? 0 : undefined
+    revolvingDrawn: productType === 'linea_revolvente' ? 0 : undefined,
+    contractedOfferId: offerId,
+    contractedTerms: {
+      amount: disclosure.approvedAmountHNL,
+      rate: disclosure.annualNominalRatePct,
+      fee: disclosure.openingFeePct,
+      term: termMonths
+    },
+    openingFeePct: disclosure.openingFeePct
   };
 
-  // Desembolso neto = Monto aprobado menos deducción de comisión de apertura (1.5%)
+  // Desembolso neto = Monto aprobado menos deducción de comisión de apertura acordada
   const netCashReceived = disclosure.netDisbursementHNL;
 
   // Determinar acreditación según cuenta seleccionada (Requisito 3)
@@ -2873,16 +3005,15 @@ export function requestFullCommercialCredit(
   }
 
   // Vincular y pignorar todas las garantías seleccionadas de forma conjunta (Requisitos 5 y 7)
-  const normalizedIds = Array.isArray(collateralId) ? collateralId : (collateralId ? [collateralId] : []);
   let updatedCollaterals = state.realEstateCollaterals || [];
   const targetRequiredCoverage = disclosure.requiredCollateralValueHNL > 0
     ? disclosure.requiredCollateralValueHNL
     : (disclosure.collateralCoverageRequiredForApprovedHNL || disclosure.approvedAmountHNL);
   let remainingCoverageToAllocate = targetRequiredCoverage;
 
-  if (normalizedIds.length > 0) {
+  if (effectiveCollateralIds.length > 0) {
     updatedCollaterals = updatedCollaterals.map(col => {
-      if (!normalizedIds.includes(col.id)) return col;
+      if (!effectiveCollateralIds.includes(col.id)) return col;
       if (remainingCoverageToAllocate <= 0) return col;
 
       const available = calculateCollateralAvailableCoverage(col);
@@ -2949,7 +3080,7 @@ export function requestFullCommercialCredit(
     netDisbursedOrPaidHNL: netCashReceived,
     netDisbursement: netCashReceived,
     deductionsBreakdown: [
-      { concept: 'Comisión Bancaria de Apertura (1.5%)', amountHNL: disclosure.openingFeeHNL }
+      { concept: `Comisión Bancaria de Apertura (${disclosure.openingFeePct}%)`, amountHNL: disclosure.openingFeeHNL }
     ],
     priorBalanceHNL: isCashDestination ? state.storeCash : priorCheckingBalance,
     newBalanceHNL: isCashDestination ? state.storeCash + netCashReceived : newCheckingBalance,
@@ -2957,7 +3088,8 @@ export function requestFullCommercialCredit(
     loanBalancePriorHNL: 0,
     loanBalanceNewHNL: disclosure.approvedAmountHNL,
     referenceCode: `CR-${bankId.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`,
-    authStamp: `BCH-DISB-${state.currentYear || 2026}-${Date.now().toString().slice(-6)}`
+    authStamp: `BCH-DISB-${state.currentYear || 2026}-${Date.now().toString().slice(-6)}`,
+    disclaimer: 'Simulación Financiera y Fiscal - Sin Validez Legal Oficial'
   };
 
   // Correo institucional al buzón de la empresa
@@ -2970,7 +3102,7 @@ export function requestFullCommercialCredit(
     recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
     companyName: state.storeName,
     subject: `Acreditación Confirmada: Desembolso ${disclosure.productConfig.name} (L ${netCashReceived.toLocaleString()})`,
-    body: `Aviso de Acreditación de Fondos:\n\nNos complace informarle que ${bank.name} ha efectuado el desembolso de su crédito comercial:\n\n• Monto Aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()}\n• Deducción Comisión de Apertura (1.5%): -L ${disclosure.openingFeeHNL.toLocaleString()}\n• Desembolso Neto Acreditado: L ${netCashReceived.toLocaleString()}\n• Destino de Fondos: ${isCashDestination ? 'Caja Chica en Efectivo' : `${targetBank.name} (${targetCheckingAccNum})`}\n• Cuota Mensual Pactada: L ${disclosure.monthlyPaymentHNL.toLocaleString()}/mes al ${disclosure.annualNominalRatePct}% anual.\n• Plazo de Amortización: ${termMonths} meses\n\nEl comprobante digital ha quedado registrado en su bitácora financiera.`,
+    body: `Aviso de Acreditación de Fondos:\n\nNos complace informarle que ${bank.name} ha efectuado el desembolso de su crédito comercial:\n\n• Monto Aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()}\n• Deducción Comisión de Apertura (${disclosure.openingFeePct}%): -L ${disclosure.openingFeeHNL.toLocaleString()}\n• Desembolso Neto Acreditado: L ${netCashReceived.toLocaleString()}\n• Destino de Fondos: ${isCashDestination ? 'Caja Chica en Efectivo' : `${targetBank.name} (${targetCheckingAccNum})`}\n• Cuota Mensual Pactada: L ${disclosure.monthlyPaymentHNL.toLocaleString()}/mes al ${disclosure.annualNominalRatePct}% anual.\n• Plazo de Amortización: ${termMonths} meses\n\nEl comprobante digital ha quedado registrado en su bitácora financiera.\n\n[Simulación Financiera y Fiscal - Sin Validez Legal Oficial]`,
     sentDate: timestampStr,
     simDay: state.currentDay,
     simMonth: state.currentMonth,
@@ -3035,7 +3167,7 @@ export function requestFullCommercialCredit(
     success: true,
     disclosure,
     voucher,
-    message: `¡FINANCIAMIENTO DESEMBOLSADO! ${bank.name} acreditó L ${netCashReceived.toLocaleString()} en ${isCashDestination ? 'Caja Chica' : `tu cuenta de ${targetBank.name}`}. Monto aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()} (Comisión 1.5% deducida: L ${disclosure.openingFeeHNL.toLocaleString()}). Comprobante No. ${voucherNum}.`
+    message: `¡FINANCIAMIENTO DESEMBOLSADO! ${bank.name} acreditó L ${netCashReceived.toLocaleString()} en ${isCashDestination ? 'Caja Chica' : `tu cuenta de ${targetBank.name}`}. Monto aprobado: L ${disclosure.approvedAmountHNL.toLocaleString()} (Comisión ${disclosure.openingFeePct}% deducida: L ${disclosure.openingFeeHNL.toLocaleString()}). Comprobante No. ${voucherNum}.`
   };
 }
 
@@ -4678,6 +4810,7 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
     const monthlyRate = rate / 100 / 12;
     const cuota = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -term)));
 
+    const expAtl = advanceSimCalendar(state.currentDay, state.currentMonth, state.currentYear || 2026, 15);
     const offer: DynamicBankOffer = {
       id: 'offer_atl_capital',
       bankId: 'atlantida',
@@ -4690,8 +4823,9 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
       openingFeePct: 1.5,
       requiresCollateral: false,
       estimatedMonthlyPaymentHNL: cuota,
-      expiresDay: state.currentDay + 15,
-      expiresMonth: state.currentMonth,
+      expiresDay: expAtl.day,
+      expiresMonth: expAtl.month,
+      expiresYear: expAtl.year,
       isPreApproved: true,
       status: 'disponible'
     };
@@ -4723,6 +4857,7 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
   // Oferta 2: BAC Credomatic - Tarjeta Infinite Black si liquidez >= L 500,000
   if (totalLiquidity >= 500000 && !currentOffers.some(o => o.id === 'offer_bac_card')) {
     const cardLimit = 450000;
+    const expBac = advanceSimCalendar(state.currentDay, state.currentMonth, state.currentYear || 2026, 20);
     const offer: DynamicBankOffer = {
       id: 'offer_bac_card',
       bankId: 'bac',
@@ -4735,8 +4870,9 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
       openingFeePct: 0,
       requiresCollateral: false,
       estimatedMonthlyPaymentHNL: Math.round(cardLimit * 0.05),
-      expiresDay: state.currentDay + 20,
-      expiresMonth: state.currentMonth,
+      expiresDay: expBac.day,
+      expiresMonth: expBac.month,
+      expiresYear: expBac.year,
       isPreApproved: true,
       status: 'disponible'
     };
@@ -4768,6 +4904,7 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
   // Oferta 3: Banco de Occidente - DPF Step-Up con Bonificación de Tasa si liquidez >= L 300,000
   if (totalLiquidity >= 300000 && !currentOffers.some(o => o.id === 'offer_occ_dpf')) {
     const invAmount = 200000;
+    const expOcc = advanceSimCalendar(state.currentDay, state.currentMonth, state.currentYear || 2026, 30);
     const offer: DynamicBankOffer = {
       id: 'offer_occ_dpf',
       bankId: 'occidente',
@@ -4780,8 +4917,9 @@ export function evaluateAndGenerateBankOffers(state: DailySimulationState): Dail
       openingFeePct: 0,
       requiresCollateral: false,
       estimatedMonthlyPaymentHNL: Math.round((invAmount * 0.085) / 12),
-      expiresDay: state.currentDay + 30,
-      expiresMonth: state.currentMonth,
+      expiresDay: expOcc.day,
+      expiresMonth: expOcc.month,
+      expiresYear: expOcc.year,
       isPreApproved: true,
       status: 'disponible'
     };
@@ -4901,6 +5039,59 @@ export function negotiateBankOfferFromEmail(
   const reqTerm = proposal.requestedTerm ?? offer.termMonths;
   const reqFee = proposal.requestedFee ?? offer.openingFeePct;
   const selectedCollateralIds = proposal.collateralIds || proposal.requestedCollateralIds || [];
+
+  // Validar vigencia de la oferta antes de negociar
+  if (isSimOfferExpired(state, offer)) {
+    const expiredRecord = {
+      date: timestampStr,
+      requestedAmount: reqAmount,
+      requestedRate: reqRate,
+      requestedTerm: reqTerm,
+      requestedFee: reqFee,
+      bankResponse: 'rechazado' as const,
+      reason: `La oferta venció el Día ${offer.expiresDay}, Mes ${offer.expiresMonth} (${offer.expiresYear || state.currentYear || 2026}) y ya no se encuentra vigente para negociación.`,
+      offeredAmount: currentOfferAmount,
+      offeredRate: currentOfferRate,
+      offeredTerm: offer.termMonths,
+      offeredFee: offer.openingFeePct
+    };
+    return {
+      updatedState: state,
+      outcome: 'rechazado',
+      reason: `La oferta venció el Día ${offer.expiresDay}, Mes ${offer.expiresMonth} (${offer.expiresYear || state.currentYear || 2026}) y ya no se encuentra vigente para negociación.`,
+      dialogue: `Dictamen de Riesgo (${bank.name}): No es posible evaluar una propuesta de negociación sobre una oferta comercial caducada.`,
+      message: 'Oferta vencida.',
+      updatedOffer: { ...offer, status: 'vencida' },
+      negotiationRecord: expiredRecord
+    };
+  }
+
+  // Validar si ya fue contratada
+  if (offer.status === 'aceptada') {
+    const acceptedRecord = {
+      date: timestampStr,
+      requestedAmount: reqAmount,
+      requestedRate: reqRate,
+      requestedTerm: reqTerm,
+      requestedFee: reqFee,
+      bankResponse: 'rechazado' as const,
+      reason: 'Esta oferta comercial ya fue aceptada y desembolsada anteriormente.',
+      offeredAmount: currentOfferAmount,
+      offeredRate: currentOfferRate,
+      offeredTerm: offer.termMonths,
+      offeredFee: offer.openingFeePct
+    };
+    return {
+      updatedState: state,
+      outcome: 'rechazado',
+      reason: 'Esta oferta comercial ya fue aceptada y desembolsada formalmente.',
+      dialogue: `Dictamen de Riesgo (${bank.name}): La operación ya fue ejecutada y se encuentra activa en el libro mayor.`,
+      message: 'Oferta ya contratada.',
+      updatedOffer: offer,
+      negotiationRecord: acceptedRecord
+    };
+  }
+
 
   const { totalCoverageHNL } = evaluateSelectedCollateralsCoverage(state, selectedCollateralIds);
   const prod = COMMERCIAL_LOAN_PRODUCTS[offer.productType] || COMMERCIAL_LOAN_PRODUCTS.capital_trabajo;
