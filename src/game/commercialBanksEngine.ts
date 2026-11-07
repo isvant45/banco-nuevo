@@ -394,7 +394,7 @@ export function evaluateContractorEconomicCapacity(state: DailySimulationState):
   const activeContractsValue = (state.activeWorks || []).reduce((sum, w) => sum + (w.totalContractPrice - w.billedMilestonesAmount), 0);
   // Ventas reales acumuladas o registradas en caja (sin inflaciones ficticias mínimas)
   const realSales = state.monthlySalesAccumulated || 0;
-  const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + r.totalHNL, 0) * 30;
+  const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + (r.totalHNL ?? 0), 0) * 30;
   const monthlySales = realSales > 0 ? realSales : (receiptsSales > 0 ? receiptsSales : 0);
 
   // Gastos operativos y obligaciones de crédito existentes
@@ -2585,7 +2585,7 @@ export function calculateCreditTermsDisclosure(
 
   // 4. Límite por capacidad de pago real (Requisito 6: ventas reales, gastos operativos y deudas)
   const realMonthlySales = state.monthlySalesAccumulated || 0;
-  const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + r.totalHNL, 0) * 30;
+  const receiptsSales = (state.dailyReceipts || []).reduce((sum, r) => sum + (r.totalHNL ?? 0), 0) * 30;
   const monthlySales = realMonthlySales > 0 ? realMonthlySales : (receiptsSales > 0 ? receiptsSales : 0);
   const monthlyOperatingCosts = ((state.dailyWages || 0) + (state.dailyRent || 0)) * 30;
   const existingMonthlyDebt = Object.values(state.commercialBanks || {}).reduce((s, b) => s + (b.activeLoan?.monthlyPayment || 0), 0);

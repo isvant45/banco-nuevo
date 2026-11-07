@@ -4,7 +4,15 @@ import { GoogleGenAI } from '@google/genai';
 import path from 'path';
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+function getPort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const val = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(val)) return val;
+  }
+  return 3000;
+}
+const PORT = getPort();
 
 app.use(express.json());
 
@@ -152,7 +160,10 @@ Por favor evalúa y responde en formato JSON válido.`
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -163,8 +174,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Aureo Bank Sim] Servidor activo en puerto ${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[Aureo Bank Sim] Puerto ${PORT} en uso, esperando liberación...`);
+    } else {
+      console.error('[Aureo Bank Sim] Error en servidor:', err);
+    }
   });
 }
 

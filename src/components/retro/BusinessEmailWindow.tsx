@@ -254,7 +254,8 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
           setPaymentError(res.message);
           return;
         }
-        if (res.remainingBalance <= 0) {
+        const remainingBal = res.remainingBalance ?? 0;
+        if (remainingBal <= 0) {
           if (selectedEmail && onUpdateEmailState) {
             onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
           }
@@ -265,11 +266,11 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
               statusTag: 'Pendiente',
               paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
                 ...selectedEmail.paymentNoticePayload,
-                amountDueHNL: res.remainingBalance
+                amountDueHNL: remainingBal
               } : undefined
             });
           }
-          setPaymentSuccessFeedback(`Abono aplicado. Saldo deudor restante: L ${res.remainingBalance.toLocaleString()}.`);
+          setPaymentSuccessFeedback(`Abono aplicado. Saldo deudor restante: L ${remainingBal.toLocaleString()}.`);
         }
       }
     } else if (paymentTarget.type === 'sar') {
@@ -279,7 +280,8 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
           setPaymentError(res.message);
           return;
         }
-        if (res.remainingDebt <= 0) {
+        const remainingD = res.remainingDebt ?? 0;
+        if (remainingD <= 0) {
           if (selectedEmail && onUpdateEmailState) {
             onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
           }
@@ -290,11 +292,11 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
               statusTag: 'Pendiente',
               paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
                 ...selectedEmail.paymentNoticePayload,
-                amountDueHNL: res.remainingDebt
+                amountDueHNL: remainingD
               } : undefined
             });
           }
-          setPaymentSuccessFeedback(`Abono al SAR aplicado. Saldo fiscal pendiente: L ${res.remainingDebt.toLocaleString()}.`);
+          setPaymentSuccessFeedback(`Abono al SAR aplicado. Saldo fiscal pendiente: L ${remainingD.toLocaleString()}.`);
         }
       }
     }
@@ -345,8 +347,8 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     }
 
     setNegotiationResultFeedback({
-      outcome: result.outcome,
-      message: result.reason
+      outcome: result.outcome || 'rechazado',
+      message: result.reason || result.message || 'Evaluación completada.'
     });
 
     if (onUpdateEmailState) {
@@ -392,7 +394,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     }
 
     if (onAcceptOfferFromEmail) {
-      const res = onAcceptOfferFromEmail(offerToAccept, acceptDestinationAccount, offerToAccept.linkedCollateralIds);
+      const res = onAcceptOfferFromEmail(offerToAccept, acceptDestinationAccount, acceptDestinationAccount, offerToAccept.linkedCollateralIds);
       if (!res.success) {
         setAcceptError(res.message);
         return;

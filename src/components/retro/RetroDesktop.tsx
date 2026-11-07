@@ -8,7 +8,8 @@ import {
   ConstructionMaterialId,
   CommercialLoanType,
   TransactionVoucher,
-  SimulatedEmail
+  SimulatedEmail,
+  DynamicBankOffer
 } from '../../game/retroSimTypes';
 import { 
   SECTOR_DEFAULT_PRODUCTS, 
@@ -583,7 +584,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     productType: CommercialLoanType,
     amount: number,
     termMonths: number,
-    offerId: string
+    offerId?: string
   ) => {
     sound.playClick();
     setPreloadedLoan({
@@ -591,7 +592,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       productType,
       amount,
       termMonths,
-      offerId
+      offerId: offerId || ''
     });
     bringToFront('bancos_comerciales');
   };
@@ -599,19 +600,21 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   const handleRespondEmail = (originalEmail: SimulatedEmail, replyText: string) => {
     const replyEmail: SimulatedEmail = {
       id: `reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      daySent: simState.currentDay,
-      monthSent: simState.currentMonth,
-      fromName: `${entityName} (Tú)`,
-      fromAddress: `gerencia@${entityName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
-      toName: originalEmail.fromName,
-      toAddress: originalEmail.fromAddress,
+      simDay: simState.currentDay,
+      simMonth: simState.currentMonth,
+      simYear: simState.currentYear,
+      senderName: `${entityName} (Tú)`,
+      senderEmail: `gerencia@${entityName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+      recipient: originalEmail.senderName || originalEmail.sender,
+      recipientEmail: originalEmail.senderEmail,
       subject: originalEmail.subject.startsWith('RE:') ? originalEmail.subject : `RE: ${originalEmail.subject}`,
       category: originalEmail.category,
       body: replyText,
       isRead: true,
+      isStarred: false,
       isArchived: false,
       folder: 'sent',
-      dateFormatted: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 09:30 AM`
+      sentDate: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 09:30 AM`
     };
 
     setSimState(prev => ({
@@ -625,25 +628,25 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     bankId: CommercialBankId,
     amount: number,
     sourceAccount: 'checking' | 'cash'
-  ): { success: boolean; message: string } => {
-    const res = payCommercialLoan(simState, bankId, amount, false, sourceAccount);
+  ): { success: boolean; message: string; remainingBalance?: number } => {
+    const res = payCommercialLoan(simState, bankId, amount, sourceAccount);
     if (res.success) {
       setSimState(res.updatedState);
       sound.playApprovalStamp();
       if (res.voucher) {
         setActiveVoucherModal(res.voucher);
       }
-      return { success: true, message: res.message };
+      return { success: true, message: res.message, remainingBalance: res.remainingBalance };
     } else {
       sound.playRejectBuzzer();
-      return { success: false, message: res.message };
+      return { success: false, message: res.message, remainingBalance: res.remainingBalance };
     }
   };
 
   const handlePaySarFromEmail = (
     amount: number,
     sourceAccount: 'checking' | 'cash'
-  ): { success: boolean; message: string } => {
+  ): { success: boolean; message: string; remainingDebt?: number } => {
     const sarRecord = simState.sarTaxRecord || DEFAULT_INITIAL_SAR_RECORD;
     const isCash = sourceAccount === 'cash';
     const availableFunds = isCash ? simState.storeCash : simState.storeBankBalance;
@@ -681,29 +684,37 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       }
     }
 
+    const currentTaxDebt = sarRecord.pendingTaxDue ?? sarRecord.isrTaxAmount ?? amount;
+    const newTaxDebt = Math.max(0, currentTaxDebt - amount);
+
     const updatedSar = {
       ...sarRecord,
-      totalTaxPaidYtd: sarRecord.totalTaxPaidYtd + amount,
-      sarAuditRiskScore: Math.max(0, sarRecord.sarAuditRiskScore - 15),
-      sarNoticesPending: Math.max(0, sarRecord.sarNoticesPending - 1),
+      totalTaxPaidYtd: (sarRecord.totalTaxPaidYtd || 0) + amount,
+      pendingTaxDue: newTaxDebt,
+      isPaid: newTaxDebt <= 0,
+      sarAuditRiskScore: Math.max(0, (sarRecord.sarAuditRiskScore || 0) - 15),
+      sarNoticesPending: Math.max(0, (sarRecord.sarNoticesPending || 0) - 1),
       lastAuditResult: `Pago de impuestos por L ${amount.toLocaleString()} efectuado con éxito mediante correo/SAR.`
     };
 
     const voucher: TransactionVoucher = {
       id: `vouc_sar_${Date.now()}`,
-      day: simState.currentDay,
-      month: simState.currentMonth,
-      bankId: 'atlantida',
-      bankName: 'Servicio de Administración de Rentas (SAR)',
+      voucherNumber: `SAR-VOUC-${Math.floor(100000 + Math.random() * 900000)}`,
+      simDay: simState.currentDay,
+      simMonth: simState.currentMonth,
+      simYear: simState.currentYear,
+      companyName: entityName,
       operationType: 'pago_prestamo',
       title: 'COMPROBANTE OFICIAL DE PAGO TRIBUTARIO SAR',
-      grossAmount: amount,
-      feeDeducted: 0,
-      netAmount: amount,
-      targetAccountNumber: 'TRIB-SAR-2026-HN',
-      timestampFormatted: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 10:00 AM`,
-      status: 'aprobado',
-      authCode: `SAR-${Math.floor(100000 + Math.random() * 900000)}`
+      grossAmountHNL: amount,
+      deductionsHNL: 0,
+      netDisbursedOrPaidHNL: amount,
+      priorBalanceHNL: currentTaxDebt,
+      newBalanceHNL: newTaxDebt,
+      referenceCode: `REF-SAR-${Math.floor(100000 + Math.random() * 900000)}`,
+      authStamp: 'SELLO DIGITAL SAR - MINISTERIO DE FINANZAS',
+      destinationAccountNumber: 'TRIB-SAR-2026-HN',
+      timestamp: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 10:00 AM`
     };
 
     const updatedEmails = (simState.simulatedEmails || []).map(em => {
@@ -725,28 +736,37 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
     sound.playApprovalStamp();
     setActiveVoucherModal(voucher);
-    return { success: true, message: `¡Pago a SAR por L ${amount.toLocaleString()} procesado exitosamente! Comprobante oficial emitido.` };
+    return { 
+      success: true, 
+      message: `¡Pago a SAR por L ${amount.toLocaleString()} procesado exitosamente! Comprobante oficial emitido.`,
+      remainingDebt: newTaxDebt
+    };
   };
 
   const handleNegotiateOffer = (
-    offerId: string,
-    counterOffer: {
+    offerOrId: string | DynamicBankOffer,
+    proposal: {
       requestedAmount?: number;
       requestedRate?: number;
       requestedTerm?: number;
       requestedFee?: number;
+      collateralIds?: string[];
       requestedCollateralIds?: string[];
     }
   ) => {
-    const res = negotiateBankOfferFromEmail(simState, offerId, counterOffer);
+    const offerId = typeof offerOrId === 'string' ? offerOrId : offerOrId.id;
+    const res = negotiateBankOfferFromEmail(simState, offerId, {
+      ...proposal,
+      requestedCollateralIds: proposal.collateralIds || proposal.requestedCollateralIds
+    });
     setSimState(res.updatedState);
-    if (res.outcome === 'aprobada' || res.outcome === 'contraoferta') {
+    if (res.outcome === 'aprobado' || res.outcome === 'contraoferta') {
       sound.playApprovalStamp();
     } else {
       sound.playRejectBuzzer();
     }
     return {
-      success: res.outcome !== 'rechazada',
+      success: res.outcome !== 'rechazado',
       message: res.message,
       dialogue: res.dialogue,
       updatedOffer: res.updatedOffer
@@ -754,29 +774,39 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   };
 
   const handleAcceptOfferFromEmail = (
-    offerId: string,
-    destinationBankId?: CommercialBankId,
-    destinationAccountType: 'checking' | 'cash' = 'checking'
+    offerOrId: DynamicBankOffer | string,
+    destinationAccount?: 'checking' | 'cash' | CommercialBankId,
+    destinationAccountType: 'checking' | 'cash' = 'checking',
+    collateralIds?: string[]
   ) => {
-    const offer = (simState.dynamicBankOffers || []).find(o => o.id === offerId)
+    const offerId = typeof offerOrId === 'string' ? offerOrId : offerOrId.id;
+    const offer = (typeof offerOrId === 'object' ? offerOrId : null)
+      || (simState.dynamicBankOffers || []).find(o => o.id === offerId)
       || (simState.simulatedEmails || []).find(e => e.bankOfferPayload?.id === offerId)?.bankOfferPayload;
 
     if (!offer) {
       return { success: false, message: 'Oferta no encontrada.' };
     }
 
-    const targetBank = destinationBankId || offer.bankId;
+    const targetBank = (destinationAccount && destinationAccount !== 'checking' && destinationAccount !== 'cash')
+      ? (destinationAccount as CommercialBankId)
+      : (offer.bankId);
+
+    const actualAccountType = (destinationAccount === 'checking' || destinationAccount === 'cash')
+      ? destinationAccount
+      : destinationAccountType;
+
     const res = requestFullCommercialCredit(
       simState,
       offer.bankId,
       offer.productType,
-      offer.approvedAmount,
+      offer.approvedAmount || offer.amountOrLimitHNL,
       offer.termMonths,
       `Línea de crédito desembolsada desde oferta pre-aprobada ${offerId}`,
       0,
-      offer.linkedCollateralIds,
+      collateralIds || offer.linkedCollateralIds,
       targetBank,
-      destinationAccountType,
+      actualAccountType,
       offerId
     );
 
@@ -789,6 +819,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     } else {
       sound.playRejectBuzzer();
     }
+
     return {
       success: res.success,
       message: res.message,

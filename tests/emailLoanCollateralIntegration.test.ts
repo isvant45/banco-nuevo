@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { 
-  evaluateContractorEconomicCapacity,
   calculateCreditTermsDisclosure,
   calculateCollateralAvailableCoverage,
   evaluateSelectedCollateralsCoverage,
@@ -14,7 +13,7 @@ import {
   createInitialSimulatedEmails
 } from '../src/game/commercialBanksEngine';
 import { restoreDailySimulationState } from '../src/game/savedState';
-import { DailySimulationState, RealEstateCollateralItem, DynamicBankOffer } from '../src/game/retroSimTypes';
+import { DailySimulationState, DynamicBankOffer } from '../src/game/retroSimTypes';
 import { DEFAULT_CONSTRUCTION_MATERIALS, DEFAULT_INITIAL_SAR_RECORD } from '../src/game/constructionEngine';
 
 function createMockIntegrationState(overrides: Partial<DailySimulationState> = {}): DailySimulationState {
@@ -97,6 +96,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
   describe('Requisito 2: Regla de conteo, lectura y archivado', () => {
     it('calcula unread count considerando únicamente inbox, no leídos y no archivados', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.simulatedEmails && state.simulatedEmails.length > 0);
       const initialCount = getInboxUnreadCount(state.simulatedEmails);
       assert.ok(initialCount > 0, 'Debe haber correos no leídos al inicio');
 
@@ -128,10 +128,12 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
 
     it('conserva el estado de leído y archivado tras restaurar la partida (persistencia)', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.simulatedEmails && state.simulatedEmails.length >= 2);
       state.simulatedEmails[0].isRead = true;
       state.simulatedEmails[1].isArchived = true;
 
       const restored = restoreDailySimulationState(state);
+      assert.ok(restored.simulatedEmails && restored.simulatedEmails.length >= 2);
       assert.strictEqual(restored.simulatedEmails[0].isRead, true, 'El primer correo debe seguir leído');
       assert.strictEqual(restored.simulatedEmails[1].isArchived, true, 'El segundo correo debe seguir archivado');
       assert.strictEqual(getInboxUnreadCount(restored.simulatedEmails), getInboxUnreadCount(state.simulatedEmails));
@@ -144,18 +146,18 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
   describe('Requisito 3: Ofertas preaprobadas y prevención de doble desembolso', () => {
     it('desembolsa una oferta preaprobada válida a la cuenta seleccionada y emite comprobante', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.simulatedEmails);
       const offerEmail = state.simulatedEmails.find(e => e.bankOfferPayload);
       assert.ok(offerEmail, 'Debe existir un correo con oferta preaprobada inicial');
       const offer = offerEmail.bankOfferPayload!;
 
       const initialBankBalance = state.commercialBanks[offer.bankId]?.checkingAccount?.balance || 0;
-      const initialTotalDebt = state.commercialBanks[offer.bankId]?.activeLoan?.balanceRemaining || 0;
 
       const res = requestFullCommercialCredit(
         state,
         offer.bankId,
         offer.productType,
-        offer.approvedAmount,
+        offer.approvedAmount || offer.amountOrLimitHNL,
         offer.termMonths,
         'Desembolso de oferta inicial',
         0,
@@ -171,9 +173,11 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       // Verificar actualización de saldo neto y deuda
       const newBankBalance = res.updatedState.commercialBanks[offer.bankId]?.checkingAccount?.balance || 0;
       assert.strictEqual(newBankBalance, initialBankBalance + res.disclosure.netDisbursementHNL);
-      assert.strictEqual(res.updatedState.commercialBanks[offer.bankId]?.activeLoan?.balanceRemaining, offer.approvedAmount);
+      assert.strictEqual(res.updatedState.commercialBanks[offer.bankId]?.activeLoan?.balanceRemaining, offer.approvedAmount || offer.amountOrLimitHNL);
 
       // Verificar que la oferta quedó marcada como aceptada
+      assert.ok(res.updatedState.dynamicBankOffers);
+      assert.ok(res.updatedState.simulatedEmails);
       const updatedOfferInState = res.updatedState.dynamicBankOffers.find(o => o.id === offer.id)
         || res.updatedState.simulatedEmails.find(e => e.bankOfferPayload?.id === offer.id)?.bankOfferPayload;
       assert.strictEqual(updatedOfferInState?.status, 'aceptada');
@@ -183,7 +187,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         res.updatedState,
         offer.bankId,
         offer.productType,
-        offer.approvedAmount,
+        offer.approvedAmount || offer.amountOrLimitHNL,
         offer.termMonths,
         'Intento de doble desembolso',
         0,
@@ -198,6 +202,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
 
     it('permite desembolsar en efectivo de caja chica cuando el usuario lo elige', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.simulatedEmails);
       const offerEmail = state.simulatedEmails.find(e => e.bankOfferPayload);
       assert.ok(offerEmail);
       const offer = offerEmail.bankOfferPayload!;
@@ -207,7 +212,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         state,
         offer.bankId,
         offer.productType,
-        offer.approvedAmount,
+        offer.approvedAmount || offer.amountOrLimitHNL,
         offer.termMonths,
         'Desembolso en efectivo',
         0,
@@ -227,11 +232,17 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         id: 'offer_expired_test',
         bankId: 'atlantida',
         productType: 'capital_trabajo',
+        title: 'Préstamo Capital Trabajo',
+        amountOrLimitHNL: 300000,
         approvedAmount: 300000,
+        annualRatePct: 11.5,
         interestRateAnnual: 11.5,
         termMonths: 24,
         openingFeePct: 1.5,
+        requiresCollateral: false,
         requiredCollateralPct: 0,
+        estimatedMonthlyPaymentHNL: 14000,
+        isPreApproved: true,
         expiresDay: 10,
         expiresMonth: 2,
         status: 'vencida',
@@ -264,18 +275,21 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
   describe('Requisito 4: Negociación de ofertas desde correo', () => {
     it('permite contraofertar menor tasa y mayor plazo y registra la propuesta', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.simulatedEmails);
       const offerEmail = state.simulatedEmails.find(e => e.bankOfferPayload);
       assert.ok(offerEmail);
       const offer = offerEmail.bankOfferPayload!;
 
+      const currentRate = offer.interestRateAnnual || offer.annualRatePct || 12.0;
       const res = negotiateBankOfferFromEmail(state, offer.id, {
-        requestedRate: offer.interestRateAnnual - 1.0,
+        requestedRate: currentRate - 1.0,
         requestedTerm: offer.termMonths + 6
       });
 
       assert.ok(res.dialogue.length > 0, 'Debe generar un diálogo del comité de crédito');
-      assert.ok(res.outcome === 'aprobada' || res.outcome === 'aprobado' || res.outcome === 'contraoferta', 'Debe resolverse favorablemente con buen perfil');
+      assert.ok(res.outcome === 'aprobado' || res.outcome === 'contraoferta', 'Debe resolverse favorablemente con buen perfil');
 
+      assert.ok(res.updatedState.dynamicBankOffers);
       const updatedOffer = res.updatedState.dynamicBankOffers.find(o => o.id === offer.id);
       assert.ok(updatedOffer);
       assert.strictEqual(updatedOffer.status, 'en_negociacion');
@@ -290,6 +304,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         dailyWages: 6000,
         dailyRent: 2000
       });
+      assert.ok(state.simulatedEmails);
       const offerEmail = state.simulatedEmails.find(e => e.bankOfferPayload);
       assert.ok(offerEmail);
       const offer = offerEmail.bankOfferPayload!;
@@ -300,7 +315,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         requestedRate: 2.0
       });
 
-      assert.ok(res.outcome === 'rechazada' || res.outcome === 'rechazado');
+      assert.ok(res.outcome === 'rechazado');
       assert.match(res.dialogue, /Comité de Riesgos|Riesgo Crediticio|DENEGADO|rechaz/i);
     });
   });
@@ -333,12 +348,13 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         dailyWages: 2000,
         dailyRent: 1000
       });
+      assert.ok(state.realEstateCollaterals && state.realEstateCollaterals.length > 0);
 
       // Límite sin garantías
       const disclosureSinGarantia = calculateCreditTermsDisclosure(
         state,
         'ficohsa',
-        'linea_sobregiro',
+        'linea_revolvente',
         2000000,
         36,
         0,
@@ -350,7 +366,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       const disclosureConGarantia = calculateCreditTermsDisclosure(
         state,
         'ficohsa',
-        'linea_sobregiro',
+        'linea_revolvente',
         2000000,
         36,
         0,
@@ -375,18 +391,28 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
             id: 'col_mega_terreno',
             title: 'Terreno Industrial Valle de Amarateca',
             assetType: 'terreno_comercial',
+            ownerName: 'Constructora Hondureña Metropolitana',
+            companyName: 'Constructora Hondureña Metropolitana',
+            description: 'Terreno industrial',
+            location: 'Amarateca',
+            status: 'disponible',
+            acquisitionValueHNL: 8000000,
+            marketValueHNL: 10000000,
             appraisalValueHNL: 10000000,
+            appraisalDate: '2026-01-01',
             ltvAcceptedPct: 75,
             eligibleCollateralValueHNL: 7500000,
             registrationNumber: 'MAT-999999',
             isPledged: false,
+            liens: [],
             pledgedAmountTotal: 0,
             availableCoverageHNL: 7500000,
             isLockedForSale: false,
+            simulatedDocumentNumber: 'DOC-9999',
+            situationNotes: 'Terreno comercial en regla',
             appraisalDateDay: 1,
             appraisalDateMonth: 1,
-            appraisalDateYear: 2026,
-            status: 'disponible'
+            appraisalDateYear: 2026
           }
         ]
       });
@@ -394,7 +420,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       const disclosure = calculateCreditTermsDisclosure(
         state,
         'atlantida',
-        'construccion_desarrollo',
+        'capital_trabajo',
         5000000,
         24,
         0,
@@ -413,7 +439,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
 
     it('permite seleccionar múltiples garantías sumando su cobertura sin duplicar', () => {
       const state = createMockIntegrationState();
-      assert.ok(state.realEstateCollaterals.length >= 2, 'Debe haber al menos 2 garantías');
+      assert.ok(state.realEstateCollaterals && state.realEstateCollaterals.length >= 2, 'Debe haber al menos 2 garantías');
 
       const col1 = state.realEstateCollaterals[0];
       const col2 = state.realEstateCollaterals[1];
@@ -436,6 +462,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
   describe('Requisito 7: Gravamen al desembolso y liberación automática al liquidar', () => {
     it('grava las garantías al desembolsar y las libera automáticamente al cancelar el préstamo', () => {
       const state = createMockIntegrationState();
+      assert.ok(state.realEstateCollaterals && state.realEstateCollaterals.length > 0);
       const col = state.realEstateCollaterals[0];
       assert.strictEqual(col.isPledged, false);
 
@@ -454,6 +481,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       );
 
       assert.strictEqual(disburseRes.success, true);
+      assert.ok(disburseRes.updatedState.realEstateCollaterals);
       const pledgedCol = disburseRes.updatedState.realEstateCollaterals.find(c => c.id === col.id);
       assert.ok(pledgedCol);
       assert.strictEqual(pledgedCol.isPledged, true, 'La garantía debe quedar marcada como pignorada');
@@ -468,7 +496,6 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         disburseRes.updatedState,
         'atlantida',
         totalPayoff,
-        true, // cancelacion total
         'checking'
       );
 
@@ -476,6 +503,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       assert.strictEqual(payRes.updatedState.commercialBanks.atlantida.activeLoan, undefined, 'El préstamo debe quedar cancelado');
 
       // 3. Verificar que la garantía se liberó automáticamente
+      assert.ok(payRes.updatedState.realEstateCollaterals);
       const releasedCol = payRes.updatedState.realEstateCollaterals.find(c => c.id === col.id);
       assert.ok(releasedCol);
       assert.strictEqual(releasedCol.isPledged, false, 'La garantía debe haberse liberado');
@@ -485,6 +513,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       // 4. Verificar emisión de comprobante de cancelación y notificación
       assert.ok(payRes.voucher);
       assert.strictEqual(payRes.voucher.operationType, 'cancelacion_total');
+      assert.ok(payRes.updatedState.simulatedEmails);
       const confirmationEmail = payRes.updatedState.simulatedEmails.find(e => /cancelaci[oó]n total|finiquito/i.test(e.subject));
       assert.ok(confirmationEmail, 'Debe enviarse un correo de confirmación de finiquito bancario');
     });
@@ -513,7 +542,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
 
       // Pagar un abono parcial de 50,000 desde checking
       const initialBankBalance = disburseRes.updatedState.commercialBanks.ficohsa.checkingAccount!.balance;
-      const payRes = payCommercialLoan(disburseRes.updatedState, 'ficohsa', 50000, false, 'checking');
+      const payRes = payCommercialLoan(disburseRes.updatedState, 'ficohsa', 50000, 'checking');
 
       assert.strictEqual(payRes.success, true);
       const remainingLoan = payRes.updatedState.commercialBanks.ficohsa.activeLoan;
@@ -534,6 +563,7 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       state.commercialBanks.atlantida.activeLoan = {
         id: 'loan_fail_test',
         bankId: 'atlantida',
+        principalAmount: 100000,
         productType: 'capital_trabajo',
         originalAmount: 100000,
         balanceRemaining: 100000,
@@ -543,8 +573,9 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
         purpose: 'Test'
       };
 
-      const payRes = payCommercialLoan(state, 'atlantida', 15000, false, 'checking');
+      const payRes = payCommercialLoan(state, 'atlantida', 15000, 'checking');
       assert.strictEqual(payRes.success, false, 'Debe fallar por fondos insuficientes');
+      assert.ok(state.commercialBanks.atlantida.activeLoan);
       assert.strictEqual(state.commercialBanks.atlantida.activeLoan.balanceRemaining, 100000, 'La deuda no debe alterarse');
     });
   });
