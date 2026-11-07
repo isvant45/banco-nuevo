@@ -26,6 +26,12 @@ import { sound } from '../../game/audioFx';
 
 interface CommercialBanksWindowProps {
   state: DailySimulationState;
+  initialBankId?: CommercialBankId;
+  initialProductType?: CommercialLoanType;
+  initialAmount?: number;
+  initialTermMonths?: number;
+  initialOfferId?: string;
+  initialCollateralIds?: string[];
   onRequestLoan: (bankId: CommercialBankId, amount: number, termMonths: number, purpose: string) => void;
   onRequestCard: (bankId: CommercialBankId, limit: number) => void;
   onOpenChecking: (bankId: CommercialBankId, deposit: number) => void;
@@ -58,8 +64,10 @@ interface CommercialBanksWindowProps {
     termMonths: number, 
     purpose: string, 
     graceMonths: number, 
-    collateralId?: string,
-    destinationBankId?: CommercialBankId
+    collateralIds?: string[],
+    destinationBankId?: CommercialBankId,
+    destinationAccountType?: 'checking' | 'cash',
+    offerId?: string
   ) => void;
   onRequestNewAppraisal?: (collateralId: string) => void;
   onRegisterAssetAsCollateral?: (asset: any) => void;
@@ -71,6 +79,12 @@ interface CommercialBanksWindowProps {
 
 export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   state,
+  initialBankId,
+  initialProductType,
+  initialAmount,
+  initialTermMonths,
+  initialOfferId,
+  initialCollateralIds,
   onRequestLoan,
   onRequestCard,
   onOpenChecking,
@@ -97,17 +111,37 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   onExecuteFactoring,
   onViewVoucher
 }) => {
-  const [selectedBankId, setSelectedBankId] = useState<CommercialBankId>('atlantida');
-  const [activeTab, setActiveTab] = useState<'cuentas' | 'credito' | 'tarjeta' | 'dpf' | 'garantias' | 'asesor' | 'transferencias'>('cuentas');
+  const [selectedBankId, setSelectedBankId] = useState<CommercialBankId>(initialBankId || 'atlantida');
+  const [activeTab, setActiveTab] = useState<'cuentas' | 'credito' | 'tarjeta' | 'dpf' | 'garantias' | 'asesor' | 'transferencias'>(
+    initialOfferId || initialProductType ? 'credito' : 'cuentas'
+  );
 
   // Formulario Solicitud de Crédito
-  const [selectedProductType, setSelectedProductType] = useState<CommercialLoanType>('capital_trabajo');
-  const [loanAmount, setLoanAmount] = useState<number>(500000);
-  const [loanTermMonths, setLoanTermMonths] = useState<number>(24);
+  const [selectedProductType, setSelectedProductType] = useState<CommercialLoanType>(initialProductType || 'capital_trabajo');
+  const [loanAmount, setLoanAmount] = useState<number>(initialAmount || 500000);
+  const [loanTermMonths, setLoanTermMonths] = useState<number>(initialTermMonths || 24);
   const [loanPurpose, setLoanPurpose] = useState<string>('Capital operativo de compras');
   const [loanGraceMonths, setLoanGraceMonths] = useState<number>(0);
-  const [selectedCollateralId, setSelectedCollateralId] = useState<string>('');
-  const [destinationBankForLoan, setDestinationBankForLoan] = useState<CommercialBankId>('atlantida');
+  const [selectedCollateralIds, setSelectedCollateralIds] = useState<string[]>(initialCollateralIds || []);
+  const [currentOfferId, setCurrentOfferId] = useState<string | undefined>(initialOfferId);
+  const [destinationBankForLoan, setDestinationBankForLoan] = useState<CommercialBankId>(initialBankId || 'atlantida');
+  const [loanDestinationType, setLoanDestinationType] = useState<'checking' | 'cash'>('checking');
+
+  // Sincronizar con props iniciales si cambian (por ejemplo al pulsar "Ver condiciones" en un correo)
+  React.useEffect(() => {
+    if (initialBankId) {
+      setSelectedBankId(initialBankId);
+      setDestinationBankForLoan(initialBankId);
+    }
+    if (initialProductType) {
+      setSelectedProductType(initialProductType);
+      setActiveTab('credito');
+    }
+    if (initialAmount) setLoanAmount(initialAmount);
+    if (initialTermMonths) setLoanTermMonths(initialTermMonths);
+    if (initialOfferId !== undefined) setCurrentOfferId(initialOfferId);
+    if (initialCollateralIds) setSelectedCollateralIds(initialCollateralIds);
+  }, [initialBankId, initialProductType, initialAmount, initialTermMonths, initialOfferId, initialCollateralIds]);
 
   // Modal de Divulgación y Confirmación de Desembolso
   const [disclosureModalOpen, setDisclosureModalOpen] = useState<boolean>(false);
@@ -160,23 +194,26 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   const corporateCard = relationship.corporateCard;
   const capacity = evaluateContractorEconomicCapacity(state);
 
-  const collaterals = state.realEstateCollaterals && state.realEstateCollaterals.length > 0
-    ? state.realEstateCollaterals
-    : createDefaultRealEstateCollaterals(state.retailSector);
+  // Garantías reales: usar únicamente activos persistidos pertenecientes al prestatario (Requisito 5)
+  const collaterals = state.realEstateCollaterals || [];
 
-  // Manejo de Solicitud de Desembolso
-  const handleOpenDisclosureModal = () => {
-    sound.playClick();
-    const disclosure = calculateCreditTermsDisclosure(
+  // Evaluación en tiempo real de los términos del crédito (Requisito 5 y 6)
+  const liveDisclosure = React.useMemo(() => {
+    return calculateCreditTermsDisclosure(
       state,
       selectedBankId,
       selectedProductType,
       loanAmount,
       loanTermMonths,
       loanGraceMonths,
-      selectedCollateralId || undefined
+      selectedCollateralIds
     );
-    setCurrentDisclosure(disclosure);
+  }, [state, selectedBankId, selectedProductType, loanAmount, loanTermMonths, loanGraceMonths, selectedCollateralIds]);
+
+  // Manejo de Solicitud de Desembolso
+  const handleOpenDisclosureModal = () => {
+    sound.playClick();
+    setCurrentDisclosure(liveDisclosure);
     setDestinationBankForLoan(selectedBankId);
     setDisclosureModalOpen(true);
   };
@@ -194,8 +231,10 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
         loanTermMonths,
         loanPurpose,
         loanGraceMonths,
-        selectedCollateralId || undefined,
-        destinationBankForLoan
+        selectedCollateralIds,
+        destinationBankForLoan,
+        loanDestinationType,
+        currentOfferId
       );
     } else {
       onRequestLoan(selectedBankId, loanAmount, loanTermMonths, loanPurpose);
@@ -645,7 +684,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                   </div>
 
                   {/* Propósito del Crédito */}
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block font-bold text-slate-700 mb-1">Destino Comercial de los Fondos:</label>
                     <input
                       type="text"
@@ -656,22 +695,159 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                     />
                   </div>
 
-                  {/* Garantía Real de Respaldo */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Garantía Real a Pignorar (Opcional):</label>
-                    <select
-                      value={selectedCollateralId}
-                      onChange={(e) => setSelectedCollateralId(e.target.value)}
-                      className="w-full p-1.5 border border-slate-400 bg-white text-xs"
-                    >
-                      <option value="">Sin garantía hipotecaria específica (Fianza solidaria)</option>
-                      {collaterals.map(col => (
-                        <option key={col.id} value={col.id} disabled={col.availableCoverageHNL <= 0}>
-                          {col.title} — Disp: {formatHNLAmount(col.availableCoverageHNL)} ({col.status})
-                        </option>
-                      ))}
-                    </select>
+                  {/* Garantías Reales de Respaldo - Selección Múltiple (Requisito 5) */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="block font-bold text-slate-700">
+                        Garantías Reales a Pignorar (Selección Múltiple sin duplicar cobertura):
+                      </label>
+                      <span className="text-[11px] font-mono text-slate-600">
+                        Seleccionadas: {selectedCollateralIds.length} · Cobertura conjunta: <strong>{formatHNLAmount(liveDisclosure.collateralCoverageProvidedHNL)}</strong>
+                      </span>
+                    </div>
+
+                    {collaterals.length === 0 ? (
+                      <div className="p-2.5 bg-slate-50 border border-slate-300 text-slate-600 text-xs italic">
+                        No mantienes bienes inmuebles ni maquinaria registrados en tu balance para pignorar como garantía hipotecaria/prendaria. 
+                        El financiamiento se evaluará bajo la modalidad sin garantía real (fianza solidaria). Puedes registrar activos propios en la pestaña "Garantías Reales".
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-300 p-2 bg-slate-50">
+                        {collaterals.map(col => {
+                          const isSelected = selectedCollateralIds.includes(col.id);
+                          const isUnavailable = col.availableCoverageHNL <= 0 && !isSelected;
+
+                          return (
+                            <label
+                              key={col.id}
+                              className={`p-2 border flex items-start gap-2 cursor-pointer transition-colors ${
+                                isSelected 
+                                  ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-500' 
+                                  : isUnavailable 
+                                    ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed' 
+                                    : 'bg-white border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isUnavailable}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedCollateralIds(prev => [...prev, col.id]);
+                                  } else {
+                                    setSelectedCollateralIds(prev => prev.filter(id => id !== col.id));
+                                  }
+                                }}
+                                className="mt-0.5"
+                              />
+                              <div className="text-xs leading-tight flex-1">
+                                <div className="font-bold text-slate-900 flex justify-between">
+                                  <span>{col.title}</span>
+                                  <span className="font-mono text-blue-900">{formatHNLAmount(col.availableCoverageHNL)} disp.</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  Avalúo: {formatHNLAmount(col.appraisalValueHNL)} · LTV: {col.ltvAcceptedPct}% · Gravámenes: {formatHNLAmount(col.pledgedAmountTotal || 0)}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* Oferta pre-aprobada vinculada si aplica */}
+                {currentOfferId && (
+                  <div className="bg-amber-50 border border-amber-300 p-2 text-xs flex justify-between items-center text-amber-950">
+                    <div>
+                      <span className="font-bold">🏷️ Oferta Pre-aprobada Vinculada: </span>
+                      <span className="font-mono">{currentOfferId}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentOfferId(undefined)}
+                      className="text-[11px] underline text-amber-900 hover:text-red-700 cursor-pointer font-semibold"
+                    >
+                      Desvincular oferta
+                    </button>
+                  </div>
+                )}
+
+                {/* Cuadro Explicativo del Monto Aprobado y Límites de Riesgo (Requisito 6) */}
+                <div className="bg-slate-50 border-2 border-blue-900/40 p-3 space-y-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-300 pb-1">
+                    <h5 className="font-black text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>📊</span>
+                      <span>Determinación del Monto Aprobado y Evaluación de Riesgo</span>
+                    </h5>
+                    <span className="text-[10px] text-slate-500 font-mono">Normativa de Crédito CNBS</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-2.5 border border-slate-300">
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">1. Monto Solicitado:</span>
+                      <strong className="font-mono text-slate-900">{formatHNLAmount(loanAmount)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">2. Máximo sin Garantía:</span>
+                      <strong className="font-mono text-slate-800">{formatHNLAmount(liveDisclosure.unsecuredLimitHNL)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">3. Cobertura Aportada:</span>
+                      <strong className="font-mono text-blue-900">{formatHNLAmount(liveDisclosure.collateralCoverageProvidedHNL)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">4. Máximo por Garantías:</span>
+                      <strong className="font-mono text-indigo-900">{formatHNLAmount(liveDisclosure.collateralBackedMaxHNL)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">5. Máximo por Capacidad de Pago:</span>
+                      <strong className="font-mono text-slate-800">{formatHNLAmount(liveDisclosure.paymentCapacityMaxHNL)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100 bg-blue-50/70 px-1">
+                      <span className="text-blue-950 font-bold">6. Máximo Final Aprobado:</span>
+                      <strong className="font-mono text-blue-950 font-black">{formatHNLAmount(liveDisclosure.finalMaxApprovedHNL)}</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">7. Cuota Mensual Estimada:</span>
+                      <strong className="font-mono text-slate-900">{formatHNLAmount(liveDisclosure.monthlyPaymentHNL)} / mes</strong>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600 font-medium">Tasa Anual Efectiva:</span>
+                      <strong className="font-mono text-slate-900">{liveDisclosure.effectiveInterestRateAnnual}% anual</strong>
+                    </div>
+                  </div>
+
+                  {/* Fila 8: Motivo explicativo detallado */}
+                  <div className="p-2 rounded bg-amber-50 border border-amber-300 text-amber-950 text-[11px] flex items-start gap-2">
+                    <span className="text-sm">ℹ️</span>
+                    <div>
+                      <span className="font-bold">Motivo del Límite: </span>
+                      <span>{liveDisclosure.limitReasonExplanation}</span>
+                    </div>
+                  </div>
+
+                  {loanAmount > liveDisclosure.finalMaxApprovedHNL && (
+                    <div className="flex justify-between items-center bg-rose-50 border border-rose-300 p-2 text-rose-900 text-xs">
+                      <span>El monto solicitado excede el cupo aprobado de {formatHNLAmount(liveDisclosure.finalMaxApprovedHNL)}.</span>
+                      <button
+                        type="button"
+                        onClick={() => setLoanAmount(liveDisclosure.finalMaxApprovedHNL)}
+                        className="px-2.5 py-1 bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] cursor-pointer shadow-xs active:scale-95"
+                      >
+                        Ajustar a {formatHNLAmount(liveDisclosure.finalMaxApprovedHNL)}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-3 flex justify-end">
@@ -1136,27 +1312,58 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                 <p className="text-[11px] text-slate-600">Institución Acreedora: <strong>{bankProfile.name}</strong></p>
               </div>
 
-              {/* Selector de Cuenta Destino del Desembolso */}
-              <div className="bg-slate-50 p-2.5 border border-slate-300 space-y-1.5">
+              {/* Selector de Tipo de Cuenta de Destino y Banco (Requisito 3) */}
+              <div className="bg-slate-50 p-2.5 border border-slate-300 space-y-2">
                 <label className="block font-bold text-slate-800 text-xs">
-                  Seleccionar Banco y Cuenta de Destino para Acreditar los Fondos:
+                  Cuenta y Medio de Destino del Desembolso:
                 </label>
-                <select
-                  value={destinationBankForLoan}
-                  onChange={(e) => setDestinationBankForLoan(e.target.value as CommercialBankId)}
-                  className="w-full p-1.5 border border-slate-400 bg-white font-bold text-xs"
-                >
-                  {(Object.keys(COMMERCIAL_BANKS_PROFILES) as CommercialBankId[]).map(bKey => {
-                    const b = COMMERCIAL_BANKS_PROFILES[bKey];
-                    const rel = state.commercialBanks[bKey];
-                    const chk = rel?.checkingAccount;
-                    return (
-                      <option key={bKey} value={bKey}>
-                        {b.name} — Cuenta Corriente {chk ? chk.accountNumber : '(Se abrirá automáticamente)'} | Saldo: {formatHNLAmount(chk?.balance || 0)}
-                      </option>
-                    );
-                  })}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLoanDestinationType('checking')}
+                    className={`p-2 border text-left cursor-pointer rounded-xs text-xs ${
+                      loanDestinationType === 'checking' ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-500 font-bold' : 'bg-white border-slate-300'
+                    }`}
+                  >
+                    <span>🏦 Cuenta de Cheques</span>
+                    <span className="block text-[10px] text-slate-500 font-normal">Acreditar a cuenta bancaria</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLoanDestinationType('cash')}
+                    className={`p-2 border text-left cursor-pointer rounded-xs text-xs ${
+                      loanDestinationType === 'cash' ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-500 font-bold' : 'bg-white border-slate-300'
+                    }`}
+                  >
+                    <span>💵 Caja Chica de Empresa</span>
+                    <span className="block text-[10px] text-slate-500 font-normal">Efectivo líquido directo</span>
+                  </button>
+                </div>
+
+                {loanDestinationType === 'checking' && (
+                  <div>
+                    <label className="block font-semibold text-slate-700 text-[11px] mb-1">
+                      Banco Destinatario:
+                    </label>
+                    <select
+                      value={destinationBankForLoan}
+                      onChange={(e) => setDestinationBankForLoan(e.target.value as CommercialBankId)}
+                      className="w-full p-1.5 border border-slate-400 bg-white font-bold text-xs"
+                    >
+                      {(Object.keys(COMMERCIAL_BANKS_PROFILES) as CommercialBankId[]).map(bKey => {
+                        const b = COMMERCIAL_BANKS_PROFILES[bKey];
+                        const rel = state.commercialBanks[bKey];
+                        const chk = rel?.checkingAccount;
+                        return (
+                          <option key={bKey} value={bKey}>
+                            {b.name} — Cuenta Corriente {chk ? chk.accountNumber : '(Se abrirá automáticamente)'} | Saldo: {formatHNLAmount(chk?.balance || 0)}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Desglose Monetario Claro */}

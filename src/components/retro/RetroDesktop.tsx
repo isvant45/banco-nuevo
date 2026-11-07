@@ -67,7 +67,9 @@ import {
   requestNewAppraisal,
   registerNewAssetAsCollateral,
   evaluateAndGenerateBankOffers,
-  createInitialSimulatedEmails
+  createInitialSimulatedEmails,
+  getInboxUnreadCount,
+  negotiateBankOfferFromEmail
 } from '../../game/commercialBanksEngine';
 import {
   DEFAULT_MACHINERY_DEALERS,
@@ -133,14 +135,31 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     )
   );
 
-  // Estado diario central de la simulación
+  // Estado diario central de la simulación con persistencia en localStorage (Requisito 2)
   const [simState, setSimState] = useState<DailySimulationState>(() => {
+    try {
+      const saved = localStorage.getItem('aureo_retro_sim_save_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.simState) {
+          return restoreDailySimulationState(parsed.simState);
+        }
+      }
+    } catch (e) {
+      // Ignorar errores de acceso a almacenamiento
+    }
+
     const products = SECTOR_DEFAULT_PRODUCTS[initialSector] || SECTOR_DEFAULT_PRODUCTS.minimarket;
     const isConstructora = initialSector === 'constructora';
     const initialStoreCash = isConstructora ? 120000 : 35000;
     const initialStoreBank = isConstructora ? 1850000 : 120000;
     const initialVaultCash = 850000;
     const initialDeposits = 4500000;
+
+    const initialEmails = createInitialSimulatedEmails(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro'), initialSector, initialStoreBank);
+    const initialBankOffers = initialEmails
+      .filter(e => e.bankOfferPayload)
+      .map(e => e.bankOfferPayload!);
 
     return {
       currentDay: 1,
@@ -209,14 +228,38 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
       // Garantías Reales, Correos, Vouchers y Ofertas Dinámicas
       realEstateCollaterals: createDefaultRealEstateCollaterals(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro'), initialSector),
-      simulatedEmails: createInitialSimulatedEmails(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro'), initialSector, initialStoreBank),
+      simulatedEmails: initialEmails,
       transactionVouchers: [],
-      dynamicBankOffers: [],
+      dynamicBankOffers: initialBankOffers,
       fiscalPeriods: [],
 
       dailyHistory: []
     };
   });
+
+  // Estado para precarga de financiamiento desde ofertas de correo (Requisito 3)
+  const [preloadedLoan, setPreloadedLoan] = useState<{
+    bankId?: CommercialBankId;
+    productType?: CommercialLoanType;
+    amount?: number;
+    termMonths?: number;
+    offerId?: string;
+    collateralIds?: string[];
+  }>({});
+
+  // Auto-guardado en localStorage para persistencia tras recargar página (Requisito 2)
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('aureo_retro_sim_save_v2', JSON.stringify({
+        roleMode,
+        retailSector,
+        entityName,
+        simState
+      }));
+    } catch (e) {
+      // Ignorar quota exceeded
+    }
+  }, [simState, roleMode, retailSector, entityName]);
 
   // Ventanas activas y estados
   const [openWindows, setOpenWindows] = useState<Record<string, { isOpen: boolean; isMinimized: boolean; isMaximized: boolean; zIndex: number }>>({
@@ -489,8 +532,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     termMonths: number,
     purpose: string,
     graceMonths: number = 0,
-    collateralId?: string,
-    destinationBankId?: CommercialBankId
+    collateralIds?: string[] | string,
+    destinationBankId?: CommercialBankId,
+    destinationAccountType: 'checking' | 'cash' = 'checking',
+    offerId?: string
   ) => {
     const res = requestFullCommercialCredit(
       simState,
@@ -500,8 +545,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       termMonths,
       purpose,
       graceMonths,
-      collateralId,
-      destinationBankId
+      collateralIds,
+      destinationBankId,
+      destinationAccountType,
+      offerId
     );
     setSimState(res.updatedState);
     if (res.success) {
@@ -513,6 +560,240 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       sound.playRejectBuzzer();
     }
     alert(res.message);
+  };
+
+  // Handlers para Acciones del Correo Empresarial (Requisitos 1, 2, 3, 4, 8)
+  const handleEmailUpdateState = (emailId: string, partial: Partial<SimulatedEmail>) => {
+    setSimState(prev => {
+      const updated = (prev.simulatedEmails || []).map(em => {
+        if (em.id === emailId) {
+          return { ...em, ...partial };
+        }
+        return em;
+      });
+      return {
+        ...prev,
+        simulatedEmails: updated
+      };
+    });
+  };
+
+  const handleOpenLoanTerms = (
+    bankId: CommercialBankId,
+    productType: CommercialLoanType,
+    amount: number,
+    termMonths: number,
+    offerId: string
+  ) => {
+    sound.playClick();
+    setPreloadedLoan({
+      bankId,
+      productType,
+      amount,
+      termMonths,
+      offerId
+    });
+    bringToFront('bancos_comerciales');
+  };
+
+  const handleRespondEmail = (originalEmail: SimulatedEmail, replyText: string) => {
+    const replyEmail: SimulatedEmail = {
+      id: `reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      daySent: simState.currentDay,
+      monthSent: simState.currentMonth,
+      fromName: `${entityName} (Tú)`,
+      fromAddress: `gerencia@${entityName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
+      toName: originalEmail.fromName,
+      toAddress: originalEmail.fromAddress,
+      subject: originalEmail.subject.startsWith('RE:') ? originalEmail.subject : `RE: ${originalEmail.subject}`,
+      category: originalEmail.category,
+      body: replyText,
+      isRead: true,
+      isArchived: false,
+      folder: 'sent',
+      dateFormatted: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 09:30 AM`
+    };
+
+    setSimState(prev => ({
+      ...prev,
+      simulatedEmails: [replyEmail, ...(prev.simulatedEmails || [])]
+    }));
+    sound.playClick();
+  };
+
+  const handlePayLoanFromEmail = (
+    bankId: CommercialBankId,
+    amount: number,
+    sourceAccount: 'checking' | 'cash'
+  ): { success: boolean; message: string } => {
+    const res = payCommercialLoan(simState, bankId, amount, false, sourceAccount);
+    if (res.success) {
+      setSimState(res.updatedState);
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+      return { success: true, message: res.message };
+    } else {
+      sound.playRejectBuzzer();
+      return { success: false, message: res.message };
+    }
+  };
+
+  const handlePaySarFromEmail = (
+    amount: number,
+    sourceAccount: 'checking' | 'cash'
+  ): { success: boolean; message: string } => {
+    const sarRecord = simState.sarTaxRecord || DEFAULT_INITIAL_SAR_RECORD;
+    const isCash = sourceAccount === 'cash';
+    const availableFunds = isCash ? simState.storeCash : simState.storeBankBalance;
+
+    if (amount <= 0) {
+      return { success: false, message: 'El monto a pagar debe ser mayor a cero.' };
+    }
+    if (amount > availableFunds) {
+      return {
+        success: false,
+        message: `Fondos insuficientes en ${isCash ? 'Caja Chica' : 'Cuentas Bancarias'}. Saldo disponible: L ${availableFunds.toLocaleString()}, Monto a pagar: L ${amount.toLocaleString()}.`
+      };
+    }
+
+    const newCash = isCash ? simState.storeCash - amount : simState.storeCash;
+    const newBank = !isCash ? simState.storeBankBalance - amount : simState.storeBankBalance;
+
+    let updatedBanks = { ...simState.commercialBanks };
+    if (!isCash) {
+      for (const bId of Object.keys(updatedBanks) as CommercialBankId[]) {
+        const rel = updatedBanks[bId];
+        if (rel?.checkingAccount && rel.checkingAccount.balance >= amount) {
+          updatedBanks = {
+            ...updatedBanks,
+            [bId]: {
+              ...rel,
+              checkingAccount: {
+                ...rel.checkingAccount,
+                balance: rel.checkingAccount.balance - amount
+              }
+            }
+          };
+          break;
+        }
+      }
+    }
+
+    const updatedSar = {
+      ...sarRecord,
+      totalTaxPaidYtd: sarRecord.totalTaxPaidYtd + amount,
+      sarAuditRiskScore: Math.max(0, sarRecord.sarAuditRiskScore - 15),
+      sarNoticesPending: Math.max(0, sarRecord.sarNoticesPending - 1),
+      lastAuditResult: `Pago de impuestos por L ${amount.toLocaleString()} efectuado con éxito mediante correo/SAR.`
+    };
+
+    const voucher: TransactionVoucher = {
+      id: `vouc_sar_${Date.now()}`,
+      day: simState.currentDay,
+      month: simState.currentMonth,
+      bankId: 'atlantida',
+      bankName: 'Servicio de Administración de Rentas (SAR)',
+      operationType: 'pago_prestamo',
+      title: 'COMPROBANTE OFICIAL DE PAGO TRIBUTARIO SAR',
+      grossAmount: amount,
+      feeDeducted: 0,
+      netAmount: amount,
+      targetAccountNumber: 'TRIB-SAR-2026-HN',
+      timestampFormatted: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 10:00 AM`,
+      status: 'aprobado',
+      authCode: `SAR-${Math.floor(100000 + Math.random() * 900000)}`
+    };
+
+    const updatedEmails = (simState.simulatedEmails || []).map(em => {
+      if (em.category === 'sar_tributario') {
+        return { ...em, isResolved: true };
+      }
+      return em;
+    });
+
+    setSimState(prev => ({
+      ...prev,
+      storeCash: newCash,
+      storeBankBalance: newBank,
+      commercialBanks: updatedBanks,
+      sarTaxRecord: updatedSar,
+      transactionVouchers: [voucher, ...(prev.transactionVouchers || [])],
+      simulatedEmails: updatedEmails
+    }));
+
+    sound.playApprovalStamp();
+    setActiveVoucherModal(voucher);
+    return { success: true, message: `¡Pago a SAR por L ${amount.toLocaleString()} procesado exitosamente! Comprobante oficial emitido.` };
+  };
+
+  const handleNegotiateOffer = (
+    offerId: string,
+    counterOffer: {
+      requestedAmount?: number;
+      requestedRate?: number;
+      requestedTerm?: number;
+      requestedFee?: number;
+      requestedCollateralIds?: string[];
+    }
+  ) => {
+    const res = negotiateBankOfferFromEmail(simState, offerId, counterOffer);
+    setSimState(res.updatedState);
+    if (res.outcome === 'aprobada' || res.outcome === 'contraoferta') {
+      sound.playApprovalStamp();
+    } else {
+      sound.playRejectBuzzer();
+    }
+    return {
+      success: res.outcome !== 'rechazada',
+      message: res.message,
+      dialogue: res.dialogue,
+      updatedOffer: res.updatedOffer
+    };
+  };
+
+  const handleAcceptOfferFromEmail = (
+    offerId: string,
+    destinationBankId?: CommercialBankId,
+    destinationAccountType: 'checking' | 'cash' = 'checking'
+  ) => {
+    const offer = (simState.dynamicBankOffers || []).find(o => o.id === offerId)
+      || (simState.simulatedEmails || []).find(e => e.bankOfferPayload?.id === offerId)?.bankOfferPayload;
+
+    if (!offer) {
+      return { success: false, message: 'Oferta no encontrada.' };
+    }
+
+    const targetBank = destinationBankId || offer.bankId;
+    const res = requestFullCommercialCredit(
+      simState,
+      offer.bankId,
+      offer.productType,
+      offer.approvedAmount,
+      offer.termMonths,
+      `Línea de crédito desembolsada desde oferta pre-aprobada ${offerId}`,
+      0,
+      offer.linkedCollateralIds,
+      targetBank,
+      destinationAccountType,
+      offerId
+    );
+
+    setSimState(res.updatedState);
+    if (res.success) {
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+    } else {
+      sound.playRejectBuzzer();
+    }
+    return {
+      success: res.success,
+      message: res.message,
+      voucher: res.voucher
+    };
   };
 
   const handleExecuteFlexiblePayment = (
@@ -1122,7 +1403,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     ] : []),
     { 
       id: 'business_email', 
-      title: `Correo Empresarial (${simState.simulatedEmails?.filter(e => !e.isRead).length || 0})`, 
+      title: `Correo Empresarial (${getInboxUnreadCount(simState.simulatedEmails)})`, 
       icon: '📨', 
       isOpen: !!openWindows.business_email?.isOpen, 
       isMinimized: !!openWindows.business_email?.isMinimized 
@@ -1634,9 +1915,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         >
           <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1 relative">
             📨
-            {simState.simulatedEmails && simState.simulatedEmails.filter(e => !e.isRead).length > 0 && (
+            {getInboxUnreadCount(simState.simulatedEmails) > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow">
-                {simState.simulatedEmails.filter(e => !e.isRead).length}
+                {getInboxUnreadCount(simState.simulatedEmails)}
               </span>
             )}
           </div>
@@ -2001,6 +2282,12 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         >
           <CommercialBanksWindow
             state={simState}
+            initialBankId={preloadedLoan.bankId}
+            initialProductType={preloadedLoan.productType}
+            initialAmount={preloadedLoan.amount}
+            initialTermMonths={preloadedLoan.termMonths}
+            initialOfferId={preloadedLoan.offerId}
+            initialCollateralIds={preloadedLoan.collateralIds}
             onOpenChecking={handleOpenBankChecking}
             onRequestLoan={handleRequestCommercialLoan}
             onRequestCard={handleRequestCorporateCard}
@@ -2274,12 +2561,20 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       >
         <BusinessEmailWindow
           state={simState}
-          onUpdateState={(nextSt: DailySimulationState) => setSimState(nextSt)}
           companyName={entityName}
+          onUpdateEmailState={handleEmailUpdateState}
+          onOpenLoanTerms={handleOpenLoanTerms}
+          onOpenWindow={bringToFront}
+          onRespondEmail={handleRespondEmail}
+          onPayLoanFromEmail={handlePayLoanFromEmail}
+          onPaySarFromEmail={handlePaySarFromEmail}
+          onNegotiateOffer={handleNegotiateOffer}
+          onAcceptOfferFromEmail={handleAcceptOfferFromEmail}
+          onViewVoucher={(voucher) => setActiveVoucherModal(voucher)}
           onOpenBank={() => bringToFront('bancos_comerciales')}
           onOpenSar={() => bringToFront('sar_audit')}
           onOpenRegister={() => bringToFront('pos_register')}
-          onViewVoucher={(voucher) => setActiveVoucherModal(voucher)}
+          onUpdateState={(nextSt: DailySimulationState) => setSimState(nextSt)}
         />
       </RetroWindow>
 
@@ -2307,7 +2602,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onOpenNewGame={() => setIsNewGameModalOpen(true)}
         onOpenAuditReport={onOpenAuditReport || (() => {})}
         onOpenBusinessEmail={() => bringToFront('business_email')}
-        unreadEmailsCount={simState.simulatedEmails?.filter(e => !e.isRead).length || 0}
+        unreadEmailsCount={getInboxUnreadCount(simState.simulatedEmails)}
         onOpenFinancialStatements={() => bringToFront('financial_statements')}
         onOpenLiabilitiesManager={() => bringToFront('liabilities_manager')}
         onOpenCompetitorsMarket={() => bringToFront('competitors_market')}

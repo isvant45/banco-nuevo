@@ -5,10 +5,16 @@ import {
   DailySimulationState, 
   CommercialBankId, 
   CommercialLoanType,
-  TransactionVoucher
+  TransactionVoucher,
+  DynamicBankOffer
 } from '../../game/retroSimTypes';
 import { CustomAmountInput, formatHNLAmount } from '../common/CustomAmountInput';
-import { COMMERCIAL_BANKS_PROFILES } from '../../game/commercialBanksEngine';
+import { 
+  COMMERCIAL_BANKS_PROFILES, 
+  getInboxUnreadCount, 
+  negotiateBankOfferFromEmail, 
+  calculateCollateralAvailableCoverage 
+} from '../../game/commercialBanksEngine';
 import { sound } from '../../game/audioFx';
 
 interface BusinessEmailWindowProps {
@@ -18,13 +24,15 @@ interface BusinessEmailWindowProps {
   onOpenBank?: () => void;
   onOpenSar?: () => void;
   onOpenRegister?: () => void;
-  onOpenLoanTerms?: (bankId: CommercialBankId, productType: CommercialLoanType, amount: number, termMonths: number) => void;
-  onPayLoanFromEmail?: (bankId: CommercialBankId, amount: number, payFromAccount: 'checking' | 'cash') => void;
-  onPaySarFromEmail?: (amount: number, payFromAccount: 'checking' | 'cash') => void;
+  onOpenLoanTerms?: (bankId: CommercialBankId, productType: CommercialLoanType, amount: number, termMonths: number, offerId?: string) => void;
+  onPayLoanFromEmail?: (bankId: CommercialBankId, amount: number, payFromAccount: 'checking' | 'cash') => { success: boolean; message: string; remainingBalance?: number };
+  onPaySarFromEmail?: (amount: number, payFromAccount: 'checking' | 'cash') => { success: boolean; message: string; remainingDebt?: number };
   onOpenWindow?: (windowId: string) => void;
   onViewVoucher?: (voucher: TransactionVoucher) => void;
   onUpdateEmailState?: (emailId: string, updates: Partial<SimulatedEmail>) => void;
   onRespondEmail?: (originalEmail: SimulatedEmail, replyText: string) => void;
+  onNegotiateOffer?: (offerOrId: DynamicBankOffer | string, proposal: { requestedAmount?: number; requestedRate?: number; requestedTerm?: number; requestedFee?: number; collateralIds?: string[]; requestedCollateralIds?: string[] }) => { outcome?: 'aprobado' | 'contraoferta' | 'rechazado'; success?: boolean; reason?: string; message?: string; dialogue?: string; updatedOffer?: DynamicBankOffer };
+  onAcceptOfferFromEmail?: (offerOrId: DynamicBankOffer | string, destinationAccount?: 'checking' | 'cash' | CommercialBankId, destinationAccountType?: 'checking' | 'cash', collateralIds?: string[]) => { success: boolean; message: string; voucher?: TransactionVoucher };
 }
 
 const CATEGORY_LABELS: Record<EmailCategory, { label: string; icon: string; color: string }> = {
@@ -48,15 +56,18 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   onOpenWindow,
   onViewVoucher,
   onUpdateEmailState,
-  onRespondEmail
+  onRespondEmail,
+  onNegotiateOffer,
+  onAcceptOfferFromEmail
 }) => {
   const [selectedFolder, setSelectedFolder] = useState<'inbox' | 'starred' | 'sent' | 'archive'>('inbox');
   const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all'>('all');
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<'all' | 'company' | 'personal'>('all');
+  const [onlyUnread, setOnlyUnread] = useState<boolean>(false);
 
-  // Modal de pago directo incrustado en el correo
+  // Modal de pago directo
   const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
   const [paymentTarget, setPaymentTarget] = useState<{
     type: 'loan' | 'sar' | 'supplier';
@@ -66,10 +77,30 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     accountSource: 'checking' | 'cash';
   } | null>(null);
   const [directPayAmount, setDirectPayAmount] = useState<number>(0);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccessFeedback, setPaymentSuccessFeedback] = useState<string | null>(null);
 
   // Redacción de respuestas
   const [isReplying, setIsReplying] = useState<boolean>(false);
   const [replyText, setReplyText] = useState<string>('');
+
+  // Negociación de oferta bancaria
+  const [isNegotiating, setIsNegotiating] = useState<boolean>(false);
+  const [negotiateAmount, setNegotiateAmount] = useState<number>(0);
+  const [negotiateRate, setNegotiateRate] = useState<number>(10.5);
+  const [negotiateTerm, setNegotiateTerm] = useState<number>(36);
+  const [negotiateFee, setNegotiateFee] = useState<number>(1.0);
+  const [selectedCollateralsForOffer, setSelectedCollateralsForOffer] = useState<string[]>([]);
+  const [negotiationResultFeedback, setNegotiationResultFeedback] = useState<{
+    outcome: 'aprobado' | 'contraoferta' | 'rechazado';
+    message: string;
+  } | null>(null);
+
+  // Modal de desembolso y aceptación de oferta
+  const [acceptModalOpen, setAcceptModalOpen] = useState<boolean>(false);
+  const [offerToAccept, setOfferToAccept] = useState<DynamicBankOffer | null>(null);
+  const [acceptDestinationAccount, setAcceptDestinationAccount] = useState<'checking' | 'cash'>('checking');
+  const [acceptError, setAcceptError] = useState<string | null>(null);
 
   const companySlug = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
   const companyEmailAddress = `gerencia@${companySlug}.hn`;
@@ -77,7 +108,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
 
   const emails = state.simulatedEmails || [];
 
-  // Filtrado de correos
+  // Filtrado de correos respetando carpeta y regla de no leídos
   const filteredEmails = useMemo(() => {
     return emails.filter(email => {
       // Carpeta
@@ -85,6 +116,11 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       if (selectedFolder === 'starred' && (!email.isStarred || email.isArchived)) return false;
       if (selectedFolder === 'sent' && email.folder !== 'sent') return false;
       if (selectedFolder === 'archive' && !email.isArchived) return false;
+
+      // Filtro de Solo no leídos (mantener el correo seleccionado abierto si el usuario lo está leyendo)
+      if (onlyUnread) {
+        if (email.isRead && email.id !== selectedEmailId) return false;
+      }
 
       // Filtro de Cuenta
       const recip = (email.recipientEmail || email.recipient || '').toLowerCase();
@@ -106,23 +142,39 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
 
       return true;
     });
-  }, [emails, selectedFolder, selectedCategory, searchQuery, accountFilter]);
+  }, [emails, selectedFolder, selectedCategory, searchQuery, accountFilter, onlyUnread, selectedEmailId]);
 
+  // Correo seleccionado: si no hay selección explícita o se cambió de vista, no mostrar correo ajeno
   const selectedEmail = useMemo(() => {
-    if (!selectedEmailId) return filteredEmails[0] || null;
-    return emails.find(e => e.id === selectedEmailId) || filteredEmails[0] || null;
-  }, [emails, selectedEmailId, filteredEmails]);
+    if (!selectedEmailId) return null;
+    const found = emails.find(e => e.id === selectedEmailId);
+    if (!found) return null;
+    // Si el correo fue archivado y estamos en inbox, no mostrarlo
+    if (selectedFolder === 'inbox' && found.isArchived) return null;
+    if (selectedFolder === 'archive' && !found.isArchived) return null;
+    if (selectedFolder === 'sent' && found.folder !== 'sent') return null;
+    return found;
+  }, [emails, selectedEmailId, selectedFolder]);
 
-  // Contadores
-  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.isRead && !e.isArchived).length;
+  // Conteo unificado: mensajes recibidos, no leídos y no archivados
+  const inboxUnreadCount = getInboxUnreadCount(emails);
   const starredCount = emails.filter(e => e.isStarred && !e.isArchived).length;
 
   const handleSelectEmail = (email: SimulatedEmail) => {
     sound.playClick();
     setSelectedEmailId(email.id);
     setIsReplying(false);
+    setIsNegotiating(false);
+    setNegotiationResultFeedback(null);
     if (!email.isRead && onUpdateEmailState) {
       onUpdateEmailState(email.id, { isRead: true });
+    }
+  };
+
+  const handleToggleReadStatus = (email: SimulatedEmail) => {
+    sound.playClick();
+    if (onUpdateEmailState) {
+      onUpdateEmailState(email.id, { isRead: !email.isRead });
     }
   };
 
@@ -137,7 +189,38 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   const handleToggleArchive = (email: SimulatedEmail) => {
     sound.playClick();
     if (onUpdateEmailState) {
-      onUpdateEmailState(email.id, { isArchived: !email.isArchived, folder: email.isArchived ? 'inbox' : 'archive' });
+      const willArchive = !email.isArchived;
+      onUpdateEmailState(email.id, { 
+        isArchived: willArchive, 
+        folder: willArchive ? 'archive' : 'inbox' 
+      });
+      // Si se archiva el correo actualmente visible, deseleccionarlo para evitar que quede huérfano
+      setSelectedEmailId(null);
+    }
+  };
+
+  const handleMarkAllAsRead = () => {
+    sound.playClick();
+    if (onUpdateEmailState) {
+      emails.forEach(e => {
+        if (!e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
+          onUpdateEmailState(e.id, { isRead: true });
+        }
+      });
+    }
+  };
+
+  const handleArchiveRead = () => {
+    sound.playClick();
+    if (onUpdateEmailState) {
+      emails.forEach(e => {
+        if (e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
+          onUpdateEmailState(e.id, { isArchived: true, folder: 'archive' });
+        }
+      });
+      if (selectedEmail?.isRead) {
+        setSelectedEmailId(null);
+      }
     }
   };
 
@@ -148,6 +231,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     title?: string
   ) => {
     sound.playClick();
+    setPaymentError(null);
     setPaymentTarget({
       type,
       bankId,
@@ -161,16 +245,58 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
 
   const handleConfirmDirectPayment = () => {
     if (!paymentTarget || directPayAmount <= 0) return;
-    sound.playApprovalStamp();
+    setPaymentError(null);
 
-    if (paymentTarget.type === 'loan' && paymentTarget.bankId && onPayLoanFromEmail) {
-      onPayLoanFromEmail(paymentTarget.bankId, directPayAmount, paymentTarget.accountSource);
-    } else if (paymentTarget.type === 'sar' && onPaySarFromEmail) {
-      onPaySarFromEmail(directPayAmount, paymentTarget.accountSource);
-    }
-
-    if (selectedEmail && onUpdateEmailState) {
-      onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto' });
+    if (paymentTarget.type === 'loan' && paymentTarget.bankId) {
+      if (onPayLoanFromEmail) {
+        const res = onPayLoanFromEmail(paymentTarget.bankId, directPayAmount, paymentTarget.accountSource);
+        if (!res.success) {
+          setPaymentError(res.message);
+          return;
+        }
+        if (res.remainingBalance <= 0) {
+          if (selectedEmail && onUpdateEmailState) {
+            onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
+          }
+          setPaymentSuccessFeedback(`¡Préstamo cancelado en su totalidad! Saldo L 0.00.`);
+        } else {
+          if (selectedEmail && onUpdateEmailState) {
+            onUpdateEmailState(selectedEmail.id, {
+              statusTag: 'Pendiente',
+              paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
+                ...selectedEmail.paymentNoticePayload,
+                amountDueHNL: res.remainingBalance
+              } : undefined
+            });
+          }
+          setPaymentSuccessFeedback(`Abono aplicado. Saldo deudor restante: L ${res.remainingBalance.toLocaleString()}.`);
+        }
+      }
+    } else if (paymentTarget.type === 'sar') {
+      if (onPaySarFromEmail) {
+        const res = onPaySarFromEmail(directPayAmount, paymentTarget.accountSource);
+        if (!res.success) {
+          setPaymentError(res.message);
+          return;
+        }
+        if (res.remainingDebt <= 0) {
+          if (selectedEmail && onUpdateEmailState) {
+            onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
+          }
+          setPaymentSuccessFeedback(`¡Obligación fiscal SAR cancelada al 100%! Habilitado para Solvencia.`);
+        } else {
+          if (selectedEmail && onUpdateEmailState) {
+            onUpdateEmailState(selectedEmail.id, {
+              statusTag: 'Pendiente',
+              paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
+                ...selectedEmail.paymentNoticePayload,
+                amountDueHNL: res.remainingDebt
+              } : undefined
+            });
+          }
+          setPaymentSuccessFeedback(`Abono al SAR aplicado. Saldo fiscal pendiente: L ${res.remainingDebt.toLocaleString()}.`);
+        }
+      }
     }
 
     setPaymentModalOpen(false);
@@ -184,6 +310,109 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     }
     setReplyText('');
     setIsReplying(false);
+  };
+
+  // Apertura de Drawer de Negociación de Oferta
+  const handleStartNegotiateOffer = (offer: DynamicBankOffer) => {
+    sound.playClick();
+    setIsNegotiating(true);
+    setNegotiateAmount(offer.amountOrLimitHNL);
+    setNegotiateRate(offer.annualRatePct);
+    setNegotiateTerm(offer.termMonths);
+    setNegotiateFee(offer.openingFeePct);
+    setSelectedCollateralsForOffer(offer.linkedCollateralIds || []);
+    setNegotiationResultFeedback(null);
+  };
+
+  const handleExecuteNegotiation = () => {
+    if (!selectedEmail?.bankOfferPayload) return;
+    sound.playClick();
+    const offer = selectedEmail.bankOfferPayload;
+
+    const proposal = {
+      requestedAmount: negotiateAmount,
+      requestedRate: negotiateRate,
+      requestedTerm: negotiateTerm,
+      requestedFee: negotiateFee,
+      collateralIds: selectedCollateralsForOffer
+    };
+
+    let result;
+    if (onNegotiateOffer) {
+      result = onNegotiateOffer(offer, proposal);
+    } else {
+      result = negotiateBankOfferFromEmail(state, offer, proposal);
+    }
+
+    setNegotiationResultFeedback({
+      outcome: result.outcome,
+      message: result.reason
+    });
+
+    if (onUpdateEmailState) {
+      onUpdateEmailState(selectedEmail.id, {
+        bankOfferPayload: result.updatedOffer,
+        statusTag: result.outcome === 'aprobado' || result.outcome === 'contraoferta' ? 'Pre-Aprobado' : selectedEmail.statusTag
+      });
+    }
+
+    // Registrar en sent/diálogo
+    if (onRespondEmail) {
+      onRespondEmail(
+        selectedEmail,
+        `Solicitud de Negociación: Monto L ${negotiateAmount.toLocaleString()}, Tasa ${negotiateRate}%, Plazo ${negotiateTerm} meses.${selectedCollateralsForOffer.length > 0 ? ` Con ${selectedCollateralsForOffer.length} garantía(s) real(es).` : ''}`
+      );
+    }
+  };
+
+  // Apertura de Modal de Aceptación y Desembolso
+  const handleOpenAcceptOfferModal = (offer: DynamicBankOffer) => {
+    sound.playClick();
+    setOfferToAccept(offer);
+    setAcceptError(null);
+    setAcceptDestinationAccount('checking');
+    setAcceptModalOpen(true);
+  };
+
+  const handleConfirmDisbursement = () => {
+    if (!offerToAccept) return;
+    setAcceptError(null);
+
+    // Validar vigencia
+    const isExpired = offerToAccept.expiresDay < state.currentDay && offerToAccept.expiresMonth <= state.currentMonth;
+    if (isExpired) {
+      setAcceptError(`La oferta venció el Día ${offerToAccept.expiresDay} y no puede ser contratada.`);
+      return;
+    }
+
+    // Validar si ya fue aceptada
+    if (offerToAccept.status === 'aceptada') {
+      setAcceptError('Esta oferta ya fue contratada y desembolsada anteriormente.');
+      return;
+    }
+
+    if (onAcceptOfferFromEmail) {
+      const res = onAcceptOfferFromEmail(offerToAccept, acceptDestinationAccount, offerToAccept.linkedCollateralIds);
+      if (!res.success) {
+        setAcceptError(res.message);
+        return;
+      }
+    }
+
+    sound.playApprovalStamp();
+    if (selectedEmail && onUpdateEmailState) {
+      onUpdateEmailState(selectedEmail.id, {
+        statusTag: 'Resuelto',
+        bankOfferPayload: {
+          ...offerToAccept,
+          status: 'aceptada',
+          acceptedDate: `Día ${state.currentDay}, Mes ${state.currentMonth} (${state.currentYear || 2026})`
+        }
+      });
+    }
+
+    setAcceptModalOpen(false);
+    setOfferToAccept(null);
   };
 
   return (
@@ -231,7 +460,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
           {/* Carpetas Principales */}
           <div className="space-y-1">
             <button
-              onClick={() => { sound.playClick(); setSelectedFolder('inbox'); }}
+              onClick={() => { sound.playClick(); setSelectedFolder('inbox'); setSelectedEmailId(null); }}
               className={`w-full text-left px-2 py-1.5 rounded-xs flex items-center justify-between font-bold cursor-pointer border ${
                 selectedFolder === 'inbox'
                   ? 'bg-[#000080] text-white border-blue-950 shadow-inner'
@@ -242,17 +471,17 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 <span>📥</span>
                 <span>Bandeja de Entrada</span>
               </div>
-              {unreadCount > 0 && (
+              {inboxUnreadCount > 0 && (
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
                   selectedFolder === 'inbox' ? 'bg-rose-500 text-white' : 'bg-blue-800 text-white'
                 }`}>
-                  {unreadCount}
+                  {inboxUnreadCount}
                 </span>
               )}
             </button>
 
             <button
-              onClick={() => { sound.playClick(); setSelectedFolder('starred'); }}
+              onClick={() => { sound.playClick(); setSelectedFolder('starred'); setSelectedEmailId(null); }}
               className={`w-full text-left px-2 py-1.5 rounded-xs flex items-center justify-between font-bold cursor-pointer border ${
                 selectedFolder === 'starred'
                   ? 'bg-[#000080] text-white border-blue-950 shadow-inner'
@@ -271,7 +500,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
             </button>
 
             <button
-              onClick={() => { sound.playClick(); setSelectedFolder('sent'); }}
+              onClick={() => { sound.playClick(); setSelectedFolder('sent'); setSelectedEmailId(null); }}
               className={`w-full text-left px-2 py-1.5 rounded-xs flex items-center justify-between font-bold cursor-pointer border ${
                 selectedFolder === 'sent'
                   ? 'bg-[#000080] text-white border-blue-950 shadow-inner'
@@ -285,7 +514,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
             </button>
 
             <button
-              onClick={() => { sound.playClick(); setSelectedFolder('archive'); }}
+              onClick={() => { sound.playClick(); setSelectedFolder('archive'); setSelectedEmailId(null); }}
               className={`w-full text-left px-2 py-1.5 rounded-xs flex items-center justify-between font-bold cursor-pointer border ${
                 selectedFolder === 'archive'
                   ? 'bg-[#000080] text-white border-blue-950 shadow-inner'
@@ -304,7 +533,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
             <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Categorías</span>
             <div className="space-y-0.5">
               <button
-                onClick={() => setSelectedCategory('all')}
+                onClick={() => { setSelectedCategory('all'); setSelectedEmailId(null); }}
                 className={`w-full text-left px-2 py-1 text-[11px] rounded-xs font-semibold cursor-pointer ${
                   selectedCategory === 'all' ? 'bg-slate-300 font-bold text-slate-950' : 'text-slate-700 hover:bg-slate-200'
                 }`}
@@ -318,7 +547,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 return (
                   <button
                     key={catKey}
-                    onClick={() => setSelectedCategory(catKey)}
+                    onClick={() => { setSelectedCategory(catKey); setSelectedEmailId(null); }}
                     className={`w-full text-left px-2 py-1 text-[11px] rounded-xs flex items-center justify-between cursor-pointer ${
                       selectedCategory === catKey ? 'bg-slate-300 font-bold text-slate-950' : 'text-slate-700 hover:bg-slate-200'
                     }`}
@@ -340,7 +569,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       {/* ------------------------------------------------------------- */}
       {/* PANEL CENTRAL: LISTA DE MENSAJES Y FILTROS                     */}
       {/* ------------------------------------------------------------- */}
-      <div className="w-80 bg-white border-r-2 border-[#808080] flex flex-col shrink-0">
+      <div className="w-84 bg-white border-r-2 border-[#808080] flex flex-col shrink-0">
         {/* Buscador y Controles Superiores */}
         <div className="p-2 bg-[#dfdfdf] border-b border-[#808080] space-y-1.5">
           <div className="relative flex items-center">
@@ -361,8 +590,38 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
               </button>
             )}
           </div>
+
+          {/* Barra de Filtros Rápidos y Acciones Masivas */}
+          <div className="flex items-center justify-between gap-1 text-[10px]">
+            <button
+              onClick={() => setOnlyUnread(!onlyUnread)}
+              className={`px-1.5 py-0.5 rounded-xs border font-bold cursor-pointer transition-colors ${
+                onlyUnread ? 'bg-amber-500 text-white border-amber-600 shadow-inner' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+              }`}
+            >
+              {onlyUnread ? '✓ Solo No Leídos' : 'Ver Todos'}
+            </button>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleMarkAllAsRead}
+                className="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xs font-semibold cursor-pointer active:scale-95"
+                title="Marcar todos como leídos"
+              >
+                Leer Todos
+              </button>
+              <button
+                onClick={handleArchiveRead}
+                className="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xs font-semibold cursor-pointer active:scale-95"
+                title="Archivar mensajes ya leídos"
+              >
+                Archivar Leídos
+              </button>
+            </div>
+          </div>
+
           <div className="flex justify-between items-center text-[10px] text-slate-600">
-            <span>{filteredEmails.length} mensaje(s) listados</span>
+            <span>{filteredEmails.length} mensaje(s) · {inboxUnreadCount} no leído(s)</span>
             <span className="font-mono">Día {state.currentDay}, Mes {state.currentMonth}</span>
           </div>
         </div>
@@ -393,7 +652,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-bold truncate text-[11px] text-slate-900 max-w-[170px]">
-                      {email.senderName}
+                      {email.senderName || email.sender}
                     </span>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
@@ -404,7 +663,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                         {email.isStarred ? '⭐' : '☆'}
                       </button>
                       <span className="text-[10px] text-slate-500 font-mono">
-                        Día {email.simDay}
+                        Día {email.simDay || email.dateDay || 1}
                       </span>
                     </div>
                   </div>
@@ -425,8 +684,16 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     </span>
 
                     {email.bankOfferPayload && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded-xs bg-indigo-100 text-indigo-900 border border-indigo-300 font-bold">
-                        Oferta Pre-Aprobada 🏛️
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-xs border font-bold ${
+                        email.bankOfferPayload.status === 'aceptada'
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : email.bankOfferPayload.status === 'en_negociacion'
+                          ? 'bg-blue-100 text-blue-900 border-blue-300'
+                          : email.bankOfferPayload.status === 'rechazada'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300'
+                          : 'bg-indigo-100 text-indigo-900 border-indigo-300'
+                      }`}>
+                        {email.bankOfferPayload.status === 'aceptada' ? 'Oferta Aceptada ✅' : 'Oferta Pre-Aprobada 🏛️'}
                       </span>
                     )}
 
@@ -465,6 +732,14 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 </button>
 
                 <button
+                  onClick={() => handleToggleReadStatus(selectedEmail)}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-400 font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                >
+                  <span>{selectedEmail.isRead ? '✉️' : '📩'}</span>
+                  <span>{selectedEmail.isRead ? 'Marcar No Leído' : 'Marcar Leído'}</span>
+                </button>
+
+                <button
                   onClick={() => handleToggleArchive(selectedEmail)}
                   className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-400 font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
                 >
@@ -476,13 +751,20 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
               <div className="flex items-center gap-1.5 text-[11px]">
                 <span className="text-slate-500 font-mono">Buzón:</span>
                 <span className="font-mono font-bold text-slate-800 bg-white border border-slate-300 px-1.5 py-0.5 rounded-xs">
-                  {selectedEmail.recipientEmail}
+                  {selectedEmail.recipientEmail || companyEmailAddress}
                 </span>
               </div>
             </div>
 
             {/* Contenido Completo del Correo con Scroll */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4">
+              {paymentSuccessFeedback && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-400 text-emerald-950 font-bold text-xs rounded flex justify-between items-center">
+                  <span>✅ {paymentSuccessFeedback}</span>
+                  <button onClick={() => setPaymentSuccessFeedback(null)} className="text-emerald-800 hover:text-black">✕</button>
+                </div>
+              )}
+
               {/* Metadatos del Mensaje */}
               <div className="border-b border-slate-300 pb-3 space-y-1">
                 <div className="flex justify-between items-start">
@@ -490,33 +772,51 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     {selectedEmail.subject}
                   </h2>
                   <span className="text-[11px] text-slate-500 font-mono shrink-0 ml-2">
-                    {selectedEmail.sentDate}
+                    {selectedEmail.sentDate || `Día ${selectedEmail.simDay || 1}, Mes ${selectedEmail.simMonth || 1} (2026)`}
                   </span>
                 </div>
 
                 <div className="flex items-baseline gap-2 text-xs">
                   <span className="text-slate-500 font-bold">De:</span>
-                  <span className="font-bold text-slate-900">{selectedEmail.senderName}</span>
+                  <span className="font-bold text-slate-900">{selectedEmail.senderName || selectedEmail.sender}</span>
                   <span className="text-slate-500 font-mono">&lt;{selectedEmail.senderEmail}&gt;</span>
                 </div>
 
                 <div className="flex items-baseline gap-2 text-xs">
                   <span className="text-slate-500 font-bold">Para:</span>
-                  <span className="font-mono text-slate-700">{selectedEmail.recipientEmail}</span>
+                  <span className="font-mono text-slate-700">{selectedEmail.recipientEmail || companyEmailAddress}</span>
                 </div>
               </div>
 
               {/* Tarjeta Interactiva de Oferta Bancaria Dinámica */}
               {selectedEmail.bankOfferPayload && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-400 p-3.5 rounded-xs space-y-2 shadow-xs">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-400 p-3.5 rounded-xs space-y-2.5 shadow-xs">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-800 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded">
-                        OFERTA DE FINANCIAMIENTO PRE-APROBADA
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-blue-800 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded">
+                          OFERTA DE FINANCIAMIENTO PRE-APROBADA
+                        </span>
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
+                          selectedEmail.bankOfferPayload.status === 'aceptada'
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : selectedEmail.bankOfferPayload.status === 'en_negociacion'
+                            ? 'bg-blue-100 text-blue-900 border-blue-300'
+                            : selectedEmail.bankOfferPayload.status === 'rechazada'
+                            ? 'bg-rose-100 text-rose-900 border-rose-300'
+                            : selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth
+                            ? 'bg-slate-200 text-slate-700 border-slate-300'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                        }`}>
+                          Estado: {selectedEmail.bankOfferPayload.status.toUpperCase()}
+                        </span>
+                      </div>
                       <h3 className="font-black text-sm text-blue-950 mt-1">
                         {selectedEmail.bankOfferPayload.title}
                       </h3>
+                      <p className="text-[11px] text-slate-600">
+                        Entidad Emisora: <strong>{COMMERCIAL_BANKS_PROFILES[selectedEmail.bankOfferPayload.bankId]?.name || selectedEmail.bankOfferPayload.bankId}</strong> | Vence el Día {selectedEmail.bankOfferPayload.expiresDay}, Mes {selectedEmail.bankOfferPayload.expiresMonth}
+                      </p>
                     </div>
                     <span className="text-2xl">🏛️</span>
                   </div>
@@ -548,16 +848,14 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button
-                      onClick={() => {
-                        if (onOpenWindow) onOpenWindow('bancos_comerciales');
-                      }}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-400 text-slate-800 font-bold text-xs cursor-pointer active:scale-95"
-                    >
-                      Ver Condiciones en Banco ➔
-                    </button>
+                  {selectedEmail.bankOfferPayload.previousTerms && (
+                    <div className="text-[10px] text-slate-500 bg-blue-50/50 p-1.5 border border-blue-100">
+                      Términos previos negociados: Monto {formatHNLAmount(selectedEmail.bankOfferPayload.previousTerms.amount)} · Tasa {selectedEmail.bankOfferPayload.previousTerms.rate}% · Plazo {selectedEmail.bankOfferPayload.previousTerms.term}m.
+                    </div>
+                  )}
 
+                  {/* Acciones de la Oferta */}
+                  <div className="flex justify-end gap-2 pt-1 flex-wrap">
                     <button
                       onClick={() => {
                         if (selectedEmail.bankOfferPayload && onOpenLoanTerms) {
@@ -565,13 +863,162 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                             selectedEmail.bankOfferPayload.bankId,
                             selectedEmail.bankOfferPayload.productType,
                             selectedEmail.bankOfferPayload.amountOrLimitHNL,
-                            selectedEmail.bankOfferPayload.termMonths
+                            selectedEmail.bankOfferPayload.termMonths,
+                            selectedEmail.bankOfferPayload.id
                           );
+                        } else if (onOpenWindow) {
+                          onOpenWindow('bancos_comerciales');
                         }
                       }}
+                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-400 text-slate-800 font-bold text-xs cursor-pointer active:scale-95"
+                    >
+                      Ver Condiciones en Banco ➔
+                    </button>
+
+                    <button
+                      onClick={() => handleStartNegotiateOffer(selectedEmail.bankOfferPayload!)}
+                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || (selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth)}
+                      className="px-3 py-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-slate-950 font-bold text-xs border border-amber-700 cursor-pointer active:scale-95"
+                    >
+                      💬 Negociar Condiciones
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenAcceptOfferModal(selectedEmail.bankOfferPayload!)}
+                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || (selectedEmail.bankOfferPayload.expiresDay < state.currentDay && selectedEmail.bankOfferPayload.expiresMonth <= state.currentMonth)}
+                      className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:bg-slate-400 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
+                    >
+                      {selectedEmail.bankOfferPayload.status === 'aceptada' ? 'Oferta Ya Contratada ✅' : 'Aceptar y Desembolsar ✍️'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Panel Desplegable de Negociación */}
+              {isNegotiating && selectedEmail?.bankOfferPayload && (
+                <div className="bg-amber-50/70 border-2 border-amber-400 p-3.5 rounded-xs space-y-3">
+                  <div className="flex justify-between items-center border-b border-amber-300 pb-1.5">
+                    <span className="font-bold text-amber-950 text-xs">
+                      Mesa de Negociación de Crédito (Dictamen Simulado de Comité Local)
+                    </span>
+                    <button
+                      onClick={() => setIsNegotiating(false)}
+                      className="text-slate-500 hover:text-black font-bold text-xs cursor-pointer"
+                    >
+                      Cerrar ✕
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-0.5">Monto Pretendido (HNL):</label>
+                      <input
+                        type="number"
+                        step={50000}
+                        value={negotiateAmount}
+                        onChange={(e) => setNegotiateAmount(Number(e.target.value))}
+                        className="w-full p-1.5 border border-slate-400 bg-white font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-0.5">Tasa Pretendida (% Anual):</label>
+                      <input
+                        type="number"
+                        step={0.25}
+                        min={7.5}
+                        max={18}
+                        value={negotiateRate}
+                        onChange={(e) => setNegotiateRate(Number(e.target.value))}
+                        className="w-full p-1.5 border border-slate-400 bg-white font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-0.5">Plazo Pretendido (Meses):</label>
+                      <select
+                        value={negotiateTerm}
+                        onChange={(e) => setNegotiateTerm(Number(e.target.value))}
+                        className="w-full p-1.5 border border-slate-400 bg-white font-bold"
+                      >
+                        <option value={12}>12 meses (1 año)</option>
+                        <option value={24}>24 meses (2 años)</option>
+                        <option value={36}>36 meses (3 años)</option>
+                        <option value={48}>48 meses (4 años)</option>
+                        <option value={60}>60 meses (5 años)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-0.5">Comisión Pretendida (%):</label>
+                      <input
+                        type="number"
+                        step={0.25}
+                        min={0.5}
+                        max={2.5}
+                        value={negotiateFee}
+                        onChange={(e) => setNegotiateFee(Number(e.target.value))}
+                        className="w-full p-1.5 border border-slate-400 bg-white font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Selector de Garantías Reales de Respaldo */}
+                  <div>
+                    <label className="block font-bold text-slate-800 text-[11px] mb-1">
+                      Aportar Garantías Reales para Respaldar la Contrapropuesta:
+                    </label>
+                    {(state.realEstateCollaterals || []).length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic bg-white p-2 border border-slate-300">
+                        No mantienes bienes inmuebles ni maquinaria registrados en tu catálogo patrimonial.
+                      </p>
+                    ) : (
+                      <div className="space-y-1 bg-white p-2 border border-slate-300 max-h-32 overflow-y-auto">
+                        {(state.realEstateCollaterals || []).map(col => {
+                          const avail = calculateCollateralAvailableCoverage(col);
+                          const isChecked = selectedCollateralsForOffer.includes(col.id);
+                          return (
+                            <label key={col.id} className="flex items-center justify-between p-1 hover:bg-slate-50 text-[11px] cursor-pointer">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedCollateralsForOffer([...selectedCollateralsForOffer, col.id]);
+                                    } else {
+                                      setSelectedCollateralsForOffer(selectedCollateralsForOffer.filter(id => id !== col.id));
+                                    }
+                                  }}
+                                />
+                                <span className="font-semibold">{col.title}</span>
+                              </div>
+                              <span className="font-mono text-slate-600">Disp: {formatHNLAmount(avail)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {negotiationResultFeedback && (
+                    <div className={`p-2.5 border text-xs ${
+                      negotiationResultFeedback.outcome === 'aprobado'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                        : negotiationResultFeedback.outcome === 'contraoferta'
+                        ? 'bg-blue-50 border-blue-300 text-blue-950 font-bold'
+                        : 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
+                    }`}>
+                      {negotiationResultFeedback.message}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleExecuteNegotiation}
                       className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
                     >
-                      Aceptar y Solicitar Desembolso ✍️
+                      Enviar Propuesta a Evaluación 📤
                     </button>
                   </div>
                 </div>
@@ -642,7 +1089,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                 <div className="border-t-2 border-blue-900 pt-3 space-y-2 bg-blue-50/30 p-3 rounded-xs">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-blue-950 text-xs">
-                      Redactando respuesta a: {selectedEmail.senderName} ({selectedEmail.senderEmail})
+                      Redactando respuesta a: {selectedEmail.senderName || selectedEmail.sender} ({selectedEmail.senderEmail})
                     </span>
                     <button
                       onClick={() => setIsReplying(false)}
@@ -660,7 +1107,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     className="w-full p-2 border border-slate-400 bg-white text-xs font-sans text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
                   />
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 flex-wrap">
                     <button
                       onClick={() => setReplyText('Aceptamos la propuesta en los términos estipulados. Procederemos con la formalización contractual y la firma digital.')}
                       className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-[10px] font-medium text-slate-700 cursor-pointer"
@@ -697,6 +1144,117 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       </div>
 
       {/* ------------------------------------------------------------- */}
+      {/* MODAL DE DESEMBOLSO Y ACEPTACIÓN DE OFERTA PRE-APROBADA        */}
+      {/* ------------------------------------------------------------- */}
+      {acceptModalOpen && offerToAccept && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-[#c0c0c0] border-2 border-white shadow-2xl max-w-lg w-full text-slate-900 font-sans p-1">
+            <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-bold px-2 py-1 flex justify-between items-center text-xs">
+              <span>✍️ Contratación y Desembolso de Oferta</span>
+              <button
+                onClick={() => setAcceptModalOpen(false)}
+                className="w-5 h-5 bg-red-600 hover:bg-red-700 text-white font-bold flex items-center justify-center text-xs cursor-pointer border border-white/50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-white border border-slate-400 mt-1 space-y-3 text-xs">
+              <div>
+                <h4 className="font-black text-sm text-slate-900">{offerToAccept.title}</h4>
+                <p className="text-[11px] text-slate-600">
+                  Banco Acreedor: <strong>{COMMERCIAL_BANKS_PROFILES[offerToAccept.bankId]?.name || offerToAccept.bankId}</strong>
+                </p>
+              </div>
+
+              {acceptError && (
+                <div className="p-2 bg-rose-50 border border-rose-400 text-rose-950 font-bold rounded">
+                  ⚠️ {acceptError}
+                </div>
+              )}
+
+              {/* Desglose de Condiciones Finales */}
+              <div className="space-y-1.5 border border-slate-300 p-2.5 bg-slate-50">
+                <div className="flex justify-between py-1 border-b">
+                  <span className="text-slate-600">Monto Aprobado:</span>
+                  <span className="font-mono font-bold text-slate-900">{formatHNLAmount(offerToAccept.amountOrLimitHNL)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b text-rose-700">
+                  <span>(-) Comisión de Apertura ({offerToAccept.openingFeePct}%):</span>
+                  <span className="font-mono font-bold">-{formatHNLAmount(Math.round(offerToAccept.amountOrLimitHNL * (offerToAccept.openingFeePct / 100)))}</span>
+                </div>
+                <div className="flex justify-between py-1.5 text-sm font-black bg-blue-100 px-2 border border-blue-300 text-blue-950">
+                  <span>DESEMBOLSO NETO LÍQUIDO:</span>
+                  <span className="font-mono text-emerald-800">
+                    {formatHNLAmount(offerToAccept.amountOrLimitHNL - Math.round(offerToAccept.amountOrLimitHNL * (offerToAccept.openingFeePct / 100)))}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 text-slate-700">
+                  <span>Cuota Mensual Pactada:</span>
+                  <span className="font-mono font-bold text-slate-900">{formatHNLAmount(offerToAccept.estimatedMonthlyPaymentHNL)}/mes</span>
+                </div>
+                <div className="flex justify-between py-1 text-slate-700">
+                  <span>Tasa Nominal / Plazo:</span>
+                  <span className="font-mono font-bold text-slate-900">{offerToAccept.annualRatePct}% anual · {offerToAccept.termMonths} meses</span>
+                </div>
+              </div>
+
+              {/* Selector de Cuenta Destino */}
+              <div>
+                <label className="block font-bold text-slate-700 text-xs mb-1">Cuenta de Acreditación de Fondos:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAcceptDestinationAccount('checking')}
+                    className={`p-2 border text-left cursor-pointer ${
+                      acceptDestinationAccount === 'checking'
+                        ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-500'
+                        : 'bg-white border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold block">Cuenta Corriente</span>
+                    <span className="text-[10px] text-slate-600">{formatHNLAmount(state.storeBankBalance)}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAcceptDestinationAccount('cash')}
+                    className={`p-2 border text-left cursor-pointer ${
+                      acceptDestinationAccount === 'cash'
+                        ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-500'
+                        : 'bg-white border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold block">Caja Chica (Efectivo)</span>
+                    <span className="text-[10px] text-slate-600">{formatHNLAmount(state.storeCash)}</span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-500 italic bg-amber-50 p-2 border border-amber-200">
+                Al confirmar, el importe líquido se acreditará inmediatamente, la deuda quedará registrada en el banco correspondiente y se emitirá el comprobante oficial.
+              </p>
+
+              <div className="pt-2 border-t flex justify-end gap-2">
+                <button
+                  onClick={() => setAcceptModalOpen(false)}
+                  className="px-3 py-1 bg-slate-200 hover:bg-slate-300 border border-slate-400 font-bold text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmDisbursement}
+                  className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
+                >
+                  Confirmar Desembolso Oficial ✍️
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* MODAL DE PAGO DIRECTO DESDE EL CORREO                          */}
       {/* ------------------------------------------------------------- */}
       {paymentModalOpen && paymentTarget && (
@@ -719,6 +1277,12 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                   Importe adeudado registrado: <strong>{formatHNLAmount(paymentTarget.amountDue)}</strong>
                 </p>
               </div>
+
+              {paymentError && (
+                <div className="p-2 bg-rose-50 border border-rose-400 text-rose-950 font-bold rounded">
+                  ⚠️ {paymentError}
+                </div>
+              )}
 
               {/* Selector de cuenta origen */}
               <div>

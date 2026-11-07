@@ -60,6 +60,7 @@ export interface SalesReceipt {
   tax: number;
   total: number;
   totalAmount?: number; // Alias de conveniencia
+  totalHNL?: number; // Alias en Lempiras
   costOfGoods: number;
   paymentMethod: 'efectivo' | 'tarjeta';
 }
@@ -280,6 +281,8 @@ export interface BankCommercialLoan {
   termMonthsRemaining: number;
   purpose: string;
   loanType?: CommercialLoanType;
+  productType?: CommercialLoanType;
+  originalAmount?: number;
   equipmentModel?: string;
   amortizedPrincipalTotal?: number;
   isRestructured?: boolean;
@@ -487,6 +490,10 @@ export interface SarTaxAuditRecord {
   solvenciaFiscalIssued: boolean;
   solvenciaExpirationYear: number;
   auditNotes: string[];
+  sarNoticesPending?: number;
+  totalTaxPaidYtd?: number;
+  sarAuditRiskScore?: number;
+  lastAuditResult?: string;
 }
 
 export interface DailySimulationState {
@@ -664,7 +671,11 @@ export interface RealEstateCollateralItem {
   situationNotes: string;
   // Compatibilidad hacia atrás
   pledgedToBankId?: CommercialBankId;
+  pledgedBankId?: CommercialBankId;
   linkedDebtId?: string;
+  appraisalDateDay?: number;
+  appraisalDateMonth?: number;
+  appraisalDateYear?: number;
 }
 
 export type VoucherOperationType = 
@@ -740,16 +751,42 @@ export interface DynamicBankOffer {
   title: string;
   amountOrLimitHNL: number;
   offeredAmount?: number;
+  approvedAmount?: number;
   annualRatePct: number;
+  interestRateAnnual?: number;
   termMonths: number;
   openingFeePct: number;
   requiresCollateral: boolean;
+  requiredCollateralPct?: number;
+  reasoning?: string;
   estimatedMonthlyPaymentHNL: number;
   expiresDay: number;
   expiresMonth: number;
   isPreApproved: boolean;
-  status: 'vigente' | 'negociando' | 'aceptada' | 'rechazada' | 'expirada' | 'disponible';
+  status: 'disponible' | 'en_negociacion' | 'aceptada' | 'rechazada' | 'vencida' | 'vigente' | 'negociando' | 'expirada';
   negotiatedRateDiscountPct?: number;
+  linkedCollateralIds?: string[];
+  previousTerms?: {
+    amount: number;
+    rate: number;
+    term: number;
+    fee: number;
+  };
+  negotiationHistory?: {
+    date: string;
+    requestedAmount: number;
+    requestedRate: number;
+    requestedTerm: number;
+    requestedFee: number;
+    bankResponse: 'aprobado' | 'contraoferta' | 'rechazado';
+    reason: string;
+    offeredAmount: number;
+    offeredRate: number;
+    offeredTerm: number;
+    offeredFee: number;
+  }[];
+  acceptedDate?: string;
+  disbursedVoucherId?: string;
 }
 
 export interface SimulatedEmail {

@@ -130,8 +130,10 @@ export function restoreDailySimulationState(saved: any): DailySimulationState {
   if (!Array.isArray(result.transactionVouchers)) {
     result.transactionVouchers = [];
   }
-  if (!Array.isArray(result.dynamicBankOffers)) {
-    result.dynamicBankOffers = [];
+  if (!Array.isArray(result.dynamicBankOffers) || result.dynamicBankOffers.length === 0) {
+    result.dynamicBankOffers = (result.simulatedEmails || [])
+      .filter((e: any) => e.bankOfferPayload)
+      .map((e: any) => e.bankOfferPayload!);
   }
   if (!Array.isArray(result.fiscalPeriods)) {
     result.fiscalPeriods = [];
