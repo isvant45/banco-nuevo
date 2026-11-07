@@ -75,38 +75,38 @@ REGLAS DE RESPUESTA:
 
     // Si hay cliente AI activo disponible
     if (ai) {
-      const contents = [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Historial de conversación previo: ${JSON.stringify(conversationHistory || [])}
+      try {
+        const contents = [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `Historial de conversación previo: ${JSON.stringify(conversationHistory || [])}
 Contraoferta o mensaje actual del jugador: "${playerCounterOffer || 'Solicito revisión de mis condiciones de crédito'}".
 Solicitud del jugador: Monto L ${Number(requestDetails?.amountHNL || 0).toLocaleString()}, Plazo ${requestDetails?.termMonths || 36} meses, Tasa deseada ${requestDetails?.targetRatePct || 12}%.
 Por favor evalúa y responde en formato JSON válido.`
-            }
-          ]
-        }
-      ];
+              }
+            ]
+          }
+        ];
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: 'application/json',
-        }
-      });
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+          }
+        });
 
-      const responseText = response.text || '{}';
-      try {
+        const responseText = response.text || '{}';
         const parsed = JSON.parse(responseText);
         // Garantizar que la propuesta respete los límites deterministas
         parsed.proposedAmountHNL = Math.min(parsed.proposedAmountHNL, deterministicLimits?.maxAmountHNL || 2000000);
         parsed.proposedRatePct = Math.max(parsed.proposedRatePct, deterministicLimits?.minInterestRatePct || 10.5);
         return res.json(parsed);
-      } catch (e) {
-        // Fallback si no parsea
+      } catch (geminiError) {
+        console.warn('Gemini API no disponible o en alta demanda, utilizando motor determinista:', geminiError);
       }
     }
 
