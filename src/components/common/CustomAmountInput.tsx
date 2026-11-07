@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export function formatHNLAmount(amount: number): string {
   if (isNaN(amount) || !isFinite(amount)) return 'L 0.00';
-  return `L ${amount.toLocaleString('es-HN', {
+  return `L ${amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`;
@@ -12,26 +12,61 @@ export function formatHNLAmount(amount: number): string {
  * Parsea cadenas con formatos monetarios habituales:
  * - "L 1,250.50"
  * - "1250,50"
- * - "1,250.50"
- * - " 25000 "
+ * - "L. 25,000.75"
+ * - "1.500.000,25"
+ * - "500.9"
+ * - "  75000.00  "
+ * - "0.05"
+ * Devuelve 0 para entradas vacías, y NaN para entradas inválidas o negativas.
  */
-export function parseMonetaryInput(val: string): number | null {
-  if (!val) return null;
-  // Eliminar prefijos de moneda, espacios y letras
-  let cleaned = val.replace(/^[Ll]\.?\s*/, '').trim();
-  if (!cleaned) return null;
+export function parseMonetaryInput(val: string): number {
+  if (val === undefined || val === null) return 0;
+  const str = String(val).trim();
+  if (str === '') return 0;
+  if (str.includes('-')) return NaN;
 
-  // Manejar formatos con coma como separador de decimales (ej. 1250,50)
-  if (cleaned.includes(',') && !cleaned.includes('.')) {
-    cleaned = cleaned.replace(',', '.');
-  } else if (cleaned.includes(',') && cleaned.includes('.')) {
-    // Caso de separador de miles y punto decimal: "1,250.50"
-    cleaned = cleaned.replace(/,/g, '');
+  // Eliminar prefijos de moneda como "L.", "L", "l.", "l"
+  let cleaned = str.replace(/^[Ll]\.?\s*/, '').trim();
+  if (!cleaned) return 0;
+
+  // Validar caracteres no numéricos
+  if (/[^0-9.,\s]/.test(cleaned)) {
+    return NaN;
+  }
+
+  // Detectar formato europeo vs formato americano
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastComma = cleaned.lastIndexOf(',');
+
+  if (lastDot !== -1 && lastComma !== -1) {
+    if (lastComma > lastDot) {
+      // Formato Europeo: 1.500.000,25 -> quitar puntos, cambiar coma por punto
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Formato US: 1,500,000.25 -> quitar comas
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else if (lastComma !== -1) {
+    // Solo comas presentes
+    const parts = cleaned.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      // Decimal con coma: "1250,50" -> "1250.50"
+      cleaned = parts[0] + '.' + parts[1];
+    } else {
+      // Separador de miles: "1,250" -> "1250"
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else {
+    // Solo puntos presentes
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      // Puntos como separadores de miles
+      cleaned = cleaned.replace(/\./g, '');
+    }
   }
 
   const num = parseFloat(cleaned);
-  if (isNaN(num) || !isFinite(num) || num < 0) return null;
-  // Redondear a 2 decimales para evitar imprecisión de punto flotante
+  if (isNaN(num) || !isFinite(num) || num < 0) return NaN;
   return Math.round(num * 100) / 100;
 }
 

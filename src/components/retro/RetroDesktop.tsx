@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   DailySimulationState, 
+  CommercialBankId,
   RetailSectorId, 
   RetroRoleMode,
   RetailCustomerWalkIn, 
@@ -61,6 +62,7 @@ import {
   executeInvoiceFactoring,
   createDefaultRealEstateCollaterals,
   executeFlexibleLoanPayment,
+  FlexibleLoanPaymentOptions,
   transferBetweenAccounts,
   requestNewAppraisal,
   registerNewAssetAsCollateral,
@@ -488,7 +490,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     purpose: string,
     graceMonths: number = 0,
     collateralId?: string,
-    destinationBankId?: string
+    destinationBankId?: CommercialBankId
   ) => {
     const res = requestFullCommercialCredit(
       simState,
@@ -513,15 +515,28 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     alert(res.message);
   };
 
-  const handleExecuteFlexiblePayment = (params: {
-    bankId: any;
-    paymentMode: 'una_cuota' | 'varias_cuotas' | 'pago_parcial' | 'abono_capital' | 'cancelar_prestamo';
-    amount: number;
-    numberOfInstallments?: number;
-    extraordinaryStrategy?: 'reducir_cuota' | 'reducir_plazo';
-    sourceAccount?: 'efectivo' | 'cuenta_bancaria';
-  }) => {
-    const res = executeFlexibleLoanPayment(simState, params);
+  const handleExecuteFlexiblePayment = (
+    bankIdOrParams: CommercialBankId | FlexibleLoanPaymentOptions,
+    paymentType?: 'cuota_mensual' | 'varias_cuotas' | 'pago_parcial' | 'abono_capital' | 'cancelacion_total',
+    amount?: number,
+    sourceAccount?: 'checking' | 'cash',
+    strategy?: 'reducir_cuota' | 'reducir_plazo',
+    numInstallments?: number
+  ) => {
+    let res;
+    if (typeof bankIdOrParams === 'string') {
+      res = executeFlexibleLoanPayment(
+        simState,
+        bankIdOrParams as CommercialBankId,
+        paymentType,
+        amount,
+        sourceAccount || 'checking',
+        strategy || 'reducir_plazo',
+        numInstallments || 1
+      );
+    } else {
+      res = executeFlexibleLoanPayment(simState, bankIdOrParams);
+    }
     setSimState(res.updatedState);
     if (res.success) {
       sound.playApprovalStamp();
@@ -535,8 +550,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   };
 
   const handleTransferBetweenAccounts = (
-    fromBankId: string,
-    toBankId: string,
+    fromBankId: CommercialBankId,
+    toBankId: CommercialBankId,
     amount: number,
     concept?: string
   ) => {
@@ -901,7 +916,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
     // Enviar resumen diario de ventas por correo si hubo cobros en el día
     if (nextState.dailyReceipts && nextState.dailyReceipts.length > 0) {
-      const totalVentasDia = nextState.dailyReceipts.reduce((sum, r) => sum + r.totalAmount, 0);
+      const totalVentasDia = nextState.dailyReceipts.reduce((sum, r) => sum + (r.totalAmount ?? r.total ?? 0), 0);
       const emailResumen: SimulatedEmail = {
         id: `em-sales-resumen-d${nextState.currentDay}-${Date.now()}`,
         dateDay: nextState.currentDay,
@@ -2259,7 +2274,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       >
         <BusinessEmailWindow
           state={simState}
-          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onUpdateState={(nextSt: DailySimulationState) => setSimState(nextSt)}
           companyName={entityName}
           onOpenBank={() => bringToFront('bancos_comerciales')}
           onOpenSar={() => bringToFront('sar_audit')}
@@ -2272,6 +2287,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       {activeVoucherModal && (
         <TransactionVoucherModal
           voucher={activeVoucherModal}
+          companyName={entityName}
           onClose={() => setActiveVoucherModal(null)}
         />
       )}
@@ -2289,7 +2305,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onAdvanceDay={handleAdvanceDay}
         onAdvanceDays={handleAdvanceDays}
         onOpenNewGame={() => setIsNewGameModalOpen(true)}
-        onOpenAuditReport={onOpenAuditReport}
+        onOpenAuditReport={onOpenAuditReport || (() => {})}
         onOpenBusinessEmail={() => bringToFront('business_email')}
         unreadEmailsCount={simState.simulatedEmails?.filter(e => !e.isRead).length || 0}
         onOpenFinancialStatements={() => bringToFront('financial_statements')}

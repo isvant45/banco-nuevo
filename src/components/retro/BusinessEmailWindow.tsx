@@ -14,6 +14,10 @@ import { sound } from '../../game/audioFx';
 interface BusinessEmailWindowProps {
   state: DailySimulationState;
   companyName: string;
+  onUpdateState?: (nextSt: DailySimulationState) => void;
+  onOpenBank?: () => void;
+  onOpenSar?: () => void;
+  onOpenRegister?: () => void;
   onOpenLoanTerms?: (bankId: CommercialBankId, productType: CommercialLoanType, amount: number, termMonths: number) => void;
   onPayLoanFromEmail?: (bankId: CommercialBankId, amount: number, payFromAccount: 'checking' | 'cash') => void;
   onPaySarFromEmail?: (amount: number, payFromAccount: 'checking' | 'cash') => void;
@@ -83,8 +87,9 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       if (selectedFolder === 'archive' && !email.isArchived) return false;
 
       // Filtro de Cuenta
-      if (accountFilter === 'company' && !email.recipientEmail.includes('gerencia@')) return false;
-      if (accountFilter === 'personal' && !email.recipientEmail.includes('propietario@')) return false;
+      const recip = (email.recipientEmail || email.recipient || '').toLowerCase();
+      if (accountFilter === 'company' && !recip.includes('gerencia@')) return false;
+      if (accountFilter === 'personal' && !recip.includes('propietario@')) return false;
 
       // Categoría
       if (selectedCategory !== 'all' && email.category !== selectedCategory) return false;
@@ -92,9 +97,10 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       // Buscador
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
-        const matchesSubject = email.subject.toLowerCase().includes(q);
-        const matchesSender = email.senderName.toLowerCase().includes(q) || email.senderEmail.toLowerCase().includes(q);
-        const matchesBody = email.body.toLowerCase().includes(q);
+        const matchesSubject = (email.subject || '').toLowerCase().includes(q);
+        const senderName = email.senderName || email.sender || '';
+        const matchesSender = senderName.toLowerCase().includes(q) || (email.senderEmail || '').toLowerCase().includes(q);
+        const matchesBody = (email.body || '').toLowerCase().includes(q);
         if (!matchesSubject && !matchesSender && !matchesBody) return false;
       }
 

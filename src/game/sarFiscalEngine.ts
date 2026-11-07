@@ -47,11 +47,12 @@ export function getOrCreateCurrentFiscalPeriod(state: DailySimulationState): Sar
  */
 export function fileSarDeclaration(
   state: DailySimulationState,
-  fiscalYear: number
+  fiscalYear: number,
+  periodMonth?: number
 ): { updatedState: DailySimulationState; success: boolean; message: string } {
   const currentPeriod = getOrCreateCurrentFiscalPeriod(state);
 
-  if (currentPeriod.isDeclared) {
+  if (currentPeriod.isDeclared && state.sarTaxRecord?.isFiled) {
     return {
       updatedState: state,
       success: false,
@@ -103,6 +104,8 @@ export function fileSarDeclaration(
       simulatedEmails: [sarEmail, ...(state.simulatedEmails || [])],
       sarTaxRecord: {
         ...state.sarTaxRecord,
+        isFiled: true,
+        pendingTaxDue: updatedPeriod.calculatedTaxAmount,
         isrTaxAmount: updatedPeriod.calculatedTaxAmount,
         isPaid: false
       }
@@ -118,7 +121,7 @@ export function fileSarDeclaration(
 export function paySarTaxObligation(
   state: DailySimulationState,
   amountToPay: number,
-  payFromAccount: 'checking' | 'cash' = 'checking',
+  payFromAccount: 'checking' | 'cash' | 'cuenta_bancaria' | 'caja' = 'checking',
   selectedBankId?: CommercialBankId
 ): { updatedState: DailySimulationState; success: boolean; message: string; voucher?: TransactionVoucher } {
   if (amountToPay <= 0) {
@@ -128,19 +131,24 @@ export function paySarTaxObligation(
   const period = getOrCreateCurrentFiscalPeriod(state);
   const remainingDebt = period.isPaid ? 0 : Math.max(0, period.calculatedTaxAmount - period.paidAmountHNL);
 
-  if (remainingDebt <= 0) {
+  const pendingRecord = state.sarTaxRecord?.pendingTaxDue ?? remainingDebt;
+  const effectiveDebt = Math.max(remainingDebt, pendingRecord);
+
+  if (effectiveDebt <= 0 && state.sarTaxRecord?.isPaid) {
     return { updatedState: state, success: false, message: 'No existen saldos pendientes de pago para este periodo fiscal.' };
   }
 
-  const actualPayment = Math.min(amountToPay, remainingDebt);
+  const actualPayment = Math.min(amountToPay, effectiveDebt > 0 ? effectiveDebt : amountToPay);
+
+  const isCash = payFromAccount === 'cash' || payFromAccount === 'caja';
 
   // Verificar fondos disponibles
-  const availableFunds = payFromAccount === 'checking' ? state.storeBankBalance : state.storeCash;
+  const availableFunds = isCash ? state.storeCash : state.storeBankBalance;
   if (availableFunds < actualPayment) {
     return {
       updatedState: state,
       success: false,
-      message: `Fondos insuficientes en ${payFromAccount === 'checking' ? 'cuenta bancaria' : 'caja chica'} para realizar el pago al SAR. Disponibles: L ${availableFunds.toLocaleString()}.`
+      message: `Fondos insuficientes en ${isCash ? 'caja chica' : 'cuenta bancaria'} para realizar el pago al SAR. Disponibles: L ${availableFunds.toLocaleString()}.`
     };
   }
 
@@ -243,8 +251,9 @@ export function paySarTaxObligation(
       simulatedEmails: [paymentEmail, ...(state.simulatedEmails || [])],
       sarTaxRecord: {
         ...state.sarTaxRecord,
+        pendingTaxDue: Math.max(0, (state.sarTaxRecord?.pendingTaxDue ?? period.calculatedTaxAmount) - actualPayment),
         isrTaxAmount: Math.max(0, period.calculatedTaxAmount - newPeriodPaidAmount),
-        isPaid: isFullyPaid
+        isPaid: isFullyPaid || Math.max(0, (state.sarTaxRecord?.pendingTaxDue ?? period.calculatedTaxAmount) - actualPayment) === 0
       }
     },
     success: true,
@@ -264,6 +273,8 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
   updatedState: DailySimulationState;
   success: boolean;
   message: string;
+  solvenciaIssued: boolean;
+  certificateText?: string;
   checklist: {
     declarationFiled: boolean;
     taxesFullyPaid: boolean;
@@ -278,9 +289,13 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
   };
 } {
   const currentPeriod = getOrCreateCurrentFiscalPeriod(state);
+  const isPendingDue = (state.sarTaxRecord?.pendingTaxDue ?? 0) > 0 || (currentPeriod.calculatedTaxAmount - currentPeriod.paidAmountHNL) > 0;
+  const isDeclared = currentPeriod.isDeclared || (state.sarTaxRecord?.isFiled ?? false);
+  const isPaid = !isPendingDue && (currentPeriod.isPaid || (state.sarTaxRecord?.isPaid ?? false));
+
   const checklist = {
-    declarationFiled: currentPeriod.isDeclared,
-    taxesFullyPaid: currentPeriod.isPaid,
+    declarationFiled: isDeclared,
+    taxesFullyPaid: isPaid,
     noPendingFines: true // No hay multas acumuladas
   };
 
@@ -289,11 +304,12 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
   if (!isEligible) {
     const missing: string[] = [];
     if (!checklist.declarationFiled) missing.push('Presentar la Declaración Jurada anual (Formulario SAR-25).');
-    if (!checklist.taxesFullyPaid) missing.push(`Liquidar el saldo del impuesto pendiente (L ${(currentPeriod.calculatedTaxAmount - currentPeriod.paidAmountHNL).toLocaleString()}).`);
+    if (!checklist.taxesFullyPaid) missing.push(`Liquidar el saldo del impuesto pendiente.`);
 
     return {
       updatedState: state,
       success: false,
+      solvenciaIssued: false,
       message: `Solicitud rechazada: Tu empresa NO reúne los requisitos de Solvencia Fiscal. Requisitos faltantes:\n• ${missing.join('\n• ')}`,
       checklist
     };
@@ -314,6 +330,8 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
   const currentPeriods = state.fiscalPeriods || [];
   const nextPeriods = currentPeriods.map(p => p.fiscalYear === updatedPeriod.fiscalYear ? updatedPeriod : p);
 
+  const certBody = `Constancia de Solvencia Fiscal - SAR Honduras:\n\nSe certifica que la empresa mercantil ${state.storeName} se encuentra formalmente SOLVENTE ante el Fisco Nacional:\n\n• Certificado No.: ${certNumber}\n• Fecha de Emisión: ${timestampStr}\n• Vigencia: 90 Días (${expiryDateStr})\n• Calificación Tributaria: Cumplidor Puntual (Riesgo Cero)\n\nSIMULACIÓN — SIN VALIDEZ OFICIAL. Documento de control interno de la simulación.`;
+
   // Email formal con certificado
   const certEmail: SimulatedEmail = {
     id: `email-sar-cert-${Date.now()}`,
@@ -323,7 +341,7 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
     recipientEmail: `gerencia@${state.storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.hn`,
     companyName: state.storeName,
     subject: `Constancia Oficial de Solvencia Fiscal Emitida: Certificado No. ${certNumber}`,
-    body: `Constancia de Solvencia Fiscal - SAR Honduras:\n\nSe certifica que la empresa mercantil ${state.storeName} se encuentra formalmente SOLVENTE ante el Fisco Nacional:\n\n• Certificado No.: ${certNumber}\n• Fecha de Emisión: ${timestampStr}\n• Vigencia: 90 Días (${expiryDateStr})\n• Calificación Tributaria: Cumplidor Puntual (Riesgo Cero)\n\nSIMULACIÓN — SIN VALIDEZ OFICIAL. Documento de control interno de la simulación.`,
+    body: certBody,
     sentDate: timestampStr,
     simDay: state.currentDay,
     simMonth: state.currentMonth,
@@ -341,9 +359,15 @@ export function requestSarSolvenciaCertificate(state: DailySimulationState): {
       ...state,
       fiscalSolvenciaActive: true,
       fiscalPeriods: nextPeriods,
-      simulatedEmails: [certEmail, ...(state.simulatedEmails || [])]
+      simulatedEmails: [certEmail, ...(state.simulatedEmails || [])],
+      sarTaxRecord: {
+        ...state.sarTaxRecord,
+        solvenciaFiscalIssued: true
+      }
     },
     success: true,
+    solvenciaIssued: true,
+    certificateText: certBody,
     message: `¡Constancia de Solvencia Fiscal No. ${certNumber} emitida con éxito! Válida por 90 días del calendario simulado.`,
     checklist,
     certificateData: {

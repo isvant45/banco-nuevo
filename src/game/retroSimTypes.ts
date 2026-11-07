@@ -59,6 +59,7 @@ export interface SalesReceipt {
   subtotal: number;
   tax: number;
   total: number;
+  totalAmount?: number; // Alias de conveniencia
   costOfGoods: number;
   paymentMethod: 'efectivo' | 'tarjeta';
 }
@@ -266,6 +267,7 @@ export type CommercialLoanType =
   | 'credito_proveedores'
   | 'leasing_financiero'
   | 'factoraje_facturas'
+  | 'credito_empresarial'
   | 'reestructurado';
 
 export interface BankCommercialLoan {
@@ -290,6 +292,10 @@ export interface BankCommercialLoan {
   leasingBuyoutOptionHNL?: number;
   factoredInvoiceAmount?: number;
   factoringDiscountPct?: number;
+  // Aliases de conveniencia y compatibilidad
+  remainingBalance?: number;
+  paidInstallments?: number;
+  status?: 'activo' | 'al_dia' | 'en_mora' | 'cancelado' | 'reestructurado';
 }
 
 export type CorporateCardTierId = 'business_standard' | 'corporate_gold' | 'infinite_black';
@@ -318,10 +324,12 @@ export interface CorporateCardRewardItem {
 
 export interface BankCorporateCreditCard {
   cardId: string;
+  cardNumber?: string; // Alias para display formateado
   bankId: CommercialBankId;
   brand: string; // ej: "Visa Signature Corporativa"
   tier?: CorporateCardTierId;
   creditLimit: number;
+  availableCredit?: number; // Alias de conveniencia
   currentBalance: number;
   interestRateAnnual: number;
   minPaymentMonthly: number;
@@ -339,6 +347,9 @@ export interface BankCheckingAccount {
   overdraftUsed: number;
   checksUsedCount: number;
   interestRateAnnual?: number; // Tasa pasiva de rendimiento anual negociada
+  interestRateYieldPct?: number;
+  openedDay?: number;
+  monthlyFeeHNL?: number;
 }
 
 export interface BankGuaranteeDeposit {
@@ -359,10 +370,12 @@ export interface BankTermDeposit {
   bankId: CommercialBankId;
   principalAmount: number;
   annualRatePct: number;
+  interestRateAnnual?: number; // Alias de conveniencia
   tierBonusPct?: number; // Bonificación de tasa por tramo de capital (+0.5% a +2.2%)
   effectiveRatePct?: number; // Tasa base + bonificación
   termDays: number;
   daysRemaining: number;
+  maturesDay?: number; // Alias día de vencimiento
   accruedInterest: number;
   currentBalance?: number; // Capital + interés compuesto acumulado
   isEarlyLiquidated?: boolean;
@@ -373,6 +386,7 @@ export interface CommercialBankRelationship {
   relationshipScore: number; // 0 - 100
   checkingAccount?: BankCheckingAccount;
   activeLoan?: BankCommercialLoan;
+  loans?: BankCommercialLoan[];
   corporateCard?: BankCorporateCreditCard;
   guaranteeDeposits: BankGuaranteeDeposit[];
   termDeposits: BankTermDeposit[];
@@ -466,6 +480,8 @@ export interface SarTaxAuditRecord {
   netTaxableIncome: number; // Base Imponible (Renta Neta Gravable)
   taxRatePct: number; // 25% ISR en Honduras
   isrTaxAmount: number; // Impuesto Sobre la Renta calculado
+  pendingTaxDue?: number;
+  isFiled?: boolean;
   isPaid: boolean;
   auditStatus: 'pendiente' | 'aprobada_conforme' | 'reparos_auditados';
   solvenciaFiscalIssued: boolean;
@@ -597,6 +613,7 @@ export type CollateralAssetType =
   | 'casa_habitacion' 
   | 'terreno_comercial' 
   | 'local_bodega' 
+  | 'planta_industrial'
   | 'vehiculo_comercial' 
   | 'maquinaria_pesada' 
   | 'deposito_plazo' 
@@ -607,6 +624,7 @@ export type CollateralStatus = 'disponible' | 'pignorado_parcial' | 'pignorado_t
 export interface CollateralLien {
   id: string;
   rank: 1 | 2; // 1er o 2do rango
+  priorityRank?: 1 | 2;
   beneficiaryBankId: CommercialBankId;
   beneficiaryBankName: string;
   linkedLoanId: string;
@@ -624,11 +642,18 @@ export interface RealEstateCollateralItem {
   location: string;
   status: CollateralStatus;
   acquisitionValueHNL: number;
+  acquisitionValue?: number;
   marketValueHNL: number;
+  marketValue?: number;
   appraisalValueHNL: number; // Valor de avalúo oficial
+  appraisalValue?: number;
   appraisalDate: string;
   ltvAcceptedPct: number; // Porcentaje aceptado de cobertura (ej: 75% u 80%)
+  ltvPercentage?: number;
   eligibleCollateralValueHNL: number; // Avalúo * % LTV
+  eligibleValue?: number;
+  committedCoverage?: number;
+  availableCoverage?: number;
   liens: CollateralLien[];
   pledgedAmountTotal: number;
   availableCoverageHNL: number;
@@ -657,7 +682,7 @@ export type VoucherOperationType =
 export interface TransactionVoucher {
   id: string;
   voucherNumber: string;
-  operationType: VoucherOperationType;
+  operationType: VoucherOperationType | string;
   title: string;
   timestamp: string;
   simDay: number;
@@ -665,18 +690,23 @@ export interface TransactionVoucher {
   simYear: number;
   companyName: string;
   primaryBankId?: CommercialBankId;
+  sourceBankId?: CommercialBankId;
   destinationBankId?: CommercialBankId;
   accountNumber?: string;
   destinationAccountNumber?: string;
   grossAmountHNL: number;
+  amount?: number;
   deductionsHNL: number;
+  openingFeeDeduction?: number;
   netDisbursedOrPaidHNL: number;
+  netDisbursement?: number;
   deductionsBreakdown?: {
     concept: string;
     amountHNL: number;
   }[];
   priorBalanceHNL: number;
   newBalanceHNL: number;
+  newBalance?: number;
   loanBalancePriorHNL?: number;
   loanBalanceNewHNL?: number;
   distributionBreakdown?: {
@@ -689,6 +719,7 @@ export interface TransactionVoucher {
   referenceCode: string;
   authStamp: string;
   notes?: string;
+  description?: string;
 }
 
 export type EmailCategory = 
@@ -708,6 +739,7 @@ export interface DynamicBankOffer {
   productType: CommercialLoanType;
   title: string;
   amountOrLimitHNL: number;
+  offeredAmount?: number;
   annualRatePct: number;
   termMonths: number;
   openingFeePct: number;
@@ -716,29 +748,37 @@ export interface DynamicBankOffer {
   expiresDay: number;
   expiresMonth: number;
   isPreApproved: boolean;
-  status: 'vigente' | 'negociando' | 'aceptada' | 'rechazada' | 'expirada';
+  status: 'vigente' | 'negociando' | 'aceptada' | 'rechazada' | 'expirada' | 'disponible';
   negotiatedRateDiscountPct?: number;
 }
 
 export interface SimulatedEmail {
   id: string;
   category: EmailCategory;
-  senderName: string;
+  senderName?: string;
+  sender?: string; // Alias de remitente
   senderEmail: string;
-  recipientEmail: string;
-  companyName: string;
+  recipientEmail?: string;
+  recipient?: string; // Alias de destinatario
+  companyName?: string;
   subject: string;
   body: string;
-  sentDate: string;
-  simDay: number;
-  simMonth: number;
-  simYear: number;
+  sentDate?: string;
+  simDay?: number;
+  simMonth?: number;
+  simYear?: number;
+  dateDay?: number; // Alias día
+  dateMonth?: number; // Alias mes
+  dateYear?: number; // Alias año
+  snippet?: string; // Resumen breve
+  status?: string; // Estado de la notificación
   isRead: boolean;
   isStarred: boolean;
-  isArchived: boolean;
-  folder: 'inbox' | 'starred' | 'sent' | 'archive';
+  isArchived?: boolean;
+  folder?: 'inbox' | 'starred' | 'sent' | 'archive';
   relatedEntityType?: 'loan_payment' | 'bank_offer' | 'customer_order' | 'supplier_invoice' | 'sar_obligation' | 'collateral_asset' | 'daily_summary';
   relatedEntityId?: string;
+  voucherId?: string;
   bankOfferPayload?: DynamicBankOffer;
   paymentNoticePayload?: {
     targetType: 'loan' | 'sar' | 'supplier';

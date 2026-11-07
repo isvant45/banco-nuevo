@@ -101,7 +101,7 @@ describe('Aceptación A: Corrección del desembolso de préstamos bancarios', ()
   it('Acredita el desembolso neto en la cuenta de cheques seleccionada y sincroniza storeBankBalance', () => {
     const state = createMockSimState();
     const targetBankId = 'ficohsa';
-    const initialChecking = state.commercialBanks[targetBankId].checkingAccount.balance;
+    const initialChecking = state.commercialBanks[targetBankId]!.checkingAccount!.balance;
     const initialStoreBank = state.storeBankBalance;
 
     const approvedAmount = 200000;
@@ -120,7 +120,7 @@ describe('Aceptación A: Corrección del desembolso de préstamos bancarios', ()
     assert.equal(res.success, true);
     assert.ok(res.voucher, 'Debe generar un TransactionVoucher');
 
-    const updatedChecking = res.updatedState.commercialBanks[targetBankId].checkingAccount.balance;
+    const updatedChecking = res.updatedState.commercialBanks[targetBankId]!.checkingAccount!.balance;
     const updatedStoreBank = res.updatedState.storeBankBalance;
 
     // Comisión de apertura 1.5% CNBS
@@ -144,7 +144,7 @@ describe('Aceptación A: Corrección del desembolso de préstamos bancarios', ()
     const state = createMockSimState();
     const lendingBankId = 'ficohsa';
     const destBankId = 'atlantida';
-    const initDestChecking = state.commercialBanks[destBankId].checkingAccount.balance;
+    const initDestChecking = state.commercialBanks[destBankId]!.checkingAccount!.balance;
 
     const res = requestFullCommercialCredit(
       state,
@@ -160,7 +160,7 @@ describe('Aceptación A: Corrección del desembolso de préstamos bancarios', ()
 
     assert.equal(res.success, true);
     const expectedNet = 100000 - Math.round(100000 * 0.015);
-    assert.equal(res.updatedState.commercialBanks[destBankId].checkingAccount.balance, initDestChecking + expectedNet);
+    assert.equal(res.updatedState.commercialBanks[destBankId]!.checkingAccount!.balance, initDestChecking + expectedNet);
   });
 });
 
@@ -191,14 +191,14 @@ describe('Aceptación B: Entrada y parseo de cualquier monto personalizado', () 
 describe('Aceptación C: Validación sin recorte silencioso del monto', () => {
   it('Rechaza transferencias o pagos que excedan el saldo disponible explicando el motivo exacto', () => {
     const state = createMockSimState();
-    const checkingBalance = state.commercialBanks.ficohsa.checkingAccount.balance;
+    const checkingBalance = state.commercialBanks.ficohsa.checkingAccount!.balance;
     const excessiveAmount = checkingBalance + 100000;
 
     const res = transferBetweenAccounts(state, 'ficohsa', 'atlantida', excessiveAmount);
     assert.equal(res.success, false);
     assert.ok(res.message.includes('Fondos insuficientes'), 'Debe reportar falta de fondos explícitamente');
     // El balance no debe cambiar
-    assert.equal(res.updatedState.commercialBanks.ficohsa.checkingAccount.balance, checkingBalance);
+    assert.equal(res.updatedState.commercialBanks.ficohsa.checkingAccount!.balance, checkingBalance);
   });
 });
 
@@ -216,10 +216,10 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
       0
     );
     const loanState = loanRes.updatedState;
-    const activeLoan = loanState.commercialBanks.ficohsa.loans[0];
+    const activeLoan = loanState.commercialBanks.ficohsa.loans![0];
     assert.ok(activeLoan, 'Debe haber un préstamo activo');
 
-    const initialRemaining = activeLoan.remainingBalance;
+    const initialRemaining = activeLoan.remainingBalance!;
     const paymentRes = executeFlexibleLoanPayment(loanState, {
       bankId: 'ficohsa',
       paymentMode: 'una_cuota',
@@ -229,8 +229,8 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
 
     assert.equal(paymentRes.success, true);
     assert.ok(paymentRes.voucher, 'Debe generar comprobante de pago');
-    const updatedLoan = paymentRes.updatedState.commercialBanks.ficohsa.loans[0];
-    assert.ok(updatedLoan.remainingBalance < initialRemaining, 'El capital remanente debe haberse reducido');
+    const updatedLoan = paymentRes.updatedState.commercialBanks.ficohsa.loans![0];
+    assert.ok(updatedLoan.remainingBalance! < initialRemaining, 'El capital remanente debe haberse reducido');
     assert.equal(updatedLoan.paidInstallments, 1);
   });
 
@@ -238,7 +238,7 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
     const baseState = createMockSimState();
     const loanRes = requestFullCommercialCredit(baseState, 'ficohsa', 'credito_empresarial', 100000, 12, 'Inv');
     const loanState = loanRes.updatedState;
-    const loan = loanState.commercialBanks.ficohsa.loans[0];
+    const loan = loanState.commercialBanks.ficohsa.loans![0];
 
     const partialAmount = Math.round(loan.monthlyPayment * 0.5); // 50% de la cuota
     const payRes = executeFlexibleLoanPayment(loanState, {
@@ -249,19 +249,19 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
     });
 
     assert.equal(payRes.success, true);
-    const updatedLoan = payRes.updatedState.commercialBanks.ficohsa.loans[0];
+    const updatedLoan = payRes.updatedState.commercialBanks.ficohsa.loans![0];
     assert.equal(updatedLoan.paidInstallments, 0, 'Un pago parcial no debe incrementar la cantidad de cuotas completas saldadas');
-    assert.ok(updatedLoan.remainingBalance < loan.remainingBalance, 'Debe amortizar el remanente neto al capital');
+    assert.ok(updatedLoan.remainingBalance! < loan.remainingBalance!, 'Debe amortizar el remanente neto al capital');
   });
 
   it('Cancela completamente el préstamo cobrando únicamente el saldo de capital remanente e interés devengado sin intereses futuros no incurridos', () => {
     const baseState = createMockSimState();
     const loanRes = requestFullCommercialCredit(baseState, 'ficohsa', 'credito_empresarial', 50000, 12, 'Inv');
     const loanState = loanRes.updatedState;
-    const loan = loanState.commercialBanks.ficohsa.loans[0];
+    const loan = loanState.commercialBanks.ficohsa.loans![0];
 
     // Asegurar saldo suficiente en cuenta
-    loanState.commercialBanks.ficohsa.checkingAccount.balance = 200000;
+    loanState.commercialBanks.ficohsa.checkingAccount!.balance = 200000;
     loanState.storeBankBalance = 200000;
 
     const cancelRes = executeFlexibleLoanPayment(loanState, {
@@ -272,17 +272,17 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
     });
 
     assert.equal(cancelRes.success, true);
-    const updatedLoan = cancelRes.updatedState.commercialBanks.ficohsa.loans[0];
+    const updatedLoan = cancelRes.updatedState.commercialBanks.ficohsa.loans![0];
     assert.equal(updatedLoan.status, 'cancelado');
     assert.equal(updatedLoan.remainingBalance, 0);
-    assert.ok(cancelRes.voucher?.description.includes('Liquidación total'));
+    assert.ok(cancelRes.voucher?.description?.includes('Liquidación total'));
   });
 
   it('Abono a capital con reducción de cuota mensual recalcula la cuota restante', () => {
     const baseState = createMockSimState();
     const loanRes = requestFullCommercialCredit(baseState, 'ficohsa', 'credito_empresarial', 150000, 24, 'Inv');
     const loanState = loanRes.updatedState;
-    const loan = loanState.commercialBanks.ficohsa.loans[0];
+    const loan = loanState.commercialBanks.ficohsa.loans![0];
     const initialMonthlyPayment = loan.monthlyPayment;
 
     const abonoRes = executeFlexibleLoanPayment(loanState, {
@@ -294,7 +294,7 @@ describe('Aceptación D: Pagos flexibles de préstamos y abonos extraordinarios'
     });
 
     assert.equal(abonoRes.success, true);
-    const updatedLoan = abonoRes.updatedState.commercialBanks.ficohsa.loans[0];
+    const updatedLoan = abonoRes.updatedState.commercialBanks.ficohsa.loans![0];
     assert.ok(updatedLoan.monthlyPayment < initialMonthlyPayment, 'La cuota mensual debe haberse reducido');
   });
 });
@@ -305,13 +305,13 @@ describe('Aceptación E: Ofertas bancarias dinámicas y no coercitivas', () => {
     const updated = evaluateAndGenerateBankOffers(state);
 
     assert.ok(updated.dynamicBankOffers && updated.dynamicBankOffers.length > 0, 'Debe haber generado ofertas bancarias dinámicas');
-    const offer = updated.dynamicBankOffers[0];
-    assert.ok(offer.offeredAmount > 0);
+    const offer = updated.dynamicBankOffers![0];
+    assert.ok((offer.offeredAmount ?? 0) > 0);
     assert.ok(offer.annualRatePct > 0);
     assert.equal(offer.status, 'disponible');
 
     // Comprobar que tener ofertas en estado disponible no crea préstamos en commercialBanks
-    const loansCount = updated.commercialBanks[offer.bankId].loans.length;
+    const loansCount = updated.commercialBanks[offer.bankId].loans!.length;
     assert.equal(loansCount, 0, 'Tener una oferta en bandeja no debe generar deuda activa');
   });
 });
@@ -331,7 +331,7 @@ describe('Aceptación F: SAR, Declaración Jurada e Impuestos (25% ISR)', () => 
     const fileRes = fileSarDeclaration(state, 2026, 1);
     assert.equal(fileRes.success, true);
     assert.equal(fileRes.updatedState.sarTaxRecord.isFiled, true);
-    assert.ok(fileRes.updatedState.sarTaxRecord.pendingTaxDue > 0, 'Debe calcular el ISR adeudado');
+    assert.ok((fileRes.updatedState.sarTaxRecord.pendingTaxDue ?? 0) > 0, 'Debe calcular el ISR adeudado');
 
     // 2. Comprobar que la solvencia se niega mientras el impuesto esté pendiente de pago
     const solvenciaCheck = requestSarSolvenciaCertificate(fileRes.updatedState);
@@ -340,7 +340,7 @@ describe('Aceptación F: SAR, Declaración Jurada e Impuestos (25% ISR)', () => 
     // 3. Pagar la obligación fiscal mediante cuenta bancaria
     const payRes = paySarTaxObligation(
       fileRes.updatedState,
-      fileRes.updatedState.sarTaxRecord.pendingTaxDue,
+      fileRes.updatedState.sarTaxRecord.pendingTaxDue!,
       'cuenta_bancaria',
       'ficohsa'
     );
@@ -357,10 +357,10 @@ describe('Aceptación F: SAR, Declaración Jurada e Impuestos (25% ISR)', () => 
 describe('Aceptación G: Garantías reales, LTV, gravámenes de prelación y bloqueo de enajenación', () => {
   it('Calcula el valor computable elegible (Avalúo x % LTV) y gestiona gravámenes de 1er rango', () => {
     const state = createMockSimState();
-    const plantAsset = state.realEstateCollaterals.find(c => c.assetType === 'planta_industrial');
+    const plantAsset = state.realEstateCollaterals!.find(c => c.assetType === 'planta_industrial')!;
     assert.ok(plantAsset, 'Debe existir activo industrial en constructora');
 
-    const expectedEligible = Math.round(plantAsset.appraisalValue * (plantAsset.ltvPercentage / 100));
+    const expectedEligible = Math.round(plantAsset.appraisalValue! * (plantAsset.ltvPercentage! / 100));
     assert.equal(plantAsset.eligibleValue, expectedEligible);
     assert.equal(plantAsset.isPledged, false);
 
@@ -377,7 +377,7 @@ describe('Aceptación G: Garantías reales, LTV, gravámenes de prelación y blo
     );
 
     assert.equal(loanRes.success, true);
-    const updatedAsset = loanRes.updatedState.realEstateCollaterals.find(c => c.id === plantAsset.id)!;
+    const updatedAsset = loanRes.updatedState.realEstateCollaterals!.find(c => c.id === plantAsset.id)!;
     assert.equal(updatedAsset.isPledged, true, 'El inmueble debe estar marcado como gravado');
     assert.equal(updatedAsset.liens.length, 1, 'Debe registrar 1 gravamen hipotecario');
     assert.equal(updatedAsset.liens[0].priorityRank, 1, 'El primer gravamen es de 1er rango');
@@ -385,7 +385,7 @@ describe('Aceptación G: Garantías reales, LTV, gravámenes de prelación y blo
     assert.equal(updatedAsset.availableCoverage, expectedEligible - 300000);
 
     // Al cancelar el préstamo, la garantía debe liberarse automáticamente
-    loanRes.updatedState.commercialBanks.ficohsa.checkingAccount.balance = 500000;
+    loanRes.updatedState.commercialBanks.ficohsa.checkingAccount!.balance = 500000;
     const cancelRes = executeFlexibleLoanPayment(loanRes.updatedState, {
       bankId: 'ficohsa',
       paymentMode: 'cancelar_prestamo',
@@ -394,27 +394,27 @@ describe('Aceptación G: Garantías reales, LTV, gravámenes de prelación y blo
     });
 
     assert.equal(cancelRes.success, true);
-    const releasedAsset = cancelRes.updatedState.realEstateCollaterals.find(c => c.id === plantAsset.id)!;
+    const releasedAsset = cancelRes.updatedState.realEstateCollaterals!.find(c => c.id === plantAsset.id)!;
     assert.equal(releasedAsset.isPledged, false, 'Al saldarse la deuda, la garantía queda liberada');
     assert.equal(releasedAsset.committedCoverage, 0);
   });
 
   it('Permite solicitar un nuevo avalúo pericial CNBS actualizando el valor comercial', () => {
     const state = createMockSimState();
-    const lotAsset = state.realEstateCollaterals.find(c => c.assetType === 'terreno_comercial')!;
+    const lotAsset = state.realEstateCollaterals!.find(c => c.assetType === 'terreno_comercial')!;
     const initialAppraisal = lotAsset.appraisalValue;
 
     const appraisalRes = requestNewAppraisal(state, lotAsset.id);
     assert.equal(appraisalRes.success, true);
-    assert.ok(appraisalRes.updatedState.realEstateCollaterals.find(c => c.id === lotAsset.id)!.appraisalValue !== initialAppraisal);
+    assert.ok(appraisalRes.updatedState.realEstateCollaterals!.find(c => c.id === lotAsset.id)!.appraisalValue !== initialAppraisal);
   });
 });
 
 describe('Aceptación H: Transferencias directas entre cuentas de cheques propias', () => {
   it('Transfiere fondos entre Ficohsa y Atlántida, genera comprobante y mantiene balance consolidado', () => {
     const state = createMockSimState();
-    const ficohsaInit = state.commercialBanks.ficohsa.checkingAccount.balance;
-    const atlantidaInit = state.commercialBanks.atlantida.checkingAccount.balance;
+    const ficohsaInit = state.commercialBanks.ficohsa.checkingAccount!.balance;
+    const atlantidaInit = state.commercialBanks.atlantida.checkingAccount!.balance;
     const storeBankInit = state.storeBankBalance;
 
     const transferAmount = 75000;
@@ -430,8 +430,8 @@ describe('Aceptación H: Transferencias directas entre cuentas de cheques propia
     assert.ok(transferRes.voucher, 'Debe generar comprobante de transferencia');
     assert.equal(transferRes.voucher?.sourceBankId, 'ficohsa');
     assert.equal(transferRes.voucher?.destinationBankId, 'atlantida');
-    assert.equal(transferRes.updatedState.commercialBanks.ficohsa.checkingAccount.balance, ficohsaInit - transferAmount);
-    assert.equal(transferRes.updatedState.commercialBanks.atlantida.checkingAccount.balance, atlantidaInit + transferAmount);
+    assert.equal(transferRes.updatedState.commercialBanks.ficohsa.checkingAccount!.balance, ficohsaInit - transferAmount);
+    assert.equal(transferRes.updatedState.commercialBanks.atlantida.checkingAccount!.balance, atlantidaInit + transferAmount);
     // El saldo total en bancos no debe variar ya que es una transferencia interna
     assert.equal(transferRes.updatedState.storeBankBalance, storeBankInit);
   });

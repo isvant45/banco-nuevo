@@ -22,6 +22,8 @@ interface RetroTaskbarProps {
   onAdvanceDays?: (days: number) => void;
   onOpenNewGame: () => void;
   onOpenAuditReport: () => void;
+  onOpenBusinessEmail?: () => void;
+  unreadEmailsCount?: number;
   onOpenFinancialStatements?: () => void;
   onOpenLiabilitiesManager?: () => void;
   onOpenCompetitorsMarket?: () => void;
@@ -42,6 +44,8 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
   onAdvanceDays,
   onOpenNewGame,
   onOpenAuditReport,
+  onOpenBusinessEmail,
+  unreadEmailsCount = 0,
   onOpenFinancialStatements,
   onOpenLiabilitiesManager,
   onOpenCompetitorsMarket,
@@ -305,6 +309,20 @@ export const RetroTaskbar: React.FC<RetroTaskbarProps> = ({
 
           {/* Bandeja Reloj y Estado */}
           <div className="h-7 px-2.5 bg-[#c0c0c0] border-t border-l border-[#808080] border-b border-r border-white flex items-center gap-2 text-xs font-mono">
+            {onOpenBusinessEmail && (
+              <button
+                onClick={onOpenBusinessEmail}
+                title={`Correo Empresarial (${unreadEmailsCount} sin leer)`}
+                className="text-xs hover:opacity-80 flex items-center gap-1 font-sans cursor-pointer"
+              >
+                <span>📬</span>
+                {unreadEmailsCount > 0 && (
+                  <span className="bg-rose-600 text-white font-bold text-[10px] px-1 rounded-full">
+                    {unreadEmailsCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={handleToggleSound}
               title={isMuted ? 'Activar sonido' : 'Silenciar sonido'}

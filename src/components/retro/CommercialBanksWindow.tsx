@@ -5,9 +5,6 @@ import {
   BankCommercialLoan,
   CommercialLoanType,
   RealEstateCollateralItem,
-  BankAdvisorTopic,
-  BankAdvisorConsultation,
-  CreditTermsDisclosure,
   TransactionVoucher
 } from '../../game/retroSimTypes';
 import { 
@@ -15,6 +12,9 @@ import {
   COMMERCIAL_LOAN_PRODUCTS,
   CORPORATE_CARD_TIERS,
   CORPORATE_REWARDS_CATALOG,
+  BankAdvisorTopic,
+  BankAdvisorConsultation,
+  CreditTermsDisclosure,
   evaluateContractorEconomicCapacity,
   calculateCreditTermsDisclosure,
   consultBankAdvisor,
@@ -279,7 +279,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
     if (result.outcome === 'aceptado') {
       sound.playApprovalStamp();
       if (advisorTopic === 'negociar_tasa' && onNegotiateLoanRate) {
-        onNegotiateLoanRate(selectedBankId, result.rateDiscountGrantedPct);
+        onNegotiateLoanRate(selectedBankId, result.rateDiscountGrantedPct || 0);
       }
     } else {
       sound.playRejectBuzzer();
@@ -606,11 +606,14 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                       onChange={(e) => setSelectedProductType(e.target.value as CommercialLoanType)}
                       className="w-full p-1.5 border border-slate-400 bg-white font-bold text-xs"
                     >
-                      {COMMERCIAL_LOAN_PRODUCTS.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.minTermMonths}-{p.maxTermMonths}m) · Tasa base: {p.annualRateNominalPct}%
-                        </option>
-                      ))}
+                      {Object.values(COMMERCIAL_LOAN_PRODUCTS).map(p => {
+                        const calculatedRate = (bankProfile.baseInterestRateLoan + p.rateSpreadPct).toFixed(1);
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.minTermMonths}-{p.maxTermMonths}m) · Tasa est: {calculatedRate}%
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -695,7 +698,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                 <div className="flex justify-between items-start border-b pb-2">
                   <div>
                     <span className="text-xs font-bold text-slate-500 uppercase">{corporateCard.brand}</span>
-                    <h4 className="font-black text-sm text-slate-900">{corporateCard.cardNumber}</h4>
+                    <h4 className="font-black text-sm text-slate-900">{corporateCard.cardNumber || `•••• •••• •••• ${corporateCard.cardId.slice(-4).toUpperCase()}`}</h4>
                   </div>
                   <span className="text-2xl">💳</span>
                 </div>
@@ -711,7 +714,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Disponible:</span>
-                    <strong className="text-emerald-800 font-mono">{formatHNLAmount(corporateCard.availableCredit)}</strong>
+                    <strong className="text-emerald-800 font-mono">{formatHNLAmount(corporateCard.availableCredit ?? Math.max(0, corporateCard.creditLimit - corporateCard.currentBalance))}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Puntos Acumulados:</span>
@@ -823,7 +826,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                     <div key={dpf.id} className="p-2 border border-slate-200 bg-slate-50 flex justify-between items-center text-xs">
                       <div>
                         <strong className="text-slate-900 block">{formatHNLAmount(dpf.currentBalance || dpf.principalAmount)}</strong>
-                        <span className="text-[11px] text-slate-500">Tasa: {dpf.interestRateAnnual}% · Vence el día {dpf.maturesDay}</span>
+                        <span className="text-[11px] text-slate-500">Tasa: {dpf.interestRateAnnual ?? dpf.effectiveRatePct ?? dpf.annualRatePct}% · Vence el día {dpf.maturesDay ?? (state.currentDay + (dpf.daysRemaining ?? 0))}</span>
                       </div>
                       <button
                         onClick={() => {
@@ -1095,13 +1098,13 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                     }`}
                   >
                     <div className="flex justify-between font-bold">
-                      <span className={c.outcome === 'aceptado' ? 'text-emerald-900' : 'text-rose-900'}>
-                        {c.outcome === 'aceptado' ? '✓ PROPUESTA ACEPTADA' : '✗ PROPUESTA RECHAZADA'}
+                      <span className={c.outcome === 'aceptado' ? 'text-emerald-900' : c.outcome === 'contraoferta' ? 'text-amber-900' : 'text-rose-900'}>
+                        {c.outcome === 'aceptado' ? '✓ PROPUESTA ACEPTADA' : c.outcome === 'contraoferta' ? '⚖ CONTRAOFERTA CONDICIONADA' : '✗ PROPUESTA RECHAZADA'}
                       </span>
-                      <span className="text-slate-500 font-mono text-[10px]">Score: {c.clientRating}</span>
+                      <span className="text-slate-500 font-mono text-[10px]">{c.officerName || c.bankName}</span>
                     </div>
                     <p className="text-slate-800 text-[11px] leading-relaxed italic">
-                      "{c.advisorResponseDialogue}"
+                      {c.officerDialog || c.advisorResponseDialogue}
                     </p>
                   </div>
                 ))
