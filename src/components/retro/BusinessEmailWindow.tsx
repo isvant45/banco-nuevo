@@ -14,8 +14,11 @@ import {
   COMMERCIAL_BANKS_PROFILES, 
   getInboxUnreadCount, 
   negotiateBankOfferFromEmail, 
-  calculateCollateralAvailableCoverage 
+  calculateCollateralAvailableCoverage,
+  payCommercialLoan,
+  requestFullCommercialCredit
 } from '../../game/commercialBanksEngine';
+import { paySarTaxObligation } from '../../game/sarFiscalEngine';
 import { isSimOfferExpired } from '../../game/simCalendar';
 import { sound } from '../../game/audioFx';
 
@@ -52,6 +55,10 @@ const CATEGORY_LABELS: Record<EmailCategory, { label: string; icon: string; colo
 export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
   state,
   companyName,
+  onUpdateState,
+  onOpenBank,
+  onOpenSar,
+  onOpenRegister,
   onOpenLoanTerms,
   onPayLoanFromEmail,
   onPaySarFromEmail,
@@ -154,17 +161,65 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     });
   }, [emails, selectedFolder, selectedCategory, searchQuery, accountFilter, onlyUnread, selectedEmailId]);
 
+  // Helpers unificados de ejecución con fallbacks a los motores de simulación
+  const doUpdateEmailState = (emailId: string, partial: Partial<SimulatedEmail>) => {
+    if (onUpdateEmailState) {
+      onUpdateEmailState(emailId, partial);
+    } else if (onUpdateState) {
+      const updated = (state.simulatedEmails || []).map(em => em.id === emailId ? { ...em, ...partial } : em);
+      onUpdateState({ ...state, simulatedEmails: updated });
+    }
+  };
+
+  const doOpenBank = () => {
+    sound.playClick();
+    if (onOpenBank) onOpenBank();
+    else if (onOpenWindow) onOpenWindow('bancos_comerciales');
+  };
+
+  const doOpenSar = () => {
+    sound.playClick();
+    if (onOpenSar) onOpenSar();
+    else if (onOpenWindow) onOpenWindow('sar_audit');
+  };
+
+  const doOpenRegister = () => {
+    sound.playClick();
+    if (onOpenRegister) onOpenRegister();
+    else if (onOpenWindow) onOpenWindow('pos_register');
+  };
+
+  const doOpenLoanTerms = (
+    bankId: CommercialBankId,
+    productType: CommercialLoanType,
+    amount: number,
+    termMonths: number,
+    offerId?: string
+  ) => {
+    sound.playClick();
+    if (onOpenLoanTerms) {
+      onOpenLoanTerms(bankId, productType, amount, termMonths, offerId);
+    } else {
+      doOpenBank();
+    }
+  };
+
   // Correo seleccionado: si no hay selección explícita o se cambió de vista, no mostrar correo ajeno
   const selectedEmail = useMemo(() => {
     if (!selectedEmailId) return null;
     const found = emails.find(e => e.id === selectedEmailId);
     if (!found) return null;
     // Si el correo fue archivado y estamos en inbox, no mostrarlo
-    if (selectedFolder === 'inbox' && found.isArchived) return null;
+    if (selectedFolder === 'inbox' && (found.folder !== 'inbox' || found.isArchived)) return null;
     if (selectedFolder === 'archive' && !found.isArchived) return null;
     if (selectedFolder === 'sent' && found.folder !== 'sent') return null;
+    if (selectedFolder === 'starred' && (!found.isStarred || found.isArchived)) return null;
+    if (selectedCategory !== 'all' && found.category !== selectedCategory) return null;
+    const recip = (found.recipientEmail || found.recipient || '').toLowerCase();
+    if (accountFilter === 'company' && !recip.includes('gerencia@')) return null;
+    if (accountFilter === 'personal' && !recip.includes('propietario@')) return null;
     return found;
-  }, [emails, selectedEmailId, selectedFolder]);
+  }, [emails, selectedEmailId, selectedFolder, selectedCategory, accountFilter]);
 
   // Conteo unificado: mensajes recibidos, no leídos y no archivados
   const inboxUnreadCount = getInboxUnreadCount(emails);
@@ -176,61 +231,51 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     setIsReplying(false);
     setIsNegotiating(false);
     setNegotiationResultFeedback(null);
-    if (!email.isRead && onUpdateEmailState) {
-      onUpdateEmailState(email.id, { isRead: true });
+    if (!email.isRead) {
+      doUpdateEmailState(email.id, { isRead: true });
     }
   };
 
   const handleToggleReadStatus = (email: SimulatedEmail) => {
     sound.playClick();
-    if (onUpdateEmailState) {
-      onUpdateEmailState(email.id, { isRead: !email.isRead });
-    }
+    doUpdateEmailState(email.id, { isRead: !email.isRead });
   };
 
   const handleToggleStar = (e: React.MouseEvent, email: SimulatedEmail) => {
     e.stopPropagation();
     sound.playClick();
-    if (onUpdateEmailState) {
-      onUpdateEmailState(email.id, { isStarred: !email.isStarred });
-    }
+    doUpdateEmailState(email.id, { isStarred: !email.isStarred });
   };
 
   const handleToggleArchive = (email: SimulatedEmail) => {
     sound.playClick();
-    if (onUpdateEmailState) {
-      const willArchive = !email.isArchived;
-      onUpdateEmailState(email.id, { 
-        isArchived: willArchive, 
-        folder: willArchive ? 'archive' : 'inbox' 
-      });
-      // Si se archiva el correo actualmente visible, deseleccionarlo para evitar que quede huérfano
-      setSelectedEmailId(null);
-    }
+    const willArchive = !email.isArchived;
+    doUpdateEmailState(email.id, { 
+      isArchived: willArchive, 
+      folder: willArchive ? 'archive' : 'inbox' 
+    });
+    // Si se archiva el correo actualmente visible, deseleccionarlo para evitar que quede huérfano
+    setSelectedEmailId(null);
   };
 
   const handleMarkAllAsRead = () => {
     sound.playClick();
-    if (onUpdateEmailState) {
-      emails.forEach(e => {
-        if (!e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
-          onUpdateEmailState(e.id, { isRead: true });
-        }
-      });
-    }
+    emails.forEach(e => {
+      if (!e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
+        doUpdateEmailState(e.id, { isRead: true });
+      }
+    });
   };
 
   const handleArchiveRead = () => {
     sound.playClick();
-    if (onUpdateEmailState) {
-      emails.forEach(e => {
-        if (e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
-          onUpdateEmailState(e.id, { isArchived: true, folder: 'archive' });
-        }
-      });
-      if (selectedEmail?.isRead) {
-        setSelectedEmailId(null);
+    emails.forEach(e => {
+      if (e.isRead && (e.folder === 'inbox' || !e.folder) && !e.isArchived) {
+        doUpdateEmailState(e.id, { isArchived: true, folder: 'archive' });
       }
+    });
+    if (selectedEmail?.isRead) {
+      setSelectedEmailId(null);
     }
   };
 
@@ -261,63 +306,98 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     setPaymentError(null);
 
     if (paymentTarget.type === 'loan' && paymentTarget.bankId) {
+      let res: { success: boolean; message: string; remainingBalance?: number };
       if (onPayLoanFromEmail) {
-        const res = onPayLoanFromEmail(paymentTarget.bankId, directPayAmount, paymentTarget.accountSource);
-        if (!res.success) {
-          setPaymentError(res.message);
-          return;
+        res = onPayLoanFromEmail(paymentTarget.bankId, directPayAmount, paymentTarget.accountSource);
+      } else if (onUpdateState) {
+        const engineRes = payCommercialLoan(state, paymentTarget.bankId, directPayAmount, paymentTarget.accountSource);
+        if (engineRes.success) {
+          onUpdateState(engineRes.updatedState);
+          if (engineRes.voucher && onViewVoucher) onViewVoucher(engineRes.voucher);
         }
-        const remainingBal = res.remainingBalance ?? 0;
-        if (remainingBal <= 0) {
-          if (selectedEmail && onUpdateEmailState) {
-            onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
-          }
-          setPaymentSuccessFeedback(`¡Préstamo cancelado en su totalidad! Saldo L 0.00.`);
-        } else {
-          if (selectedEmail && onUpdateEmailState) {
-            onUpdateEmailState(selectedEmail.id, {
-              statusTag: 'Pendiente',
-              paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
-                ...selectedEmail.paymentNoticePayload,
-                amountDueHNL: remainingBal
-              } : undefined
-            });
-          }
-          setPaymentSuccessFeedback(`Abono aplicado. Saldo deudor restante: L ${remainingBal.toLocaleString()}.`);
+        res = { success: engineRes.success, message: engineRes.message, remainingBalance: engineRes.remainingBalance };
+      } else {
+        res = { success: false, message: 'Función de pago de préstamo no disponible.' };
+      }
+
+      if (!res.success) {
+        setPaymentError(res.message);
+        return;
+      }
+      const remainingBal = res.remainingBalance ?? 0;
+      if (remainingBal <= 0) {
+        if (selectedEmail) {
+          doUpdateEmailState(selectedEmail.id, {
+            statusTag: 'Resuelto',
+            actionRequired: false,
+            accionEjecutada: true,
+            accionResultado: '✔ Préstamo Cancelado al 100%'
+          });
         }
+        setPaymentSuccessFeedback(`¡Préstamo cancelado en su totalidad! Saldo L 0.00.`);
+      } else {
+        if (selectedEmail) {
+          doUpdateEmailState(selectedEmail.id, {
+            statusTag: 'Pendiente',
+            paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
+              ...selectedEmail.paymentNoticePayload,
+              amountDueHNL: remainingBal
+            } : undefined
+          });
+        }
+        setPaymentSuccessFeedback(`Abono aplicado. Saldo deudor restante: L ${remainingBal.toLocaleString()}.`);
       }
     } else if (paymentTarget.type === 'sar') {
+      const targetBank = paymentTarget.accountSource === 'checking' ? paymentTarget.selectedBankId : undefined;
+      let res: { success: boolean; message: string; remainingDebt?: number };
       if (onPaySarFromEmail) {
-        const targetBank = paymentTarget.accountSource === 'checking' ? paymentTarget.selectedBankId : undefined;
-        const res = onPaySarFromEmail(
+        res = onPaySarFromEmail(
           directPayAmount, 
           paymentTarget.accountSource, 
           targetBank,
           selectedEmail?.id,
           paymentTarget.fiscalYear
         );
-        if (!res.success) {
-          setPaymentError(res.message);
-          return;
+      } else if (onUpdateState) {
+        const engineRes = paySarTaxObligation(state, directPayAmount, paymentTarget.accountSource, targetBank, {
+          emailId: selectedEmail?.id,
+          fiscalYear: paymentTarget.fiscalYear
+        });
+        if (engineRes.success) {
+          onUpdateState(engineRes.updatedState);
+          if (engineRes.voucher && onViewVoucher) onViewVoucher(engineRes.voucher);
         }
-        const remainingD = res.remainingDebt ?? 0;
-        if (remainingD <= 0) {
-          if (selectedEmail && onUpdateEmailState) {
-            onUpdateEmailState(selectedEmail.id, { statusTag: 'Resuelto', actionRequired: false });
-          }
-          setPaymentSuccessFeedback(`¡Obligación fiscal SAR cancelada al 100%! Habilitado para Solvencia.`);
-        } else {
-          if (selectedEmail && onUpdateEmailState) {
-            onUpdateEmailState(selectedEmail.id, {
-              statusTag: 'Pendiente',
-              paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
-                ...selectedEmail.paymentNoticePayload,
-                amountDueHNL: remainingD
-              } : undefined
-            });
-          }
-          setPaymentSuccessFeedback(`Abono al SAR aplicado. Saldo fiscal pendiente: L ${remainingD.toLocaleString()}.`);
+        res = { success: engineRes.success, message: engineRes.message, remainingDebt: engineRes.remainingDebt };
+      } else {
+        res = { success: false, message: 'Función de pago SAR no disponible.' };
+      }
+
+      if (!res.success) {
+        setPaymentError(res.message);
+        return;
+      }
+      const remainingD = res.remainingDebt ?? 0;
+      if (remainingD <= 0) {
+        if (selectedEmail) {
+          doUpdateEmailState(selectedEmail.id, {
+            statusTag: 'Resuelto',
+            actionRequired: false,
+            accionEjecutada: true,
+            accionResultado: '✔ Impuesto SAR Liquidado al 100%'
+          });
         }
+        setPaymentSuccessFeedback(`¡Obligación fiscal SAR cancelada al 100%! Habilitado para Solvencia.`);
+      } else {
+        if (selectedEmail) {
+          doUpdateEmailState(selectedEmail.id, {
+            statusTag: 'Pendiente',
+            paymentNoticePayload: selectedEmail.paymentNoticePayload ? {
+              ...selectedEmail.paymentNoticePayload,
+              amountDueHNL: remainingD
+            } : undefined
+          });
+        }
+        setPaymentSuccessFeedback(`Abono al SAR aplicado. Saldo fiscal pendiente: L ${remainingD.toLocaleString()}.`);
       }
     }
 
@@ -329,6 +409,30 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     if (!selectedEmail || !replyText.trim()) return;
     if (onRespondEmail) {
       onRespondEmail(selectedEmail, replyText);
+    } else if (onUpdateState) {
+      const replyEmail: SimulatedEmail = {
+        id: `reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        simDay: state.currentDay,
+        simMonth: state.currentMonth,
+        simYear: state.currentYear,
+        senderName: `${companyName} (Tú)`,
+        senderEmail: companyEmailAddress,
+        recipient: selectedEmail.senderName || selectedEmail.sender,
+        recipientEmail: selectedEmail.senderEmail,
+        subject: selectedEmail.subject.startsWith('RE:') ? selectedEmail.subject : `RE: ${selectedEmail.subject}`,
+        category: selectedEmail.category,
+        body: replyText,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        folder: 'sent',
+        sentDate: `Día ${state.currentDay}/0${state.currentMonth}/${state.currentYear || 2026} 09:30 AM`
+      };
+      onUpdateState({
+        ...state,
+        simulatedEmails: [replyEmail, ...(state.simulatedEmails || [])]
+      });
+      sound.playClick();
     }
     setReplyText('');
     setIsReplying(false);
@@ -364,7 +468,16 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       if (onNegotiateOffer) {
         result = onNegotiateOffer(offer, proposal);
       } else {
-        const engineRes = negotiateBankOfferFromEmail(state, offer, proposal);
+        const engineRes = negotiateBankOfferFromEmail(state, offer, {
+          requestedAmount: negotiateAmount,
+          requestedRate: negotiateRate,
+          requestedTerm: negotiateTerm,
+          requestedFee: negotiateFee,
+          requestedCollateralIds: selectedCollateralsForOffer
+        });
+        if (onUpdateState) {
+          onUpdateState(engineRes.updatedState);
+        }
         result = {
           outcome: engineRes.outcome,
           reason: engineRes.reason,
@@ -405,19 +518,45 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
       setNegotiateFee(result.updatedOffer.openingFeePct);
     }
 
-    if (onUpdateEmailState) {
-      onUpdateEmailState(selectedEmail.id, {
-        bankOfferPayload: resultingOffer,
-        statusTag: (result.outcome === 'aprobado' || result.outcome === 'contraoferta') ? 'Pre-Aprobado' : selectedEmail.statusTag
-      });
-    }
+    doUpdateEmailState(selectedEmail.id, {
+      bankOfferPayload: resultingOffer,
+      statusTag: (result.outcome === 'aprobado' || result.outcome === 'contraoferta') ? 'Pre-Aprobado' : selectedEmail.statusTag
+    });
 
     // Registrar en sent/diálogo
+    handleSendReplyText(
+      `Solicitud de Negociación: Monto L ${negotiateAmount.toLocaleString()}, Tasa ${negotiateRate}%, Plazo ${negotiateTerm} meses.${selectedCollateralsForOffer.length > 0 ? ` Con ${selectedCollateralsForOffer.length} garantía(s) real(es).` : ''}`
+    );
+  };
+
+  const handleSendReplyText = (text: string) => {
+    if (!selectedEmail || !text.trim()) return;
     if (onRespondEmail) {
-      onRespondEmail(
-        selectedEmail,
-        `Solicitud de Negociación: Monto L ${negotiateAmount.toLocaleString()}, Tasa ${negotiateRate}%, Plazo ${negotiateTerm} meses.${selectedCollateralsForOffer.length > 0 ? ` Con ${selectedCollateralsForOffer.length} garantía(s) real(es).` : ''}`
-      );
+      onRespondEmail(selectedEmail, text);
+    } else if (onUpdateState) {
+      const replyEmail: SimulatedEmail = {
+        id: `reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        simDay: state.currentDay,
+        simMonth: state.currentMonth,
+        simYear: state.currentYear,
+        senderName: `${companyName} (Tú)`,
+        senderEmail: companyEmailAddress,
+        recipient: selectedEmail.senderName || selectedEmail.sender,
+        recipientEmail: selectedEmail.senderEmail,
+        subject: selectedEmail.subject.startsWith('RE:') ? selectedEmail.subject : `RE: ${selectedEmail.subject}`,
+        category: selectedEmail.category,
+        body: text,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        folder: 'sent',
+        sentDate: `Día ${state.currentDay}/0${state.currentMonth}/${state.currentYear || 2026} 09:30 AM`
+      };
+      onUpdateState({
+        ...state,
+        simulatedEmails: [replyEmail, ...(state.simulatedEmails || [])]
+      });
+      sound.playClick();
     }
   };
 
@@ -442,7 +581,7 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
     }
 
     // Validar si ya fue aceptada
-    if (offerToAccept.status === 'aceptada') {
+    if (offerToAccept.status === 'aceptada' || selectedEmail?.accionEjecutada) {
       setAcceptError('Esta oferta ya fue contratada y desembolsada anteriormente.');
       return;
     }
@@ -453,12 +592,37 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
         setAcceptError(res.message);
         return;
       }
+    } else if (onUpdateState) {
+      const res = requestFullCommercialCredit(
+        state,
+        offerToAccept.bankId,
+        offerToAccept.productType,
+        offerToAccept.approvedAmount || offerToAccept.amountOrLimitHNL,
+        offerToAccept.termMonths,
+        `Crédito contratado desde oferta ${offerToAccept.id}`,
+        0,
+        offerToAccept.linkedCollateralIds,
+        offerToAccept.bankId,
+        acceptDestinationAccount,
+        offerToAccept.id
+      );
+      if (!res.success) {
+        setAcceptError(res.message);
+        return;
+      }
+      onUpdateState(res.updatedState);
+      if (res.voucher && onViewVoucher) onViewVoucher(res.voucher);
+    } else {
+      setAcceptError('Módulo de contratación bancaria no configurado.');
+      return;
     }
 
     sound.playApprovalStamp();
-    if (selectedEmail && onUpdateEmailState) {
-      onUpdateEmailState(selectedEmail.id, {
+    if (selectedEmail) {
+      doUpdateEmailState(selectedEmail.id, {
         statusTag: 'Resuelto',
+        accionEjecutada: true,
+        accionResultado: '✔ Oferta Contratada y Desembolsada',
         bankOfferPayload: {
           ...offerToAccept,
           status: 'aceptada',
@@ -914,38 +1078,50 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                   <div className="flex justify-end gap-2 pt-1 flex-wrap">
                     <button
                       onClick={() => {
-                        if (selectedEmail.bankOfferPayload && onOpenLoanTerms) {
-                          onOpenLoanTerms(
+                        if (selectedEmail.bankOfferPayload) {
+                          doOpenLoanTerms(
                             selectedEmail.bankOfferPayload.bankId,
                             selectedEmail.bankOfferPayload.productType,
                             selectedEmail.bankOfferPayload.amountOrLimitHNL,
                             selectedEmail.bankOfferPayload.termMonths,
                             selectedEmail.bankOfferPayload.id
                           );
-                        } else if (onOpenWindow) {
-                          onOpenWindow('bancos_comerciales');
+                        } else {
+                          doOpenBank();
                         }
                       }}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-400 text-slate-800 font-bold text-xs cursor-pointer active:scale-95"
+                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-400 text-slate-800 font-bold text-xs cursor-pointer active:scale-95 shadow-2xs"
                     >
                       Ver Condiciones en Banco ➔
                     </button>
 
-                    <button
-                      onClick={() => handleStartNegotiateOffer(selectedEmail.bankOfferPayload!)}
-                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || isSimOfferExpired(state, selectedEmail.bankOfferPayload)}
-                      className="px-3 py-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-slate-950 font-bold text-xs border border-amber-700 cursor-pointer active:scale-95"
-                    >
-                      💬 Negociar Condiciones
-                    </button>
+                    {selectedEmail.bankOfferPayload.status === 'aceptada' || selectedEmail.accionEjecutada ? (
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-400 rounded-xs font-bold text-xs flex items-center gap-1 shadow-2xs">
+                        <span>✔</span>
+                        <span>{selectedEmail.accionResultado || 'Oferta Contratada y Desembolsada'}</span>
+                      </span>
+                    ) : isSimOfferExpired(state, selectedEmail.bankOfferPayload) ? (
+                      <span className="px-3 py-1 bg-slate-200 text-slate-600 border border-slate-300 rounded-xs font-bold text-xs flex items-center gap-1">
+                        <span>⏱️</span>
+                        <span>Oferta Expirada</span>
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleStartNegotiateOffer(selectedEmail.bankOfferPayload!)}
+                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs border border-amber-700 cursor-pointer active:scale-95 shadow-2xs"
+                        >
+                          💬 Negociar Condiciones
+                        </button>
 
-                    <button
-                      onClick={() => handleOpenAcceptOfferModal(selectedEmail.bankOfferPayload!)}
-                      disabled={selectedEmail.bankOfferPayload.status === 'aceptada' || isSimOfferExpired(state, selectedEmail.bankOfferPayload)}
-                      className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:bg-slate-400 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
-                    >
-                      {selectedEmail.bankOfferPayload.status === 'aceptada' ? 'Oferta Ya Contratada ✅' : 'Aceptar y Desembolsar ✍️'}
-                    </button>
+                        <button
+                          onClick={() => handleOpenAcceptOfferModal(selectedEmail.bankOfferPayload!)}
+                          className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-xs active:scale-95"
+                        >
+                          Aceptar y Desembolsar ✍️
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -1092,19 +1268,68 @@ export const BusinessEmailWindow: React.FC<BusinessEmailWindowProps> = ({
                     </span>
                   </div>
 
+                  {selectedEmail.accionEjecutada || selectedEmail.statusTag === 'Resuelto' || selectedEmail.paymentNoticePayload.amountDueHNL <= 0 ? (
+                    <span className="px-3 py-1.5 bg-emerald-100 text-emerald-900 border border-emerald-400 rounded-xs font-bold text-xs flex items-center gap-1 shadow-2xs">
+                      <span>✔</span>
+                      <span>{selectedEmail.accionResultado || 'Obligación Pagada al 100%'}</span>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (selectedEmail.paymentNoticePayload) {
+                          handleOpenDirectPayment(
+                            selectedEmail.paymentNoticePayload.targetType,
+                            selectedEmail.paymentNoticePayload.amountDueHNL,
+                            selectedEmail.paymentNoticePayload.bankId
+                          );
+                        }
+                      }}
+                      className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-xs active:scale-95"
+                    >
+                      Pagar Ahora 💳
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Acciones contextuales para SAR si no hay paymentNoticePayload */}
+              {selectedEmail.category === 'sar_tributario' && !selectedEmail.paymentNoticePayload && (
+                <div className="bg-red-50 border border-red-300 p-2.5 rounded-xs flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-red-950 block">Módulo Tributario y Fiscal SAR</span>
+                    <span className="text-[11px] text-slate-600">
+                      Revisa tu estado de solvencia fiscal, retenciones de ISR o declaraciones juradas.
+                    </span>
+                  </div>
+                  <button
+                    onClick={doOpenSar}
+                    className="px-3 py-1 bg-red-800 hover:bg-red-900 text-white font-bold text-xs rounded-xs cursor-pointer shadow-xs active:scale-95"
+                  >
+                    Abrir Auditoría SAR 📋
+                  </button>
+                </div>
+              )}
+
+              {/* Acciones contextuales para Proveedores si no hay paymentNoticePayload */}
+              {selectedEmail.category === 'proveedores' && !selectedEmail.paymentNoticePayload && (
+                <div className="bg-purple-50 border border-purple-300 p-2.5 rounded-xs flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-purple-950 block">Catálogo y Suministros</span>
+                    <span className="text-[11px] text-slate-600">
+                      Gestiona abastecimiento, cotiza materiales con fabricantes o revisa órdenes de compra.
+                    </span>
+                  </div>
                   <button
                     onClick={() => {
-                      if (selectedEmail.paymentNoticePayload) {
-                        handleOpenDirectPayment(
-                          selectedEmail.paymentNoticePayload.targetType,
-                          selectedEmail.paymentNoticePayload.amountDueHNL,
-                          selectedEmail.paymentNoticePayload.bankId
-                        );
+                      if (state.retailSector === 'constructora') {
+                        if (onOpenWindow) onOpenWindow('tender_bidding');
+                      } else {
+                        doOpenRegister();
                       }
                     }}
-                    className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs border border-blue-950 cursor-pointer shadow-sm active:scale-95"
+                    className="px-3 py-1 bg-purple-800 hover:bg-purple-900 text-white font-bold text-xs rounded-xs cursor-pointer shadow-xs active:scale-95"
                   >
-                    Pagar Ahora 💳
+                    Ver Suministros / Catálogo 📦
                   </button>
                 </div>
               )}

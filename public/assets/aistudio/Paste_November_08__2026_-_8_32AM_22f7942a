@@ -1,0 +1,535 @@
+Sistema de Correo (Bandeja de Entrada Activa)
+El correo no debe ser solo un registro de texto estático; debe ser el centro de operaciones (Command Center) donde el jugador toma decisiones rápidas y enfrenta fricciones diarias.
+
+
+•	Correos Accionables (Smart UI): Reemplaza los mensajes informativos por notificaciones interactivas. Si un proveedor envía una factura, el correo debe tener botones de [Pagar Ahora], [Diferir a 30 días con recargo] o [Ignorar]. Si el banco aprueba un crédito, debe incluir el botón de [Firmar Contrato].
+
+•	Mecánica de Phishing y Fraudes Corporativos: Introduce correos trampa. Facturas falsas de proveedores ficticios o intentos de fraude. Si el jugador hace clic en "Pagar" sin revisar el remitente o cruzarlo con su ERP, pierde dinero y sufre una brecha de seguridad.
+
+•	Alertas de Inteligencia de Mercado: Correos ocasionales de "Analistas" (NPCs) que ofrecen rumores sobre futuros shocks económicos o cambios en las tasas del Banco Central, requiriendo que el jugador decida si actúa basado en el rumor o lo ignora.
+
+Ecosistema de Proveedores (Cadena de Suministro Dinámica)
+Los proveedores deben obligar al jugador empresario a equilibrar el margen de ganancia con el nivel de servicio y el riesgo operativo.
+
+
+•	Matriz de Calidad, Costo y Tiempo: Crea arquetipos de proveedores.
+
+
+o	El Barato: Precios bajos, pero un 20% de probabilidad de entregar tarde o con productos defectuosos (lo que baja la reputación del jugador).
+
+o	El Premium: Entregas inmediatas y alta calidad, pero reduce drásticamente el margen de ganancia.
+
+o	El Local: Términos intermedios pero altamente afectado por eventos económicos locales.
+
+•	Crédito Comercial (Cuentas por Pagar): Los proveedores no solo venden, también financian. Implementa líneas de crédito directas con ellos (Net 30, Net 60). Retrasarse en el pago al proveedor debe congelar los envíos futuros y reportarse negativamente al Credit Score del banco.
+
+•	Renegociación por Volumen: A medida que el empresario crece, debe poder abrir la pestaña de un proveedor y presionar un botón de "Exigir descuento por volumen". El éxito dependerá del historial de pagos y el volumen de compras de los últimos 5 turnos.
+
+Sección del Contador (ERP & Libro Mayor)
+Esta sección debe transformar el aburrimiento contable en un minijuego de optimización fiscal y gestión de liquidez. El jugador no debe hacer sumas manuales, sino interpretar los datos para sobrevivir.
+
+
+•	Progresión del Software (Del Excel al ERP Inteligente): Al inicio del juego, el jugador tiene un sistema rudimentario donde solo ve ingresos y egresos crudos. Debe invertir capital para comprar "Módulos ERP" (Módulo de Inventario, Módulo de Nómina, Módulo de Proyecciones). Un mejor ERP automatiza los pagos y evita multas por olvidos.
+
+•	El Triángulo de la Verdad Financiera: El dashboard del ERP debe mostrar tres pilares interconectados:
+
+
+1.	Flujo de Caja (Cash Flow): Dinero real en el banco hoy. Evita la quiebra inminente.
+
+2.	Estado de Resultados (P&L): Rentabilidad teórica. ¿El negocio es viable o solo sobrevive por préstamos?
+
+3.	Balance General: Lo que tengo (Activos) vs. lo que debo (Pasivos). Fundamental para pedir créditos al jugador Banquero.
+
+•	Auditorías y Riesgo Fiscal (Contabilidad Creativa): Implementa un botón tentador de "Optimizar Impuestos (Agresivo)". Esto oculta ingresos o infla gastos, reduciendo el pago de impuestos de ese turno y liberando liquidez. Sin embargo, activa un porcentaje de riesgo de "Auditoría Fiscal". Si el jugador es atrapado, paga el triple en multas y su Score Crediticio colapsa.
+
+Plan de Implementación (Arquitectura y Secuencia)
+Para que estos tres sistemas se integren sin romper la economía del simulador, debes programarlos en un orden específico, construyendo desde la base de datos hasta la interfaz.
+
+
+Fase 1: El Motor de Partida Doble (Backend del ERP)
+Antes de tener proveedores o correos, el juego necesita saber cómo mover el dinero de forma realista.
+
+
+1.	Crea un sistema centralizado de transacciones (TransactionManager). Cada acción financiera (vender, comprar, pagar nómina, recibir préstamo) debe generar dos entradas (Débito y Crédito).
+
+2.	Programa un script (LedgerGenerator) que lea estas transacciones y calcule automáticamente el Cash Flow, P&L y Balance General al final de cada turno.
+
+3.	Hito de prueba: Simula 10 turnos de compras y ventas por consola y verifica que los tres reportes financieros cuadren a cero.
+
+Fase 2: El Gestor de Proveedores y Cuentas por Pagar
+Con la contabilidad funcionando, conecta a los terceros.
+
+
+1.	Crea la clase Supplier con variables de: Tiempo de entrega (turnos), Precio base, Fiabilidad (0-100), y Límite de crédito otorgado al jugador.
+
+2.	Desarrolla el sistema de "Cuentas por Pagar" (AccountsPayable). Cuando el jugador compra inventario a crédito, el dinero no sale de su banco, pero entra una deuda al Libro Mayor y se programa un trigger para el turno de cobro.
+
+3.	Hito de prueba: Compra inventario a 30 días. Verifica que el inventario suba, el efectivo no baje, pero la deuda aparezca en el Balance General. Al pasar el turno de cobro, verifica que el efectivo se deduzca.
+
+Fase 3: El Sistema de Eventos (Actionable Mailbox)
+El correo actúa como la capa de presentación de todo el backend.
+
+
+1.	Diseña una estructura de datos MailEvent que contenga: Remitente, Asunto, Cuerpo, Tipo (Informativo, Factura, Contrato, Alerta), y un objeto ActionPayload (la función que se ejecutará si el jugador acepta).
+
+2.	Conecta el motor de Cuentas por Pagar al Correo. Cuando un proveedor factura, no se descuenta automáticamente; el sistema inyecta un correo tipo Factura en la bandeja del jugador.
+
+3.	Añade el temporizador de inacción. Si un correo de "Factura" no es interactuado antes de X turnos, ejecuta una función de "Multa por Mora" y envíala al Libro Mayor.
+
+Fase 4: UX/UI y Gamificación del ERP
+1.	Diseña la interfaz del contador. Usa gráficos de barras para ingresos vs egresos y gráficos de líneas para el nivel de efectivo proyectado.
+
+2.	Implementa la pantalla de "Upgrades del ERP", bloqueando visualmente ciertas métricas avanzadas (como el cálculo de depreciación o alarmas de quiebra) hasta que el jugador compre el software.
+
+3.	Crea el sistema de riesgo (Phishing / Auditorías) inyectando datos aleatorios (Random Number Generation) en la generación de correos y en el cálculo de pago de impuestos.
+La eliminación del phishing por una mecánica de Riesgo de Lavado de Activos (AML - Anti-Money Laundering) eleva la madurez del simulador. En lugar de un simple engaño visual, introduces un dilema ético y financiero real que afecta a ambos roles (Empresario y Banquero) y los pone en conflicto directo.
+
+Aquí tienes el diseño y el plan de implementación de esta nueva mecánica a través del sistema de correo y el ERP.
+
+
+1. La Mecánica para el Empresario: "La Tentación de la Liquidez"
+El empresario no sufre robos aleatorios, sino que recibe ofertas ilícitas sumamente lucrativas cuando su flujo de caja está en peligro.
+
+
+•	El Inversor Fantasma (Correo): El empresario recibe un correo de un "Fondo de Inversión Offshore" o un "Cliente Mayorista Anónimo". Ofrecen comprar todo el inventario de golpe o inyectar capital en efectivo, pero con una condición: el dinero entra sin facturación clara o desde paraísos fiscales.
+
+•	Opciones en la Interfaz (Smart UI): El correo muestra dos botones:
+
+
+o	[Rechazar Oferta]: No pasa nada. El empresario mantiene su integridad pero sigue con problemas de liquidez.
+
+o	[Aceptar Inyección de Capital]: El dinero entra instantáneamente al Flujo de Caja (ERP). El negocio se salva de la quiebra a corto plazo, pero los fondos se marcan internamente en la base de datos como "Dinero Sucio".
+
+•	Efecto en el ERP: En el Estado de Resultados, este ingreso aparece camuflado bajo el rubro de "Ventas Extraordinarias" o "Aportes de Capital", inflando artificialmente el Balance General.
+
+2. La Mecánica para el Banquero: "Oficial de Cumplimiento (KYC/AML)"
+El banquero ahora tiene la responsabilidad legal (y el riesgo) de vigilar el dinero que entra a su banco.
+
+
+•	Alertas de Software AML (Correo del Banquero): Si el Empresario acepta dinero sucio e intenta depositarlo o usarlo para pagar un crédito, el sistema del banco detecta una anomalía. El Banquero recibe un correo de alerta: "Transacción Inusual Detectada: El cliente [Empresa X] ha depositado fondos que superan su promedio de ventas histórico en un 400%."
+
+•	El Dilema del Banquero: El Banquero tiene dos opciones accionables en ese correo:
+
+
+o	[Emitir ROS (Reporte de Operación Sospechosa)]: El banquero congela esos fondos y notifica al regulador. Consecuencia: El banco se protege de multas, pero pierde esos depósitos (reduciendo su liquidez para prestar) y el Empresario pierde el dinero y su Score Crediticio.
+
+o	[Ignorar Alerta (Hacer la vista gorda)]: El banquero permite que el dinero entre a las bóvedas. Consecuencia: El banco gana muchísima liquidez para seguir prestando, pero asume el riesgo de una auditoría federal.
+
+3. El Castigo: La Unidad de Inteligencia Financiera (UIF)
+El Banco Central ahora tiene un brazo investigador que audita el juego aleatoriamente o cuando los volúmenes de dinero sucio superan cierto umbral.
+
+
+•	Auditoría Federal (Evento Global): Si la UIF inspecciona al banco y descubre que el Banquero ignoró alertas AML para mantener su liquidez, el impacto es devastador:
+
+
+o	Para el Banco: Multa colosal (ej. 30% de sus reservas) y una caída en la "Confianza del Mercado" que provoca que los ahorristas NPCs retiren su dinero (Pánico Bancario).
+
+o	Para el Empresario: Confiscación total del dinero sucio, embargo de activos equivalentes, y bloqueo automático para recibir nuevos préstamos por X turnos.
+
+Plan de Implementación Técnica (Fase AML)
+Para programar esto sin romper la contabilidad del juego, necesitas implementar una variable oculta de trazabilidad.
+
+
+1. Sistema de Trazabilidad (Backend)
+•	Modifica el modelo de datos de las transacciones (TransactionObject). Añade un booleano: isTainted = false.
+
+•	Cuando el Empresario acepta la oferta ilícita por correo, genera la transacción de ingreso marcando isTainted = true. Este valor es invisible para la interfaz pública del ERP del empresario.
+
+2. Algoritmo de Detección del Banco (KYC Engine)
+•	Crea un script (AML_Scanner.js) que corra al final del turno.
+
+•	Lógica: Si una transacción entrante tiene isTainted == true O si el depósito supera en un 300% el promedio de ingresos de los últimos 5 turnos, el script emite un objeto AlertEvent.
+
+•	Envía este AlertEvent a la bandeja de entrada del jugador Banquero.
+
+3. Interfaz de Congelamiento (Smart Contracts del Banco)
+•	Si el Banquero hace clic en [Emitir ROS], programa una función que revierta la transacción original. El dinero se resta del Balance del Empresario y se mueve a una cuenta nula (bóveda de confiscación del regulador).
+
+•	Aplica un debuff (penalización) al Score Crediticio del Empresario llevándolo al mínimo posible.
+
+4. El Gatillo de Auditoría (Regulador)
+•	Crea un contador oculto global: GlobalLaunderedMoney. Cada vez que un Banquero ignora una alerta y absorbe el dinero, este contador sube.
+
+•	Implementa una tirada de dados (RNG) cada turno. La probabilidad de una auditoría aumenta proporcionalmente al tamaño del GlobalLaunderedMoney. Cuando el evento salta, el sistema barre todas las cuentas buscando el flag isTainted y aplica las deducciones y multas programadas.
+Aquí tienes el Plan Maestro Integrado (Game Design Document & Roadmap) para banco-nuevo. Este documento unifica la macroeconomía, la fricción entre roles, el sistema de contabilidad avanzada (ERP) y la mecánica de Riesgo de Lavado de Activos (AML), creando un simulador profundo y realista.
+
+
+Documento de Diseño Integrado: "Banco-Nuevo"
+El núcleo del juego es la tensión entre la liquidez (tener efectivo para sobrevivir) y el riesgo (asumir deudas, prestar dinero o aceptar fondos ilícitos).
+
+
+1. El Motor del Mundo (Sistemas Globales)
+Antes de que los jugadores interactúen, el mundo dicta las reglas del juego:
+
+
+•	El Banco Central (Regulador y Prestamista): Define la Tasa de Interés Base (Prime Rate). Si el Banquero quiebra por falta de liquidez, el Banco Central lo rescata con préstamos a tasas punitivas. Además, controla la UIF (Unidad de Inteligencia Financiera) que ejecuta auditorías aleatorias.
+
+•	Ciclos Macroeconómicos: El juego alterna entre Expansión, Recesión y Crisis. Esto afecta el costo de los proveedores del Empresario y el comportamiento de los ahorristas (NPCs) del Banquero.
+
+•	Motor Contable (Partida Doble): Todo movimiento de dinero en el juego genera un débito y un crédito en una base de datos central. No hay dinero "mágico"; todo es trazable.
+
+2. Experiencia del Empresario (Microeconomía y Supervivencia)
+El empresario debe fabricar, vender y evitar la quiebra manejando su ERP y sus tentaciones.
+
+
+•	Ecosistema de Proveedores: Existen proveedores baratos (riesgo de retraso) y premium (seguros pero caros). Otorgan crédito (Cuentas por Pagar a 30 o 60 días). Fallarles congela el suministro y hunde el Score Crediticio.
+
+•	Evolución del ERP: El jugador empieza con un "Excel" básico y debe comprar módulos. El ERP final muestra la trinidad financiera: Flujo de Caja (dinero real para nómina/proveedores), Estado de Resultados (rentabilidad) y Balance General (Activos vs Deudas).
+
+•	La Tentación (Mecánica AML): Cuando el Flujo de Caja está en rojo, recibe correos de "Inversores Anónimos" ofreciendo inyectar capital inmediato. Si acepta, se salva de la quiebra, pero el dinero queda marcado internamente como isTainted = true (Dinero Sucio).
+
+3. Experiencia del Banquero (Gestión de Riesgo y Cumplimiento)
+El banquero no produce bienes; su mercancía es el dinero y su enemigo es la iliquidez y las multas.
+
+
+•	Encaje Legal y Pánico Bancario: Recibe depósitos de ciudadanos NPCs. Debe guardar un % por ley (Encaje). Si presta demasiado a los empresarios y hay una recesión, los ciudadanos retiran su dinero. Si no hay fondos, el banco colapsa.
+
+•	Auditoría de Crédito (Due Diligence): Antes de prestar, revisa el ERP del Empresario (Balance y Score Crediticio). Si el empresario no paga en 3 turnos, el Banquero presiona [Ejecutar Garantía], embargando y rematando la fábrica del jugador para recuperar liquidez.
+
+•	Oficial de Cumplimiento (Mecánica AML): Si el Empresario intenta ingresar el "Dinero Sucio", el software del banco lo detecta. El Banquero recibe una alerta y enfrenta un dilema:
+
+
+o	Emitir ROS (Reporte Sospechoso): Congela el dinero. El banco cumple la ley, pero pierde esa liquidez y el Empresario se hunde.
+
+o	Ignorar Alerta: El banco absorbe el dinero (gana mucha liquidez para seguir prestando), pero sube el medidor global de riesgo. Si la UIF (Banco Central) hace una auditoría, ambos jugadores sufren multas masivas, embargos y bloqueo de cuentas.
+
+4. La Capa de Interacción (Donde ambos mundos chocan)
+•	Bandeja de Entrada Activa (Command Center): Ya no hay menús aburridos. Todo ocurre por correos accionables. Las facturas tienen botones de [Pagar] o [Diferir]. Las alertas AML tienen botones de [Congelar] o [Ignorar].
+
+•	La Mesa de Negociación (Smart Contracts): Interfaz compartida donde Empresario y Banquero ajustan deslizadores en tiempo real para negociar un préstamo: Monto, Tasa de Interés, Plazo, Periodo de Gracia y Garantías. Ambos deben presionar "Firmar" para ejecutar el contrato.
+
+Plan de Implementación Extenso (Fases de Desarrollo)
+Para construir este simulador sin que el código se vuelva un caos, debes seguir una arquitectura modular estricta.
+
+
+Fase 1: Arquitectura Base y Motor Contable (Backend Core)
+Objetivo: Lograr que el dinero se mueva sin errores y deje rastro.
+
+
+1.	Clase Transacción (TransactionManager): Crea el sistema donde todo movimiento exija Origen, Destino, Monto y Fecha (Turno). Añade aquí la variable oculta isTainted (booleano para el dinero sucio).
+
+2.	Generador del Libro Mayor (LedgerGenerator): Script que calcula en tiempo real el Flujo de Caja y el Balance General leyendo el historial de transacciones.
+
+3.	Reloj del Mundo: Implementa el sistema de Turnos (ej. 1 turno = 1 mes). Al pasar el turno, se cobran intereses, se pagan nóminas (OPEX) y se deprecian máquinas (CAPEX).
+
+Fase 2: Entidades Autónomas (Proveedores y NPCs)
+Objetivo: Darle vida al mundo para que los jugadores sientan presión externa.
+
+
+1.	Módulo de Proveedores: Programa los arquetipos (Barato, Premium) y el sistema de Cuentas por Pagar. Genera deudas que se cobran automáticamente o exigen pago manual al llegar a su fecha límite.
+
+2.	Simulador de Ahorristas: Script para el Banquero que inyecta depósitos pasivos cada turno y retira fondos según la confianza del mercado y el ciclo económico (Expansión/Recesión).
+
+Fase 3: Interfaz de Correo y Mecánica AML (Lógica de Negocio)
+Objetivo: Convertir la toma de decisiones en un minijuego interactivo de riesgo.
+
+
+1.	Mailbox System: Crea los objetos de correo (MailEvent) con payloads ejecutables (botones que disparan funciones en el backend). Conecta las facturas de proveedores aquí.
+
+2.	Eventos Tentadores (Empresario): Programa el disparador que envíe el correo del "Inversor Fantasma" exclusivamente cuando el Flujo de Caja del Empresario esté a un turno de quebrar.
+
+3.	Algoritmo KYC (Banquero): Script que corra cada turno escaneando transacciones entrantes. Si detecta isTainted == true o ingresos que superen el 300% del promedio, dispara el correo de Alerta AML al Banquero con los botones de congelar o ignorar.
+
+4.	Sistema de Auditoría (Regulador): Crea el contador oculto de dinero lavado. Programa el RNG (generador de números aleatorios) que detona la auditoría federal y ejecuta el castigo (confiscaciones).
+
+Fase 4: Negociación, Préstamos y Dashboards (UI Final)
+Objetivo: La conexión multijugador (o Jugador vs IA) y visualización de datos.
+
+
+1.	Módulo de Crédito Credit Score: Algoritmo que lea el historial de pagos del Empresario y le asigne un número (300-850).
+
+2.	Mesa de Smart Contracts: UI de pantalla dividida (o asíncrona) para proponer términos de préstamo. Conecta esto al sistema de Garantías (bloquear un activo del balance del Empresario a favor del Banquero).
+
+3.	Botón de Ejecución (Embargos): Si el contrato entra en mora (3 turnos sin pago), habilita el botón en la UI del Banquero para liquidar la garantía y forzar una transacción de recuperación.
+
+4.	Dashboards Visuales (ERP): Implementa librerías de gráficos (ej. Chart.js) para mostrar los gráficos de barras y líneas en la pantalla del Empresario y los gráficos de exposición al riesgo en la pantalla del Banquero. Bloquea estas vistas detrás de "Mejoras de Software" comprables.
+Este es un clásico error de desincronización entre el estado de la interfaz (UI) y el motor contable (Backend). El juego registró que el contrato fue "Aprobado", pero nunca ejecutó la orden de mover el dinero físico entre las entidades.
+
+Para solucionarlo, debes vincular el botón de [Aprobar Préstamo] a tu TransactionManager usando el principio de Partida Doble. El dinero no debe "aparecer" mágicamente; debe salir de la bóveda del banquero y entrar a la caja del empresario en el mismo milisegundo.
+
+
+1. La Lógica Contable Faltante (El Par de Transacciones)
+Cuando el banquero y el empresario firman el contrato, el sistema debe inyectar automáticamente estas dos transacciones en el Libro Mayor:
+
+En el ERP del Empresario:
+
+
+•	Débito (Suma): +$50,000 a la cuenta Activo -> Caja Chica / Banco.
+
+•	Crédito (Suma): +$50,000 a la cuenta Pasivo -> Deuda Bancaria a Corto/Largo Plazo.(El efectivo del empresario sube, pero su deuda también, manteniendo el balance equilibrado).
+
+En el ERP del Banquero:
+
+
+•	Crédito (Resta): -$50,000 a la cuenta Activo -> Bóveda (Liquidez).
+
+•	Débito (Suma): +$50,000 a la cuenta Activo -> Préstamos Emitidos (Cartera).(El banco pierde liquidez física, pero gana un derecho de cobro que le generará intereses).
+
+2. Cómo Implementar la Corrección (Paso a Paso)
+Debes crear una función puente que actúe en el momento exacto en que el préstamo cambia de estado.
+
+
+1.	Localiza el Evento de Firma: Ve a la parte de tu código donde procesas el "Smart Contract" de la Mesa de Negociación.
+
+2.	Verifica la Liquidez Previa: Antes de hacer cualquier cosa, el sistema debe preguntar: ¿Tiene el Banquero suficiente dinero en la cuenta Bóveda para cubrir este monto sin romper su Encaje Legal?. Si la respuesta es no, lanza un error de "Iliquidez" y bloquea el botón.
+
+3.	Ejecuta la Transferencia Simultánea: Si hay fondos, llama a tu función de transacciones.
+
+4.	Actualiza los Dashboards (UI): Fuerza una actualización (re-render o fetch) en la pantalla de ambos jugadores para que el número de la "Caja Chica" del empresario y la "Bóveda" del banquero cambien en tiempo real.
+3. Ejemplo de Pseudocódigo (El Parche)
+JavaScript
+function aprobarPrestamo(contratoID, banqueroID, empresarioID, monto) {
+    // 1. Validar fondos del banquero
+    let liquidezBanco = Database.getSaldo(banqueroID, "Boveda");
+    if (liquidezBanco < monto) {
+        return UI.mostrarError("El banco no tiene liquidez suficiente.");
+    }
+
+    // 2. Iniciar la transacción atómica (si una falla, fallan todas)
+    try {
+        // --- MOVIMIENTOS DEL BANQUERO ---
+        // Restar efectivo físico de la bóveda
+        TransactionManager.registrar(banqueroID, "Boveda", -monto, "Desembolso Contrato " + contratoID);
+        // Sumar a cartera de préstamos por cobrar
+        TransactionManager.registrar(banqueroID, "Prestamos_Activos", +monto, "Alta Contrato " + contratoID);
+
+        // --- MOVIMIENTOS DEL EMPRESARIO ---
+        // Sumar efectivo a la caja chica/banco del empresario
+        TransactionManager.registrar(empresarioID, "Caja_Chica", +monto, "Desembolso Contrato " + contratoID);
+        // Registrar la deuda en sus pasivos
+        TransactionManager.registrar(empresarioID, "Deuda_Bancaria", +monto, "Alta Contrato " + contratoID);
+
+        // 3. Cambiar estado del contrato a 'Desembolsado' y activar cobro de cuotas
+        Database.actualizarEstadoContrato(contratoID, "Activo");
+        
+        // 4. Refrescar pantallas
+        UI.refrescarERP(banqueroID);
+        UI.refrescarERP(empresarioID);
+
+    } catch (error) {
+        // Revertir si algo sale mal (Rollback)
+        console.error("Error en el desembolso: ", error);
+    }
+}
+Para solucionar la mezcla de interfaces y los errores visuales en el correo, debes implementar un enrutamiento estricto basado en estados (State Management) y corregir la estructura de tu CSS/Lógica.
+
+Aquí tienes el plan de acción exacto para separar los roles y arreglar el correo.
+
+
+1. Separación Estricta en la Pantalla de Inicio
+El simulador no debe cargar ningún dato financiero ni interfaz hasta que el jugador declare quién es.
+
+
+•	Estado Inicial Cero: Al arrancar el juego, la variable global del rol debe ser nula (currentRole = null). Esto fuerza a la aplicación a renderizar únicamente la pantalla de selección.
+
+•	Pantalla de Selección de Rol (UI): Crea una vista con dos grandes tarjetas.
+
+
+o	Tarjeta 1: "Jugar como Empresario" (Ícono de fábrica. Descripción: Gestiona inventario, pide créditos, maximiza ventas).
+
+o	Tarjeta 2: "Jugar como Banquero" (Ícono de banco. Descripción: Capta depósitos, gestiona riesgo, otorga créditos).
+
+•	Asignación de Sesión: Al hacer clic en un rol, se guarda en la memoria local o estado global (sessionStorage.setItem('rol', 'EMPRESARIO')) y el juego redirige al Dashboard correspondiente.
+
+2. Aislamiento de Interfaces (Renderizado Condicional)
+El error de que al empresario le aparezca "Banco Nacional dar crédito" ocurre porque estás usando un único Dashboard genérico para ambos. Debes separar las vistas desde la raíz.
+
+No uses condicionales para ocultar botones individuales (ej. if (rol == 'Banquero') mostrarBoton()). Eso genera código espagueti. En su lugar, carga componentes completamente diferentes:
+
+
+JavaScript
+// Ejemplo de Renderizado Condicional en la vista principal
+function App() {
+    let rolActual = obtenerRolSeleccionado();
+
+    if (rolActual === "EMPRESARIO") {
+        return (
+            <DashboardEmpresario>
+                {/* Solo carga módulos del empresario */}
+                <ModuloERP />
+                <ModuloProveedores />
+                <SolicitarCredito /> 
+            </DashboardEmpresario>
+        );
+    } else if (rolActual === "BANQUERO") {
+        return (
+            <DashboardBanquero>
+                {/* Solo carga módulos del banquero */}
+                <ModuloReservasEncaje />
+                <AuditoriaCreditos />
+                <BancoNacionalRescate /> {/* Aquí va la función del Banco Central */}
+            </DashboardBanquero>
+        );
+    } else {
+        return <PantallaSeleccionRoles />;
+    }
+}
+Con esta arquitectura, es físicamente imposible que un empresario vea o interactúe con ítems de banquero.
+
+
+3. Corrección del Sistema de Correo (Visual y Funcional)
+El "traslape" de números es un problema de renderizado (CSS) y la falta de funcionalidad es un problema de manejo de estado del correo.
+
+
+Solución Visual (Evitar que los textos se encimen)
+Deja de usar márgenes fijos o posicionamiento absoluto. El correo debe estructurarse usando CSS Grid. Esto asigna un espacio rígido a cada columna para que los montos ($50,000.00) no invadan el espacio del texto.
+
+Estructura CSS recomendada para la fila del correo:
+
+
+CSS
+.correo-fila {
+    display: grid;
+    /* 4 columnas: Remitente (20%), Asunto (flexible), Monto (fijo), Botones (fijo) */
+    grid-template-columns: 20% 1fr 120px 200px; 
+    gap: 15px;
+    align-items: center;
+    border-bottom: 1px solid #ccc;
+    padding: 10px;
+}
+
+.correo-monto {
+    text-align: right; /* Alinea los números a la derecha para fácil lectura */
+    font-family: monospace; /* Evita que los números bailen porque tienen distinto ancho */
+    white-space: nowrap; /* Impide que el número salte a la siguiente línea */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+Solución Funcional (Hacer que los botones sirvan)
+Para que las funciones del correo operen sin errores (ej. que no te cobren dos veces al darle doble clic a "Pagar"), los correos deben tener un estado de acción consumida.
+
+
+1.	Actualiza el objeto del correo en la base de datos: Cada mensaje debe tener una propiedad accionEjecutada: false.
+
+2.	Lógica del Botón de Acción:
+
+
+o	Al hacer clic en [Pagar Factura], la interfaz primero verifica: if (correo.accionEjecutada) return;
+
+o	Ejecuta el cargo al Libro Mayor (usando el TransactionManager que definimos antes).
+
+o	Cambia correo.accionEjecutada = true.
+
+3.	Feedback en UI: Inmediatamente después del clic exitoso, el botón [Pagar Factura] debe desaparecer y ser reemplazado por una etiqueta de texto estática que diga "✔ Pagado" o "❌ Rechazado". Esto elimina la confusión del jugador sobre si la acción se procesó o no.
+1. Diseño del Dashboard del Empresario
+La pantalla del empresario debe transmitir la urgencia de mantener el negocio a flote. La interfaz se divide en una barra de indicadores clave (KPIs) en la parte superior y módulos operativos en el centro.
+
+Barra Superior (KPIs en tiempo real):
+
+
+•	Caja Chica (Liquidez): Dinero disponible para usar hoy. (Debe cambiar a rojo si no cubre el OPEX del próximo turno).
+
+•	Inventario: Unidades listas para la venta.
+
+•	Score Crediticio: Número (ej. 300 - 850) con una flecha verde o roja indicando la tendencia.
+
+•	Carga de Deuda: Suma de todas las cuotas a pagar en el turno actual.
+
+Grid de Módulos (Cuerpo de la pantalla):
+
+Módulo	Funcionalidad UI
+Resumen ERP	Gráfico de barras simple mostrando Ingresos vs. Egresos de los últimos 3 turnos. Muestra el Patrimonio Neto actual.
+Operaciones	Botones de acción directa: [Comprar Materia Prima] (abre modal de proveedores), [Invertir en Maquinaria] (CAPEX).
+Gestión de Pasivos	Lista de deudas activas. Muestra: Banco acreedor, Saldo Restante, Monto Próxima Cuota. Botón [Solicitar Nuevo Crédito].
+Bandeja de Correo	Widget lateral. Solo muestra los asuntos de los correos no leídos (facturas, ofertas ilícitas). Al hacer clic, abre la vista completa de la Bandeja de Entrada.
+2. Diseño del Dashboard del Banquero
+El banquero juega un juego de gestión de métricas y evaluación de riesgo. Su pantalla debe parecer una terminal financiera.
+
+Barra Superior (KPIs en tiempo real):
+
+
+•	Liquidez en Bóveda: Dinero físico disponible para prestar o devolver a ahorristas.
+
+•	Cartera Activa: Total de dinero prestado en la calle generando intereses.
+
+•	Índice de Encaje Legal: Porcentaje actual (Liquidez / Total de Depósitos). Si baja del mínimo legal (ej. 20%), el número parpadea en rojo.
+
+•	Tasa Prime (Banco Central): Tasa base de la economía actual para calcular a cuánto prestar.
+
+Grid de Módulos (Cuerpo de la pantalla):
+
+Módulo	Funcionalidad UI
+Mesa de Crédito (Due Diligence)	Lista de solicitudes entrantes de empresarios. Al hacer clic, abre el Dossier del cliente (Score, Balance, Monto solicitado). Botones: [Aprobar], [Contraofertar], [Rechazar].
+Monitoreo de Cartera	Lista de créditos otorgados. Clasificación por colores: Verde (Al día), Amarillo (Mora 1 turno), Rojo (Mora +3 turnos). Botón condicional: [Ejecutar Garantía] (solo activo en rojo).
+Cumplimiento (AML)	Panel de alertas del software de lavado de dinero. Muestra transacciones sospechosas. Botones: [Emitir ROS y Congelar] o [Ignorar Alerta].
+Banco Central	Botón de emergencia [Solicitar Rescate de Liquidez] (préstamo con intereses punitivos si rompe el encaje legal).
+3. Integración de Correos Dinámicos (Event-Driven)
+Para que el servidor envíe correos automáticamente (como la oferta de lavado de activos cuando hay iliquidez), necesitas implementar un patrón de Eventos de Turno (Turn Triggers).
+
+El motor del juego debe evaluar el estado del jugador al finalizar cada turno y disparar el correo si se cumplen ciertas condiciones.
+
+
+Estructura del Objeto Correo (MailEvent)
+JavaScript
+const modeloCorreo = {
+    id: "mail_1024",
+    remitente: "Inversor Privado",
+    asunto: "Oportunidad de Capitalización Inmediata",
+    cuerpo: "Podemos inyectar $50,000 en efectivo hoy mismo. No haremos preguntas sobre facturación.",
+    tipo: "ALERTA_AML", // Sirve para que la UI sepa qué botones renderizar
+    accionPayload: { monto: 50000, marcaIlícita: true },
+    leido: false,
+    accionEjecutada: false
+}
+Lógica del Disparador Automático (El Motor)
+Crea un script que se ejecute en la fase de "Fin de Turno" (End Turn Phase). Este script lee los saldos del jugador y decide si inyectar un correo en su base de datos.
+
+
+JavaScript
+// Función que se ejecuta al pasar el turno
+function evaluarEventosDeTurno(empresarioID) {
+    let saldoActual = Database.getSaldo(empresarioID, "Caja_Chica");
+    let opexProximoTurno = calcularGastosOperativos(empresarioID);
+
+    // Condición: El empresario no tiene dinero para sobrevivir el próximo turno
+    if (saldoActual < opexProximoTurno) {
+        
+        // Tirada de dados: 40% de probabilidad de que el "Inversor Fantasma" aparezca
+        let probabilidad = Math.random(); 
+        
+        if (probabilidad <= 0.40) {
+            generarCorreoAML(empresarioID);
+        }
+    }
+}
+
+function generarCorreoAML(empresarioID) {
+    let nuevoCorreo = {
+        id: generarIDUnico(),
+        remitente: "Capitales Offshore LLC",
+        asunto: "Liquidez Inmediata Disponible",
+        tipo: "OFERTA_AML",
+        payload: { inyeccion: 100000, tainted: true },
+        accionEjecutada: false
+    };
+
+    // Inserta el correo en la bandeja de entrada del jugador en la base de datos
+    Database.insertarCorreo(empresarioID, nuevoCorreo);
+    
+    // Si usas WebSockets, emite un evento para mostrar un globo de notificación rojo (Badge) en la UI
+    Socket.emit("nuevo_correo", { to: empresarioID });
+}
+Renderizado de Botones Dinámicos en la UI
+En el frontend (ej. React o Vanilla JS), cuando el jugador abre este correo específico, el componente lee el tipo y renderiza botones funcionales conectados al backend.
+JavaScript
+// Pseudocódigo del Frontend (Renderizado del Correo Abierto)
+function renderizarBotonesCorreo(correo) {
+    if (correo.accionEjecutada) {
+        return <span className="etiqueta-procesado">Acción Completada</span>;
+    }
+
+    if (correo.tipo === "OFERTA_AML") {
+        return (
+            <div className="botones-accion">
+                <button onClick={() => procesarInyeccionIlícita(correo)}>
+                    Aceptar Capital (Riesgo Alto)
+                </button>
+                <button onClick={() => marcarComoLeido(correo)}>
+                    Rechazar
+                </button>
+            </div>
+        );
+    }
+    
+    // Lógica similar para tipo "FACTURA_PROVEEDOR", etc.
+}

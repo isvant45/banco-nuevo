@@ -602,7 +602,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     productType: CommercialLoanType,
     amount: number,
     termMonths: number,
-    offerId?: string
+    offerId?: string,
+    collateralIds?: string[]
   ) => {
     sound.playClick();
     setPreloadedLoan({
@@ -610,7 +611,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       productType,
       amount,
       termMonths,
-      offerId: offerId || ''
+      offerId: offerId || '',
+      collateralIds: collateralIds || []
     });
     bringToFront('bancos_comerciales');
   };
@@ -663,102 +665,26 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
   const handlePaySarFromEmail = (
     amount: number,
-    sourceAccount: 'checking' | 'cash'
+    sourceAccount: 'checking' | 'cash',
+    selectedBankId?: CommercialBankId,
+    emailId?: string,
+    fiscalYear?: number
   ): { success: boolean; message: string; remainingDebt?: number } => {
-    const sarRecord = simState.sarTaxRecord || DEFAULT_INITIAL_SAR_RECORD;
-    const isCash = sourceAccount === 'cash';
-    const availableFunds = isCash ? simState.storeCash : simState.storeBankBalance;
-
-    if (amount <= 0) {
-      return { success: false, message: 'El monto a pagar debe ser mayor a cero.' };
-    }
-    if (amount > availableFunds) {
-      return {
-        success: false,
-        message: `Fondos insuficientes en ${isCash ? 'Caja Chica' : 'Cuentas Bancarias'}. Saldo disponible: L ${availableFunds.toLocaleString()}, Monto a pagar: L ${amount.toLocaleString()}.`
-      };
-    }
-
-    const newCash = isCash ? simState.storeCash - amount : simState.storeCash;
-    const newBank = !isCash ? simState.storeBankBalance - amount : simState.storeBankBalance;
-
-    let updatedBanks = { ...simState.commercialBanks };
-    if (!isCash) {
-      for (const bId of Object.keys(updatedBanks) as CommercialBankId[]) {
-        const rel = updatedBanks[bId];
-        if (rel?.checkingAccount && rel.checkingAccount.balance >= amount) {
-          updatedBanks = {
-            ...updatedBanks,
-            [bId]: {
-              ...rel,
-              checkingAccount: {
-                ...rel.checkingAccount,
-                balance: rel.checkingAccount.balance - amount
-              }
-            }
-          };
-          break;
-        }
-      }
-    }
-
-    const currentTaxDebt = sarRecord.pendingTaxDue ?? sarRecord.isrTaxAmount ?? amount;
-    const newTaxDebt = Math.max(0, currentTaxDebt - amount);
-
-    const updatedSar = {
-      ...sarRecord,
-      totalTaxPaidYtd: (sarRecord.totalTaxPaidYtd || 0) + amount,
-      pendingTaxDue: newTaxDebt,
-      isPaid: newTaxDebt <= 0,
-      sarAuditRiskScore: Math.max(0, (sarRecord.sarAuditRiskScore || 0) - 15),
-      sarNoticesPending: Math.max(0, (sarRecord.sarNoticesPending || 0) - 1),
-      lastAuditResult: `Pago de impuestos por L ${amount.toLocaleString()} efectuado con éxito mediante correo/SAR.`
-    };
-
-    const voucher: TransactionVoucher = {
-      id: `vouc_sar_${Date.now()}`,
-      voucherNumber: `SAR-VOUC-${Math.floor(100000 + Math.random() * 900000)}`,
-      simDay: simState.currentDay,
-      simMonth: simState.currentMonth,
-      simYear: simState.currentYear,
-      companyName: entityName,
-      operationType: 'pago_prestamo',
-      title: 'COMPROBANTE OFICIAL DE PAGO TRIBUTARIO SAR',
-      grossAmountHNL: amount,
-      deductionsHNL: 0,
-      netDisbursedOrPaidHNL: amount,
-      priorBalanceHNL: currentTaxDebt,
-      newBalanceHNL: newTaxDebt,
-      referenceCode: `REF-SAR-${Math.floor(100000 + Math.random() * 900000)}`,
-      authStamp: 'SELLO DIGITAL SAR - MINISTERIO DE FINANZAS',
-      destinationAccountNumber: 'TRIB-SAR-2026-HN',
-      timestamp: `Día ${simState.currentDay}/0${simState.currentMonth}/${simState.currentYear} 10:00 AM`
-    };
-
-    const updatedEmails = (simState.simulatedEmails || []).map(em => {
-      if (em.category === 'sar_tributario') {
-        return { ...em, isResolved: true };
-      }
-      return em;
+    const res = paySarTaxObligation(simState, amount, sourceAccount, selectedBankId, {
+      emailId,
+      fiscalYear
     });
-
-    setSimState(prev => ({
-      ...prev,
-      storeCash: newCash,
-      storeBankBalance: newBank,
-      commercialBanks: updatedBanks,
-      sarTaxRecord: updatedSar,
-      transactionVouchers: [voucher, ...(prev.transactionVouchers || [])],
-      simulatedEmails: updatedEmails
-    }));
-
-    sound.playApprovalStamp();
-    setActiveVoucherModal(voucher);
-    return { 
-      success: true, 
-      message: `¡Pago a SAR por L ${amount.toLocaleString()} procesado exitosamente! Comprobante oficial emitido.`,
-      remainingDebt: newTaxDebt
-    };
+    if (res.success) {
+      setSimState(res.updatedState);
+      sound.playApprovalStamp();
+      if (res.voucher) {
+        setActiveVoucherModal(res.voucher);
+      }
+      return { success: true, message: res.message, remainingDebt: res.remainingDebt };
+    } else {
+      sound.playRejectBuzzer();
+      return { success: false, message: res.message, remainingDebt: res.remainingDebt };
+    }
   };
 
   const handleNegotiateOffer = (

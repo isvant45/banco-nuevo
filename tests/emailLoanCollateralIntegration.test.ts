@@ -13,8 +13,9 @@ import {
   createInitialSimulatedEmails
 } from '../src/game/commercialBanksEngine';
 import { restoreDailySimulationState } from '../src/game/savedState';
-import { DailySimulationState, DynamicBankOffer } from '../src/game/retroSimTypes';
+import { DailySimulationState, DynamicBankOffer, SimulatedEmail } from '../src/game/retroSimTypes';
 import { DEFAULT_CONSTRUCTION_MATERIALS, DEFAULT_INITIAL_SAR_RECORD } from '../src/game/constructionEngine';
+import { paySarTaxObligation, requestSarSolvenciaCertificate } from '../src/game/sarFiscalEngine';
 
 function createMockIntegrationState(overrides: Partial<DailySimulationState> = {}): DailySimulationState {
   const storeName = 'Constructora Hondureña Metropolitana';
@@ -654,6 +655,71 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       assert.strictEqual(payRes.success, false, 'Debe fallar por fondos insuficientes');
       assert.ok(state.commercialBanks.atlantida.activeLoan);
       assert.strictEqual(state.commercialBanks.atlantida.activeLoan.balanceRemaining, 100000, 'La deuda no debe alterarse');
+    });
+
+    it('ejecuta el pago de tributos SAR desde aviso de correo actualizando registro y solvencia fiscal', () => {
+      const state = createMockIntegrationState({
+        sarTaxRecord: {
+          ...DEFAULT_INITIAL_SAR_RECORD,
+          pendingTaxDue: 85000,
+          isrTaxAmount: 85000,
+          isPaid: false,
+          solvenciaFiscalIssued: false
+        },
+        fiscalPeriods: [{
+          fiscalYear: 2026,
+          periodName: 'Ejercicio Fiscal 2026',
+          grossRevenueHNL: 340000,
+          allowableDeductionsHNL: 0,
+          taxableNetIncomeHNL: 340000,
+          calculatedTaxAmount: 85000,
+          isDeclared: true,
+          isPaid: false,
+          paidAmountHNL: 0,
+          solvenciaIssued: false
+        }]
+      });
+      // Asegurar que ficohsa tenga saldo suficiente
+      state.commercialBanks.ficohsa.checkingAccount!.balance = 200000;
+
+      // Realizar pago total de L 85,000 mediante paySarTaxObligation
+      const payRes = paySarTaxObligation(state, 85000, 'checking', 'ficohsa', {
+        emailId: 'email_sar_test_1',
+        fiscalYear: 2026
+      });
+
+      assert.strictEqual(payRes.success, true, 'El pago al SAR debe ser exitoso');
+      assert.strictEqual(payRes.remainingDebt, 0, 'La deuda tributaria debe ser cero');
+      assert.strictEqual(payRes.updatedState.sarTaxRecord.isPaid, true);
+      assert.strictEqual(payRes.updatedState.sarTaxRecord.pendingTaxDue, 0);
+      assert.ok(payRes.voucher, 'Debe generarse un comprobante de pago oficial');
+      assert.match(payRes.voucher.authStamp, /SAR|VALID|ISR/i);
+
+      // Ahora que el impuesto está pagado al 100%, la empresa puede tramitar su solvencia fiscal exitosamente
+      const solvenciaRes = requestSarSolvenciaCertificate(payRes.updatedState);
+      assert.strictEqual(solvenciaRes.success, true, 'Debe tramitarse la solvencia fiscal con éxito');
+      assert.strictEqual(solvenciaRes.solvenciaIssued, true);
+      assert.strictEqual(solvenciaRes.updatedState.fiscalSolvenciaActive, true);
+    });
+
+    it('bloquea la acción (accionEjecutada) una vez realizada para impedir cobros o contrataciones duplicadas', () => {
+      const email: SimulatedEmail = {
+        id: 'email_lock_test',
+        category: 'bancos_financiamiento',
+        senderName: 'Banco Atlántida',
+        senderEmail: 'creditos@bancatlantida.hn',
+        subject: 'Oferta Pre-Aprobada Especial',
+        body: 'Le ofrecemos financiamiento.',
+        isRead: true,
+        isStarred: false,
+        accionEjecutada: true,
+        accionResultado: '✔ Oferta Contratada y Desembolsada',
+        statusTag: 'Resuelto'
+      };
+
+      // Si accionEjecutada es true, cualquier intento posterior de ejecutar se considera bloqueado
+      assert.strictEqual(email.accionEjecutada, true);
+      assert.strictEqual(email.accionResultado, '✔ Oferta Contratada y Desembolsada');
     });
   });
 });

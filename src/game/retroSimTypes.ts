@@ -871,7 +871,10 @@ export interface SimulatedEmail {
   };
   voucherPayload?: TransactionVoucher;
   actionRequired?: boolean;
-  statusTag?: 'Pendiente' | 'Resuelto' | 'Pre-Aprobado' | 'Vencido';
+  accionEjecutada?: boolean;
+  accionResultado?: string;
+  isResolved?: boolean;
+  statusTag?: 'Pendiente' | 'Resuelto' | 'Pre-Aprobado' | 'Vencido' | string;
   isReplied?: boolean;
 }
 
