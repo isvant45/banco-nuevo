@@ -16,6 +16,7 @@ export interface RetailProduct {
   icon: string;
   stock: number;
   unitCost: number; // Costo de compra al mayorista
+  buyPrice?: number; // Alias compatible
   sellingPrice: number; // Precio de venta al público en estantería
   supplierDeliveryDays: number; // Días que tarda un pedido
   minOrderUnits: number;
@@ -641,6 +642,31 @@ export interface DailySimulationState {
   // Arquitectura Macroeconómica, Banco Central & Smart Contracts
   macroEconomyState?: IMacroEconomyState;
   smartContracts?: ISmartLoanContract[];
+
+  // Módulo de Acciones, Equity, Cap Table & Salida a Bolsa (IPO)
+  capTable?: CapTableInvestor[];
+  companyValuationHNL?: number;
+  equityOffers?: EquityRoundOffer[];
+  ipoStatus?: IpoStatus;
+  dividendsPaidYTD?: number;
+
+  // Módulo de Recursos Humanos Estratégicos (C-Suite & Buffs Pasivos)
+  cSuiteStaff?: CSuiteExecutiveId[];
+  cSuitePayrollHistory?: {
+    month: number;
+    amountPaidHNL: number;
+    executives: CSuiteExecutiveId[];
+  }[];
+
+  // Módulo de Bancos Virtuales NPC (Competencia IA)
+  npcLoans?: NpcActiveLoan[];
+
+  // Riesgo de Lavado de Activos & Auditoría UIF
+  uifAudit?: UifAuditStatus;
+
+  // Cuota de Mercado & Proyecciones a 3 Turnos
+  marketSharePct?: number;
+  historicalProfits?: number[]; // Ganancias netas de los últimos meses para cálculo de valuación
 }
 
 export type CollateralAssetType = 
@@ -981,4 +1007,139 @@ export interface FinancialStatementsSummary {
     netChangeInCash: number;
   };
 }
+
+// ----------------------------------------------------
+// Módulo de Acciones, Equity, Cap Table & IPO
+// ----------------------------------------------------
+
+export interface CapTableInvestor {
+  id: string;
+  name: string;
+  sharePercentage: number;
+  investmentTotalHNL: number;
+  dividendsPaidTotalHNL: number;
+  isPlayer: boolean;
+  type: 'founder' | 'venture_capital' | 'angel_investor' | 'public_market';
+  entryMonth: number;
+  entryValuationHNL: number;
+}
+
+export interface EquityRoundOffer {
+  id: string;
+  fundName: string;
+  fundType: 'seed_fund' | 'venture_capital' | 'private_equity' | 'angel_group';
+  badge: string;
+  offeredSharePct: number; // Ej: 10, 15, 20%
+  cashInjectionHNL: number;
+  impliedValuationHNL: number;
+  minMonthlyProfitReq: number;
+  expiresMonth: number;
+  description: string;
+  status: 'disponible' | 'aceptada' | 'rechazada' | 'expirada';
+}
+
+export interface IpoStatus {
+  isEligible: boolean;
+  isIpoCompleted: boolean;
+  tickerSymbol?: string;
+  ipoDay?: number;
+  ipoMonth?: number;
+  ipoYear?: number;
+  ipoValuationHNL?: number;
+  fundsRaisedHNL?: number;
+  publicSharePct?: number;
+  requirements: {
+    minValuationMet: boolean;
+    solvenciaFiscalActive: boolean;
+    consecutiveProfitableMonths: number;
+    targetConsecutiveMonths: number;
+    positiveNetEquity: boolean;
+  };
+}
+
+// ----------------------------------------------------
+// Módulo de Recursos Humanos (C-Suite & Buffs Pasivos)
+// ----------------------------------------------------
+
+export type CSuiteExecutiveId = 'CFO' | 'ABOGADO' | 'COO' | 'CMO';
+
+export interface CSuiteExecutiveConfig {
+  id: CSuiteExecutiveId;
+  name: string;
+  title: string;
+  salaryMonthlyHNL: number;
+  icon: string;
+  badge: string;
+  buffCode: string;
+  description: string;
+  perks: string[];
+}
+
+// ----------------------------------------------------
+// Módulo de Bancos Virtuales NPC (Competencia IA)
+// ----------------------------------------------------
+
+export type NpcBankId = 'banco_nacional' | 'banco_privado_intermedio' | 'tiburon_prestamista';
+
+export interface NpcBankProfile {
+  id: NpcBankId;
+  name: string;
+  tagline: string;
+  personality: 'conservador' | 'intermedio' | 'depredador';
+  colorHex: string;
+  icon: string;
+  interestRateAnnual: number;
+  minCreditScoreRequired: number;
+  requiresCollateral: boolean;
+  collateralRatioReq: number; // ej 1.5 (150%)
+  sharkRetentionPct?: number; // 50% de ingresos diarios en mora
+  description: string;
+}
+
+export interface NpcCreditEvaluation {
+  bankId: NpcBankId;
+  bankName: string;
+  personality: 'conservador' | 'intermedio' | 'depredador';
+  icon: string;
+  isApproved: boolean;
+  rejectionReason?: string;
+  approvedAmountHNL: number;
+  interestRateAnnual: number;
+  termMonths: number;
+  monthlyQuotaHNL: number;
+  totalRepaymentHNL: number;
+  collateralRequiredHNL: number;
+  collateralProvidedHNL: number;
+  collateralMet: boolean;
+  specialClause?: string;
+}
+
+export interface NpcActiveLoan {
+  id: string;
+  bankId: NpcBankId;
+  bankName: string;
+  principalAmount: number;
+  balanceRemaining: number;
+  monthlyQuota: number;
+  interestRateAnnual: number;
+  termMonthsRemaining: number;
+  isSharkLoan?: boolean;
+  sharkBlockedCash?: boolean;
+  sharkRetainedAmount?: number;
+  isDelinquent?: boolean;
+  collateralIdRef?: string;
+}
+
+// ----------------------------------------------------
+// Módulo de Sospecha UIF & Lavado de Activos (Ruleta Rusa)
+// ----------------------------------------------------
+
+export interface UifAuditStatus {
+  suspicionScore: number; // 0 - 100%
+  underAudit: boolean;
+  lastAuditResult?: 'salvado_por_abogado' | 'sancionado' | 'absuelto';
+  finesPaidTotalHNL: number;
+  dirtyMoneyInjectedTotalHNL: number;
+}
+
 

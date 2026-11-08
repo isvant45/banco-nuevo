@@ -109,6 +109,13 @@ import { CentralBankWindow } from './CentralBankWindow';
 import { NegotiationTableModal } from './NegotiationTableModal';
 import { DueDiligenceModal } from './DueDiligenceModal';
 import { createInitialMacroEconomyState, advanceMacroEconomyMonth } from '../../game/macroEconomyEngine';
+import { EquityMarketWindow } from './EquityMarketWindow';
+import { CSuiteStaffWindow } from './CSuiteStaffWindow';
+import { NpcFinancingWindow } from './NpcFinancingWindow';
+import { RetroToastContainer, RetroToast } from './RetroToastContainer';
+import { distributeDividendsAtMonthEnd } from '../../game/equityMarketEngine';
+import { processMonthlyCSuitePayroll, processUifTurnAudit } from '../../game/cSuiteEngine';
+import { applySharkDailyRetention } from '../../game/npcBankingEngine';
 
 interface RetroDesktopProps {
   initialRole: RetroRoleMode;
@@ -294,8 +301,21 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     liabilities_manager: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     competitors_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     erp_ledger: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
-    banco_central: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
+    banco_central: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    equity_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    csuite_staff: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    npc_financing: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
   });
+
+  // Notificaciones flotantes estilo retro / Toast en esquina inferior derecha
+  const [toasts, setToasts] = useState<RetroToast[]>([]);
+  const addToast = (t: Omit<RetroToast, 'id'>) => {
+    const id = `toast_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    setToasts(prev => [...prev.slice(-3), { ...t, id }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(item => item.id !== id));
+    }, t.durationMs || 5000);
+  };
 
   const [topZIndex, setTopZIndex] = useState(20);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(
@@ -1172,12 +1192,67 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     // Evaluar y generar ofertas bancarias dinámicas según salud financiera
     nextState = evaluateAndGenerateBankOffers(nextState);
 
+    // Procesar retención del Tiburón si hay préstamos en mora
+    nextState = applySharkDailyRetention(nextState);
+
     // Procesar impacto del sistema ERP corporativo (sucursales, marketing, moral y Libro Mayor)
     nextState = advanceErpCorporateDay(nextState);
 
-    // Si comienza un nuevo ciclo mensual (día 1 o cambio de mes), procesar política monetaria y Banco Central
+    // Si comienza un nuevo ciclo mensual (día 1 o cambio de mes), procesar macroeconomía, dividendos, nómina C-Suite y auditoría UIF
     if (nextState.currentDay === 1 || nextState.currentMonth !== simState.currentMonth) {
       nextState = advanceMacroEconomyMonth(nextState);
+
+      // Registrar ganancia en el historial de los últimos turnos para valuación
+      const estimatedMonthProfit = nextState.lastClosingSummary?.netProfit ?? (nextState.monthlySalesAccumulated > 0 ? nextState.monthlySalesAccumulated * 0.18 : 25000);
+      nextState.historicalProfits = [...(nextState.historicalProfits || []), Math.round(estimatedMonthProfit)];
+
+      // Reparto de dividendos a socios de equity
+      if (estimatedMonthProfit > 0) {
+        const divRes = distributeDividendsAtMonthEnd(nextState, estimatedMonthProfit);
+        nextState = divRes.updatedState;
+        if (divRes.totalDividendsPaid > 0) {
+          addToast({
+            title: 'Dividendos Repartidos',
+            message: `Se distribuyeron L ${divRes.totalDividendsPaid.toLocaleString()} a inversionistas del Cap Table.`,
+            type: 'money',
+            amount: -divRes.totalDividendsPaid
+          });
+        }
+      }
+
+      // Nómina de directores C-Suite
+      const payRes = processMonthlyCSuitePayroll(nextState);
+      nextState = payRes.updatedState;
+      if (payRes.totalPayrollPaid > 0) {
+        addToast({
+          title: 'Nómina C-Suite Pagada',
+          message: `Salarios C-Level liquidados por L ${payRes.totalPayrollPaid.toLocaleString()}.`,
+          type: 'info',
+          amount: -payRes.totalPayrollPaid
+        });
+      }
+
+      // Auditoría de la UIF si hay sospecha activa
+      const uifRes = processUifTurnAudit(nextState);
+      nextState = uifRes.updatedState;
+      if (uifRes.auditTriggered) {
+        if (uifRes.lawyerDefended) {
+          sound.playApprovalStamp();
+          addToast({
+            title: 'UIF: Escudo Legal Exitoso',
+            message: uifRes.message,
+            type: 'success'
+          });
+        } else {
+          sound.playHeavyStamp();
+          addToast({
+            title: 'UIF: Sanción Aplicada',
+            message: uifRes.message,
+            type: 'danger',
+            amount: uifRes.fineAmountApplied ? -uifRes.fineAmountApplied : undefined
+          });
+        }
+      }
     }
 
     // Enviar resumen diario de ventas por correo si hubo cobros en el día
@@ -1407,7 +1482,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     { id: 'liabilities_manager', title: 'Centro de Pasivos & Obligaciones', icon: '📑', isOpen: !!openWindows.liabilities_manager?.isOpen, isMinimized: !!openWindows.liabilities_manager?.isMinimized },
     { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized },
     { id: 'erp_ledger', title: 'ERP & Libro Mayor', icon: '📑', isOpen: !!openWindows.erp_ledger?.isOpen, isMinimized: !!openWindows.erp_ledger?.isMinimized },
-    { id: 'banco_central', title: 'Banco Central & Macroeconomía', icon: '🏛️', isOpen: !!openWindows.banco_central?.isOpen, isMinimized: !!openWindows.banco_central?.isMinimized }
+    { id: 'banco_central', title: 'Banco Central & Macroeconomía', icon: '🏛️', isOpen: !!openWindows.banco_central?.isOpen, isMinimized: !!openWindows.banco_central?.isMinimized },
+    { id: 'equity_market', title: 'Mercado de Acciones & Valuación (BVM)', icon: '📈', isOpen: !!openWindows.equity_market?.isOpen, isMinimized: !!openWindows.equity_market?.isMinimized },
+    { id: 'csuite_staff', title: 'Dirección C-Suite & RRHH', icon: '👔', isOpen: !!openWindows.csuite_staff?.isOpen, isMinimized: !!openWindows.csuite_staff?.isMinimized },
+    { id: 'npc_financing', title: 'Subasta de Crédito NPC', icon: '⚡', isOpen: !!openWindows.npc_financing?.isOpen, isMinimized: !!openWindows.npc_financing?.isMinimized }
   ];
 
   return (
@@ -1995,6 +2073,54 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
             Banco Central
+          </span>
+        </button>
+
+        {/* Acciones & Valuación BVM */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('equity_market');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📈
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Acciones & IPO
+          </span>
+        </button>
+
+        {/* C-Suite & Recursos Humanos */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('csuite_staff');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            👔
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            C-Suite RRHH
+          </span>
+        </button>
+
+        {/* Subasta de Crédito NPC */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('npc_financing');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            ⚡
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Crédito NPC
           </span>
         </button>
 
@@ -2696,6 +2822,77 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         />
       </RetroWindow>
 
+      {/* Ventana: Mercado de Acciones & Valuación Corporativa (BVM) */}
+      <RetroWindow
+        id="equity_market"
+        title="Mercado de Acciones & Valuación Corporativa (BVM)"
+        icon="📈"
+        initialX={75}
+        initialY={35}
+        isOpen={!!openWindows.equity_market?.isOpen}
+        isMinimized={!!openWindows.equity_market?.isMinimized}
+        isMaximized={!!openWindows.equity_market?.isMaximized}
+        zIndex={openWindows.equity_market?.zIndex || 5}
+        onFocus={() => bringToFront('equity_market')}
+        onClose={() => handleCloseWindow('equity_market')}
+        onMinimize={() => handleMinimizeWindow('equity_market')}
+        onMaximize={() => handleMaximizeWindow('equity_market')}
+      >
+        <EquityMarketWindow
+          simState={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onShowVoucher={(vch) => setActiveVoucherModal(vch)}
+          onTriggerToast={(t) => addToast(t)}
+        />
+      </RetroWindow>
+
+      {/* Ventana: Dirección Ejecutiva C-Suite & Recursos Humanos */}
+      <RetroWindow
+        id="csuite_staff"
+        title="Dirección Ejecutiva C-Suite & Recursos Humanos"
+        icon="👔"
+        initialX={105}
+        initialY={45}
+        isOpen={!!openWindows.csuite_staff?.isOpen}
+        isMinimized={!!openWindows.csuite_staff?.isMinimized}
+        isMaximized={!!openWindows.csuite_staff?.isMaximized}
+        zIndex={openWindows.csuite_staff?.zIndex || 5}
+        onFocus={() => bringToFront('csuite_staff')}
+        onClose={() => handleCloseWindow('csuite_staff')}
+        onMinimize={() => handleMinimizeWindow('csuite_staff')}
+        onMaximize={() => handleMaximizeWindow('csuite_staff')}
+      >
+        <CSuiteStaffWindow
+          simState={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onTriggerToast={(t) => addToast(t)}
+        />
+      </RetroWindow>
+
+      {/* Ventana: Subasta de Crédito & Banca Rival NPC */}
+      <RetroWindow
+        id="npc_financing"
+        title="Subasta de Crédito & Banca Rival NPC"
+        icon="⚡"
+        initialX={85}
+        initialY={48}
+        isOpen={!!openWindows.npc_financing?.isOpen}
+        isMinimized={!!openWindows.npc_financing?.isMinimized}
+        isMaximized={!!openWindows.npc_financing?.isMaximized}
+        zIndex={openWindows.npc_financing?.zIndex || 5}
+        onFocus={() => bringToFront('npc_financing')}
+        onClose={() => handleCloseWindow('npc_financing')}
+        onMinimize={() => handleMinimizeWindow('npc_financing')}
+        onMaximize={() => handleMaximizeWindow('npc_financing')}
+      >
+        <NpcFinancingWindow
+          simState={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onShowVoucher={(vch) => setActiveVoucherModal(vch)}
+          onTriggerToast={(t) => addToast(t)}
+        />
+      </RetroWindow>
+
       {/* Modal de Comprobante Oficial de Transacción Bancaria */}
       {activeVoucherModal && (
         <TransactionVoucherModal
@@ -2751,6 +2948,12 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         onOpenCompetitorsMarket={() => bringToFront('competitors_market')}
         onSaveGame={handleSaveGameJson}
         onLoadGame={handleLoadGameJson}
+      />
+
+      {/* Contenedor de Notificaciones Toast Flotantes */}
+      <RetroToastContainer
+        toasts={toasts}
+        onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
       />
     </div>
   );
