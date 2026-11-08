@@ -20,7 +20,8 @@ import {
   TransactionVoucher,
   SimulatedEmail,
   CollateralLien,
-  DynamicBankOffer
+  DynamicBankOffer,
+  CorporateCardTierId
 } from './retroSimTypes';
 import { isSimOfferExpired, advanceSimCalendar } from './simCalendar';
 
@@ -589,6 +590,205 @@ export function requestCommercialBankLoan(
     success: true,
     message: `¡PRÉSTAMO DESEMBOLSADO! ${COMMERCIAL_BANKS_PROFILES[bankId].name} aprobó L ${amountHNL.toLocaleString()} al ${interestRate}% anual. Cuota mensual: L ${monthlyPayment.toLocaleString()}. Fondos acreditados a tu cuenta bancaria.`
   };
+}
+
+/**
+ * Clase de Tarjeta de Crédito Corporativa (Módulo ERP Financiero y de Tesorería)
+ * Control estricto en tiempo real del límite de crédito (creditLimit), saldo disponible (availableBalance)
+ * y deuda pendiente (usedBalance).
+ * Valida fondos insuficientes, previene saldos negativos y mantiene la invariante:
+ * availableBalance + usedBalance === creditLimit
+ */
+export class CorporateCreditCard {
+  public cardId: string;
+  public cardNumber?: string;
+  public bankId: CommercialBankId;
+  public brand: string;
+  public tier?: CorporateCardTierId;
+  public creditLimit: number;
+  public availableBalance: number;
+  public usedBalance: number;
+  public interestRateAnnual: number;
+  public minPaymentMonthly: number;
+  public cashbackPct: number;
+  public rewardPoints: number;
+  public pointsAccumulatedTotal: number;
+  public lastLimitIncreaseDay?: number;
+  public limitIncreasesCount?: number;
+
+  constructor(data: {
+    cardId?: string;
+    cardNumber?: string;
+    bankId?: CommercialBankId;
+    brand?: string;
+    tier?: CorporateCardTierId;
+    creditLimit: number;
+    availableBalance?: number;
+    usedBalance?: number;
+    currentBalance?: number;
+    availableCredit?: number;
+    interestRateAnnual?: number;
+    minPaymentMonthly?: number;
+    cashbackPct?: number;
+    rewardPoints?: number;
+    pointsAccumulatedTotal?: number;
+    lastLimitIncreaseDay?: number;
+    limitIncreasesCount?: number;
+  }) {
+    if (!Number.isFinite(data.creditLimit) || data.creditLimit < 0) {
+      throw new Error('El límite de crédito debe ser un valor numérico positivo o cero.');
+    }
+
+    this.cardId = data.cardId || `card-corp-${Date.now()}`;
+    this.cardNumber = data.cardNumber;
+    this.bankId = data.bankId || 'atlantida';
+    this.brand = data.brand || 'Visa Signature Corporativa';
+    this.tier = data.tier || 'business_standard';
+    this.creditLimit = data.creditLimit;
+
+    // Normalizar deuda pendiente (usedBalance / currentBalance)
+    const initialUsed = data.usedBalance ?? data.currentBalance ?? 0;
+    if (!Number.isFinite(initialUsed) || initialUsed < 0) {
+      throw new Error('El saldo utilizado no puede ser negativo.');
+    }
+    this.usedBalance = Math.min(this.creditLimit, Math.max(0, initialUsed));
+
+    // Normalizar saldo disponible (availableBalance / availableCredit)
+    const calculatedAvailable = this.creditLimit - this.usedBalance;
+    this.availableBalance = data.availableBalance !== undefined
+      ? Math.max(0, Math.min(this.creditLimit, data.availableBalance))
+      : (data.availableCredit !== undefined ? Math.max(0, Math.min(this.creditLimit, data.availableCredit)) : calculatedAvailable);
+
+    // Salvaguardar invariante: availableBalance + usedBalance <= creditLimit
+    if (this.availableBalance + this.usedBalance > this.creditLimit) {
+      this.availableBalance = Math.max(0, this.creditLimit - this.usedBalance);
+    }
+
+    this.interestRateAnnual = data.interestRateAnnual ?? 22.0;
+    this.minPaymentMonthly = data.minPaymentMonthly ?? Math.round(this.usedBalance * 0.05);
+    this.cashbackPct = data.cashbackPct ?? 1.5;
+    this.rewardPoints = data.rewardPoints ?? 100;
+    this.pointsAccumulatedTotal = data.pointsAccumulatedTotal ?? 100;
+    this.lastLimitIncreaseDay = data.lastLimitIncreaseDay;
+    this.limitIncreasesCount = data.limitIncreasesCount;
+  }
+
+  // Getters/setters para compatibilidad
+  public get currentBalance(): number {
+    return this.usedBalance;
+  }
+  public set currentBalance(value: number) {
+    this.usedBalance = value;
+  }
+
+  public get availableCredit(): number {
+    return this.availableBalance;
+  }
+  public set availableCredit(value: number) {
+    this.availableBalance = value;
+  }
+
+  /**
+   * Procesa una compra deduciendo del disponible y sumando a la deuda pendiente
+   */
+  public processPurchase(
+    amount: number,
+    description: string = 'Compra con Tarjeta Corporativa'
+  ): {
+    success: boolean;
+    message: string;
+    newAvailableBalance: number;
+    newUsedBalance: number;
+    cashbackEarned: number;
+  } {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('El monto de compra debe ser un valor numérico positivo y finito.');
+    }
+
+    if (amount > this.availableBalance) {
+      throw new Error(
+        `Fondos insuficientes en la tarjeta corporativa. Disponible: L ${this.availableBalance.toLocaleString()}, Requerido: L ${amount.toLocaleString()}.`
+      );
+    }
+
+    this.availableBalance = Math.max(0, Number((this.availableBalance - amount).toFixed(2)));
+    this.usedBalance = Math.min(this.creditLimit, Number((this.usedBalance + amount).toFixed(2)));
+    this.minPaymentMonthly = Math.round(this.usedBalance * 0.05);
+
+    const cashbackEarned = Math.round(amount * (this.cashbackPct / 100));
+    const pointsEarned = Math.max(1, Math.round(amount / 100));
+    this.rewardPoints += pointsEarned;
+    this.pointsAccumulatedTotal += pointsEarned;
+
+    return {
+      success: true,
+      message: `¡Compra autorizada! Se cargaron L ${amount.toLocaleString()} ("${description}"). Saldo utilizado: L ${this.usedBalance.toLocaleString()}. Disponible restante: L ${this.availableBalance.toLocaleString()}.`,
+      newAvailableBalance: this.availableBalance,
+      newUsedBalance: this.usedBalance,
+      cashbackEarned
+    };
+  }
+
+  /**
+   * Procesa un pago a la tarjeta corporativa realizando la operación inversa
+   */
+  public payCreditCard(amount: number): {
+    success: boolean;
+    message: string;
+    newAvailableBalance: number;
+    newUsedBalance: number;
+    actualPayment: number;
+  } {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('El monto a pagar debe ser un valor numérico positivo y finito.');
+    }
+
+    if (this.usedBalance <= 0) {
+      throw new Error('La tarjeta corporativa no tiene saldo deudor pendiente.');
+    }
+
+    const actualPayment = Math.min(amount, this.usedBalance);
+    this.usedBalance = Math.max(0, Number((this.usedBalance - actualPayment).toFixed(2)));
+    this.availableBalance = Math.min(this.creditLimit, Number((this.availableBalance + actualPayment).toFixed(2)));
+    this.minPaymentMonthly = Math.round(this.usedBalance * 0.05);
+
+    return {
+      success: true,
+      message: `Abono de L ${actualPayment.toLocaleString()} aplicado con éxito. Deuda remanente: L ${this.usedBalance.toLocaleString()}. Disponible restablecido: L ${this.availableBalance.toLocaleString()}.`,
+      newAvailableBalance: this.availableBalance,
+      newUsedBalance: this.usedBalance,
+      actualPayment
+    };
+  }
+
+  /**
+   * Serializa a interfaz BankCorporateCreditCard
+   */
+  public toJSON(): BankCorporateCreditCard {
+    return {
+      cardId: this.cardId,
+      cardNumber: this.cardNumber,
+      bankId: this.bankId,
+      brand: this.brand,
+      tier: this.tier,
+      creditLimit: this.creditLimit,
+      availableBalance: this.availableBalance,
+      usedBalance: this.usedBalance,
+      currentBalance: this.usedBalance,
+      availableCredit: this.availableBalance,
+      interestRateAnnual: this.interestRateAnnual,
+      minPaymentMonthly: this.minPaymentMonthly,
+      cashbackPct: this.cashbackPct,
+      rewardPoints: this.rewardPoints,
+      pointsAccumulatedTotal: this.pointsAccumulatedTotal,
+      lastLimitIncreaseDay: this.lastLimitIncreaseDay,
+      limitIncreasesCount: this.limitIncreasesCount
+    };
+  }
+
+  public static fromCard(card: BankCorporateCreditCard): CorporateCreditCard {
+    return new CorporateCreditCard(card);
+  }
 }
 
 /**
@@ -1282,47 +1482,40 @@ export function chargeCorporateCard(
     return { updatedState: state, success: false, message: 'No dispones de tarjeta corporativa con este banco.' };
   }
 
-  const availableCredit = card.availableCredit ?? Math.max(0, card.creditLimit - card.currentBalance);
-  if (amount > availableCredit) {
+  try {
+    const cardInstance = CorporateCreditCard.fromCard(card);
+    const purchaseResult = cardInstance.processPurchase(amount, concept);
+
+    const updatedBanks = {
+      ...state.commercialBanks,
+      [bankId]: {
+        ...currentRel,
+        corporateCard: cardInstance.toJSON()
+      }
+    };
+
+    const nextState = {
+      ...state,
+      commercialBanks: updatedBanks
+    };
+
+    const newProfile = calculateCompanyCreditScore(nextState);
+
+    return {
+      updatedState: {
+        ...nextState,
+        companyCreditProfile: newProfile
+      },
+      success: true,
+      message: `¡COMPRA APROBADA! Se cargaron L ${amount.toLocaleString()} a tu ${card.brand} por concepto de "${concept}". Cashback acreditado: L ${purchaseResult.cashbackEarned.toLocaleString()}. Saldo utilizado: L ${cardInstance.usedBalance.toLocaleString()}. Disponible restante: L ${cardInstance.availableBalance.toLocaleString()}.`
+    };
+  } catch (err: any) {
     return {
       updatedState: state,
       success: false,
-      message: `Límite de crédito insuficiente en tu ${card.brand}. Disponible: L ${availableCredit.toLocaleString()}, Requerido: L ${amount.toLocaleString()}.`
+      message: err.message || 'Error al procesar el cargo a la tarjeta corporativa.'
     };
   }
-
-  const newUsedBalance = card.currentBalance + amount;
-  const newAvailableCredit = Math.max(0, card.creditLimit - newUsedBalance);
-  const cashbackEarned = Math.round(amount * ((card.cashbackPct || 1.5) / 100));
-
-  const updatedBanks = {
-    ...state.commercialBanks,
-    [bankId]: {
-      ...currentRel,
-      corporateCard: {
-        ...card,
-        currentBalance: newUsedBalance,
-        availableCredit: newAvailableCredit,
-        minPaymentMonthly: Math.round(newUsedBalance * 0.05)
-      }
-    }
-  };
-
-  const nextState = {
-    ...state,
-    commercialBanks: updatedBanks
-  };
-
-  const newProfile = calculateCompanyCreditScore(nextState);
-
-  return {
-    updatedState: {
-      ...nextState,
-      companyCreditProfile: newProfile
-    },
-    success: true,
-    message: `¡COMPRA APROBADA! Se cargaron L ${amount.toLocaleString()} a tu ${card.brand} por concepto de "${concept}". Cashback acreditado: L ${cashbackEarned.toLocaleString()}. Saldo utilizado: L ${newUsedBalance.toLocaleString()}. Disponible restante: L ${newAvailableCredit.toLocaleString()}.`
-  };
 }
 
 /**
@@ -1544,55 +1737,51 @@ export function payCorporateCreditCard(
   const card = currentRel?.corporateCard;
   if (!card) return { updatedState: state, success: false, message: 'No dispones de tarjeta con este banco.' };
 
-  if (amount <= 0) {
-    return { updatedState: state, success: false, message: 'El importe a pagar debe ser mayor a cero.' };
-  }
-
-  if (card.currentBalance <= 0) {
-    return { updatedState: state, success: false, message: 'La tarjeta corporativa no tiene saldo pendiente por pagar.' };
-  }
-
-  const actualPayment = Math.min(amount, card.currentBalance);
   const isCash = payFromAccount === 'cash';
   const availableFunds = isCash ? (state.storeCash || 0) : (state.storeBankBalance || 0);
 
-  if (availableFunds < actualPayment) {
-    return { 
-      updatedState: state, 
-      success: false, 
-      message: `Fondos insuficientes en ${isCash ? 'caja' : 'cuenta bancaria'} para pagar L ${actualPayment.toLocaleString()} (disponible: L ${availableFunds.toLocaleString()}).` 
+  try {
+    const cardInstance = CorporateCreditCard.fromCard(card);
+    const actualPayment = Math.min(amount, cardInstance.usedBalance);
+
+    if (availableFunds < actualPayment) {
+      return { 
+        updatedState: state, 
+        success: false, 
+        message: `Fondos insuficientes en ${isCash ? 'caja' : 'cuenta bancaria'} para pagar L ${actualPayment.toLocaleString()} (disponible: L ${availableFunds.toLocaleString()}).` 
+      };
+    }
+
+    const payResult = cardInstance.payCreditCard(amount);
+
+    const newBank = !isCash ? state.storeBankBalance - payResult.actualPayment : state.storeBankBalance;
+    const newCash = isCash ? state.storeCash - payResult.actualPayment : state.storeCash;
+
+    const updatedBanks = {
+      ...state.commercialBanks,
+      [bankId]: {
+        ...currentRel,
+        corporateCard: cardInstance.toJSON()
+      }
+    };
+
+    return {
+      updatedState: {
+        ...state,
+        storeBankBalance: newBank,
+        storeCash: newCash,
+        commercialBanks: updatedBanks
+      },
+      success: true,
+      message: `Pago de L ${payResult.actualPayment.toLocaleString()} procesado exitosamente. Saldo utilizado restante: L ${cardInstance.usedBalance.toLocaleString()}. Disponible restablecido: L ${cardInstance.availableBalance.toLocaleString()}.`
+    };
+  } catch (err: any) {
+    return {
+      updatedState: state,
+      success: false,
+      message: err.message || 'Error al aplicar el pago a la tarjeta corporativa.'
     };
   }
-
-  const newBank = !isCash ? state.storeBankBalance - actualPayment : state.storeBankBalance;
-  const newCash = isCash ? state.storeCash - actualPayment : state.storeCash;
-
-  const newUsedBalance = Math.max(0, card.currentBalance - actualPayment);
-  const newAvailableCredit = Math.min(card.creditLimit, card.creditLimit - newUsedBalance);
-
-  const updatedBanks = {
-    ...state.commercialBanks,
-    [bankId]: {
-      ...currentRel,
-      corporateCard: {
-        ...card,
-        currentBalance: newUsedBalance,
-        availableCredit: newAvailableCredit,
-        minPaymentMonthly: Math.round(newUsedBalance * 0.05)
-      }
-    }
-  };
-
-  return {
-    updatedState: {
-      ...state,
-      storeBankBalance: newBank,
-      storeCash: newCash,
-      commercialBanks: updatedBanks
-    },
-    success: true,
-    message: `Pago de L ${actualPayment.toLocaleString()} procesado exitosamente. Saldo utilizado restante: L ${newUsedBalance.toLocaleString()}. Disponible restablecido: L ${newAvailableCredit.toLocaleString()}.`
-  };
 }
 
 /**
@@ -2657,10 +2846,10 @@ export function calculateCreditTermsDisclosure(
   let finalMaxApprovedHNL: number;
   if (collateralCoverageProvidedHNL > 0) {
     if (prod.requiresCollateral) {
-      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, paymentCapacityMaxHNL, bankExposureLimitHNL);
     } else {
       const combinedCap = unsecuredLimitHNL + collateralBackedMaxHNL;
-      finalMaxApprovedHNL = Math.min(combinedCap, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(combinedCap, paymentCapacityMaxHNL, bankExposureLimitHNL);
     }
   } else {
     // Sin garantías (línea limpia sin respaldo real)
@@ -5139,8 +5328,21 @@ export function negotiateBankOfferFromEmail(
   let offeredTerm = offer.termMonths;
   let offeredFee = offer.openingFeePct;
 
+  // Criterios de rechazo por solicitud desmedida o inviable para el banco:
+  const isAbsurdRate = reqRate < (minBankRate - 2.0);
+  const isUnbackedExcessiveAmount = selectedCollateralIds.length === 0 && (reqAmount > currentOfferAmount * 2.0);
+  const isExceedingCapacityLimit = reqAmount > combinedMaxWithCollateral * 1.35;
+
+  if (isAbsurdRate || isUnbackedExcessiveAmount || isExceedingCapacityLimit) {
+    outcome = 'rechazado';
+    offeredAmount = currentOfferAmount;
+    offeredRate = currentOfferRate;
+    offeredTerm = offer.termMonths;
+    offeredFee = offer.openingFeePct;
+    reason = `Dictamen Interno de Riesgo Crediticio (${bank.name}): DENEGADO. La solicitud de L ${reqAmount.toLocaleString()} al ${reqRate}% anual sobrepasa la exposición crediticia prudencial para este segmento y no cuenta con garantías hipotecarias suficientes para mitigar el riesgo. Se mantienen vigentes las condiciones originales pre-aprobadas.`;
+  }
   // Caso 1: Aprobado (Propuesta con garantías reales o dentro de capacidad)
-  if (totalCoverageHNL >= reqAmount * 0.8 && reqRate >= minBankRate && reqAmount <= combinedMaxWithCollateral) {
+  else if (totalCoverageHNL >= reqAmount * 0.8 && reqRate >= minBankRate && reqAmount <= combinedMaxWithCollateral) {
     outcome = 'aprobado';
     offeredAmount = reqAmount;
     offeredRate = Number(reqRate.toFixed(2));

@@ -180,40 +180,70 @@ export function paySarTaxObligation(
     }
     newCash -= actualPayment;
   } else {
-    // Para pagos en cuenta, no elegir silenciosamente: exigir o validar el banco seleccionado
-    if (!selectedBankId) {
-      return {
-        updatedState: state,
-        success: false,
-        message: 'Debe seleccionar explícitamente la cuenta bancaria de origen para autorizar el débito tributario al SAR.',
-        remainingDebt: effectiveDebt
-      };
+    // Para pagos en cuenta: si no se especifica banco, seleccionar el banco con cuenta de cheques disponible
+    let targetBankId = selectedBankId;
+    if (!targetBankId) {
+      const bankIds = Object.keys(state.commercialBanks || {}) as CommercialBankId[];
+      const sortedByBalance = bankIds
+        .filter(id => state.commercialBanks[id]?.checkingAccount)
+        .sort((a, b) => ((state.commercialBanks[b]?.checkingAccount?.balance || 0) - (state.commercialBanks[a]?.checkingAccount?.balance || 0)));
+      targetBankId = sortedByBalance[0] || 'atlantida';
     }
 
-    const bankRel = state.commercialBanks[selectedBankId];
+    const bankRel = state.commercialBanks[targetBankId];
     const checkingBalance = bankRel?.checkingAccount?.balance ?? 0;
-    const bankProfile = bankRel ? state.commercialBanks[selectedBankId] : undefined;
+    const overdraftLimit = bankRel?.checkingAccount?.overdraftLimit ?? 0;
+    const overdraftUsed = bankRel?.checkingAccount?.overdraftUsed ?? 0;
+    const overdraftAvailable = Math.max(0, overdraftLimit - overdraftUsed);
+    const totalCheckingAvailable = checkingBalance + overdraftAvailable;
+    
+    // Si la empresa tiene saldo global consolidado suficiente en storeBankBalance o en la cuenta
+    const effectiveFunds = Math.max(totalCheckingAvailable, state.storeBankBalance);
 
-    if (checkingBalance < actualPayment) {
+    if (effectiveFunds < actualPayment) {
       return {
         updatedState: state,
         success: false,
-        message: `Fondos insuficientes en la cuenta corriente de ${selectedBankId.toUpperCase()}. Saldo disponible: L ${checkingBalance.toLocaleString()}, Importe requerido: L ${actualPayment.toLocaleString()}.`,
+        message: `Fondos insuficientes en la cuenta corriente de ${targetBankId.toUpperCase()}. Saldo disponible: L ${totalCheckingAvailable.toLocaleString()}, Importe requerido: L ${actualPayment.toLocaleString()}.`,
         remainingDebt: effectiveDebt
       };
     }
 
-    newBank -= actualPayment;
-    const currentChk = bankRel.checkingAccount!;
-    updatedCommercialBanks[selectedBankId] = {
+    newBank = Math.max(0, state.storeBankBalance - actualPayment);
+    const currentChk = bankRel?.checkingAccount || {
+      accountNumber: `CTA-0101-2026-${targetBankId.toUpperCase().slice(0, 3)}-${Math.floor(1000 + Math.random() * 9000)}`,
+      balance: 0,
+      overdraftLimit: 250000,
+      overdraftUsed: 0,
+      checksUsedCount: 1,
+      interestRateAnnual: 4.0
+    };
+
+    let newBalance = currentChk.balance;
+    let newOverdraftUsed = currentChk.overdraftUsed || 0;
+
+    if (newBalance >= actualPayment) {
+      newBalance -= actualPayment;
+    } else {
+      const remainingNeeded = actualPayment - newBalance;
+      newBalance = 0;
+      newOverdraftUsed += remainingNeeded;
+    }
+
+    updatedCommercialBanks[targetBankId] = {
       ...bankRel,
+      bankId: targetBankId,
+      relationshipScore: bankRel?.relationshipScore ?? 50,
+      guaranteeDeposits: bankRel?.guaranteeDeposits ?? [],
+      termDeposits: bankRel?.termDeposits ?? [],
       checkingAccount: {
         ...currentChk,
-        balance: currentChk.balance - actualPayment
+        balance: newBalance,
+        overdraftUsed: newOverdraftUsed
       }
     };
-    sourceAccountLabel = `Cuenta Corriente ${selectedBankId.toUpperCase()} (${currentChk.accountNumber})`;
-    selectedBankName = selectedBankId.toUpperCase();
+    sourceAccountLabel = `Cuenta Corriente ${targetBankId.toUpperCase()} (${currentChk.accountNumber})`;
+    selectedBankName = targetBankId.toUpperCase();
   }
 
   // 4. Actualizar la obligación exacta del período fiscal

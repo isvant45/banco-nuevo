@@ -340,8 +340,10 @@ export interface BankCorporateCreditCard {
   brand: string; // ej: "Visa Signature Corporativa"
   tier?: CorporateCardTierId;
   creditLimit: number;
+  availableBalance?: number; // Saldo disponible para compras
+  usedBalance?: number; // Deuda pendiente actual
   availableCredit?: number; // Alias de conveniencia
-  currentBalance: number;
+  currentBalance: number; // Alias para compatibilidad
   interestRateAnnual: number;
   minPaymentMonthly: number;
   lastLimitIncreaseDay?: number;
