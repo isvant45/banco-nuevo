@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan maestro para transformar el simulador en un sistema económico y bancario profundo de 4 fases:\n- Fase 1: Arquitectura Macroeconómica (Banco Central, Tasa de Referencia Prime, Rescates Punitivos, Ciclos Económicos y Shocks de Mercado).\n- Fase 2: Módulo del Empresario (OPEX/CAPEX, Flujo de Caja, Credit Score en tiempo real, Cadena de Suministro y Depreciación).\n- Fase 3: Módulo del Banquero (Encaje Legal del 20%, Riesgo de Pánico Bancario / Bank Run, Dossier de Due Diligence, Clasificación de Cartera y Embargo/Liquidación de Garantías al 60%).\n- Fase 4: Mesa de Negociación (Smart Contracts con sliders interactivos de tasa, gracia y garantías), Dashboards de Riesgo y Liquidez, y Ventana Dedicada del Banco Central en el Escritorio Retro con modo dual conmutable.",
-  "updatedAt":  "2026-11-08T13:59:56.563247477Z",
+  "summary":  "Plan Maestro Integrado Revisado: Separación estricta de roles desde el arranque con Pantalla de Selección Cero y Dashboards raíz independientes (Empresario vs Banquero), rediseño del sistema de correos con CSS Grid y estado de acción consumida (anti-doble cobro y tags de estado ✔), y disparadores dinámicos de fin de turno para ofertas ilícitas AML.",
+  "updatedAt":  "2026-11-08T14:24:35.923652394Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
