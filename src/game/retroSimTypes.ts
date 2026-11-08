@@ -631,6 +631,8 @@ export type CollateralAssetType =
   | 'terreno_comercial' 
   | 'local_bodega' 
   | 'planta_industrial'
+  | 'edificio'
+  | 'edificio_corporativo'
   | 'vehiculo_comercial' 
   | 'maquinaria_pesada' 
   | 'deposito_plazo' 

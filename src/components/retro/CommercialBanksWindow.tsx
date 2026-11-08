@@ -171,7 +171,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   // Formulario Nueva Garantía
   const [newAssetModalOpen, setNewAssetModalOpen] = useState<boolean>(false);
   const [newAssetTitle, setNewAssetTitle] = useState<string>('');
-  const [newAssetType, setNewAssetType] = useState<'casa_habitacion' | 'terreno_comercial' | 'local_bodega' | 'vehiculo_comercial' | 'maquinaria_pesada'>('local_bodega');
+  const [newAssetType, setNewAssetType] = useState<'edificio' | 'edificio_corporativo' | 'casa_habitacion' | 'terreno_comercial' | 'local_bodega' | 'planta_industrial' | 'vehiculo_comercial' | 'maquinaria_pesada'>('edificio');
   const [newAssetLocation, setNewAssetLocation] = useState<string>('Tegucigalpa, M.D.C.');
   const [newAssetCost, setNewAssetCost] = useState<number>(1500000);
   const [newAssetDesc, setNewAssetDesc] = useState<string>('');
@@ -1561,7 +1561,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                   <span className="font-mono font-bold text-slate-900">{formatHNLAmount(currentDisclosure.approvedAmountHNL)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b text-rose-700">
-                  <span>(-) Comisión de Apertura (1.5%):</span>
+                  <span>(-) Comisión de Apertura ({((currentDisclosure.openingFeeHNL / (currentDisclosure.approvedAmountHNL || 1)) * 100).toFixed(1)}%):</span>
                   <span className="font-mono font-bold">-{formatHNLAmount(currentDisclosure.openingFeeHNL)}</span>
                 </div>
                 <div className="flex justify-between py-1.5 text-sm font-black bg-blue-50/80 px-2 border border-blue-200 text-blue-950">
@@ -1826,9 +1826,11 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                     onChange={(e) => setNewAssetType(e.target.value as any)}
                     className="w-full p-1.5 border border-slate-400 bg-white font-bold text-xs"
                   >
+                    <option value="edificio">Edificio Comercial / Corporativo (80% LTV)</option>
                     <option value="casa_habitacion">Casa Habitación (80% LTV)</option>
                     <option value="terreno_comercial">Terreno Comercial (80% LTV)</option>
                     <option value="local_bodega">Local / Bodega (75% LTV)</option>
+                    <option value="planta_industrial">Planta Industrial (75% LTV)</option>
                     <option value="maquinaria_pesada">Maquinaria Pesada (70% LTV)</option>
                     <option value="vehiculo_comercial">Vehículo Comercial (70% LTV)</option>
                   </select>

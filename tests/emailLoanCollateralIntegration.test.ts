@@ -437,6 +437,83 @@ describe('Integración Correo, Préstamos, Garantías y Persistencia', () => {
       );
     });
 
+    it('un edificio como garantía aporta capacidad de pago y permite aprobar y desembolsar el crédito', () => {
+      // Estado con flujo operativo bajo
+      const state = createMockIntegrationState({
+        monthlySalesAccumulated: 0,
+        dailyWages: 2000,
+        dailyRent: 1000,
+        storeBankBalance: 200000,
+        storeCash: 50000,
+        realEstateCollaterals: [
+          {
+            id: 'col_edificio_test',
+            title: 'Edificio Comercial San Pedro',
+            assetType: 'edificio',
+            ownerName: 'Constructora Hondureña Metropolitana',
+            companyName: 'Constructora Hondureña Metropolitana',
+            description: 'Edificio corporativo de 4 plantas',
+            location: 'San Pedro Sula',
+            status: 'disponible',
+            acquisitionValueHNL: 10000000,
+            marketValueHNL: 12000000,
+            appraisalValueHNL: 10000000,
+            appraisalDate: '2026-01-01',
+            ltvAcceptedPct: 80,
+            eligibleCollateralValueHNL: 8000000,
+            registrationNumber: 'MAT-EDIF-001',
+            isPledged: false,
+            liens: [],
+            pledgedAmountTotal: 0,
+            availableCoverageHNL: 8000000,
+            isLockedForSale: false,
+            simulatedDocumentNumber: 'DOC-EDIF-001',
+            situationNotes: 'Edificio libre de gravamen'
+          }
+        ]
+      });
+
+      // Solicitud de crédito de L 4,000,000 vinculando el edificio
+      const disclosure = calculateCreditTermsDisclosure(
+        state,
+        'ficohsa',
+        'capital_trabajo',
+        4000000,
+        36,
+        0,
+        ['col_edificio_test']
+      );
+
+      // Verificaciones clave:
+      // 1. Cobertura aportada > 0
+      assert.strictEqual(disclosure.collateralCoverageProvidedHNL, 8000000);
+      // 2. Máximo por capacidad de pago NO debe ser 0; debe contar el respaldo del edificio
+      assert.ok(disclosure.paymentCapacityMaxHNL >= 4000000, `Capacidad de pago debe contar el edificio: ${disclosure.paymentCapacityMaxHNL}`);
+      // 3. Monto final aprobado debe cubrir la solicitud
+      assert.strictEqual(disclosure.approvedAmountHNL, 4000000);
+      assert.strictEqual(disclosure.collateralSatisfied, true);
+
+      // 4. Desembolsar el crédito exitosamente con el edificio como garantía
+      const disburseResult = requestFullCommercialCredit(
+        state,
+        'ficohsa',
+        'capital_trabajo',
+        4000000,
+        36,
+        'Expansión corporativa',
+        0,
+        ['col_edificio_test'],
+        'ficohsa',
+        'checking'
+      );
+
+      assert.strictEqual(disburseResult.success, true, 'El crédito respaldado por el edificio debe ser desembolsado exitosamente');
+      assert.ok(disburseResult.updatedState.commercialBanks['ficohsa'].activeLoan, 'Debe crearse el crédito activo');
+      assert.strictEqual(disburseResult.updatedState.commercialBanks['ficohsa'].activeLoan?.principalAmount, 4000000);
+      const pledgedEdificio = disburseResult.updatedState.realEstateCollaterals?.find(c => c.id === 'col_edificio_test');
+      assert.strictEqual(pledgedEdificio?.isPledged, true, 'El edificio debe quedar pignorado');
+    });
+
     it('permite seleccionar múltiples garantías sumando su cobertura sin duplicar', () => {
       const state = createMockIntegrationState();
       assert.ok(state.realEstateCollaterals && state.realEstateCollaterals.length >= 2, 'Debe haber al menos 2 garantías');
