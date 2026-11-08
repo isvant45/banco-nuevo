@@ -390,7 +390,7 @@ export const MachineryDealerWindow: React.FC<MachineryDealerWindowProps> = ({
                 <div key={unit.id} className="bg-slate-50 border border-slate-300 p-2.5 space-y-1.5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-2xl">{unit.icon}</span>
-                    <span className="text-xs">{renderStars(unit.ratingStars)}</span>
+                    <span className="text-xs">{renderStars(unit.ratingStars || 3)}</span>
                   </div>
 
                   <div>

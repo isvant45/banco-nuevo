@@ -10,6 +10,16 @@ interface RetailRegisterWindowProps {
   storeName: string;
   onServeCustomer: (customer: RetailCustomerWalkIn, paymentMethod: 'efectivo' | 'tarjeta') => void;
   onBatchServe: () => void;
+  autoCashierEnabled?: boolean;
+  onToggleAutoCashier?: (enabled: boolean) => void;
+  isAutoCashierUnlocked?: boolean;
+  pricingMarkupPct?: number;
+  onChangeMarkup?: (markup: number) => void;
+  dailyMarketingSpend?: number;
+  onChangeMarketing?: (spend: number) => void;
+  isStrikeActive?: boolean;
+  strikeDaysRemaining?: number;
+  onResolveStrike?: () => void;
 }
 
 export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
@@ -19,7 +29,17 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
   storeCash,
   storeName,
   onServeCustomer,
-  onBatchServe
+  onBatchServe,
+  autoCashierEnabled = false,
+  onToggleAutoCashier,
+  isAutoCashierUnlocked = false,
+  pricingMarkupPct = 100,
+  onChangeMarkup,
+  dailyMarketingSpend = 0,
+  onChangeMarketing,
+  isStrikeActive = false,
+  strikeDaysRemaining = 0,
+  onResolveStrike
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentCustomer = queue[currentIndex] || queue[0];
@@ -72,28 +92,146 @@ export const RetailRegisterWindow: React.FC<RetailRegisterWindowProps> = ({
 
   return (
     <div className="space-y-3 font-sans text-xs">
+      {/* Banner de Huelga Laboral si está activa */}
+      {isStrikeActive && (
+        <div className="bg-red-600 text-white p-2.5 border-2 border-red-950 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl animate-pulse">🚨</span>
+            <div>
+              <span className="font-bold text-sm block">¡HUELGA LABORAL ACTIVA EN MOSTRADOR!</span>
+              <span className="text-[11px] text-red-100">
+                Los trabajadores se niegan a atender clientes ({strikeDaysRemaining} días restantes). Fija salarios competitivos o negocia el fin de la huelga.
+              </span>
+            </div>
+          </div>
+          {onResolveStrike && (
+            <button
+              onClick={() => {
+                sound.playCashChime();
+                onResolveStrike();
+              }}
+              className="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold border border-black shadow"
+            >
+              🤝 Negociar Bono de Emergencia
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Indicador Grande de Clientes en Fila & Automatización */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-500 p-2.5 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-amber-200 border-2 border-amber-600 rounded flex items-center justify-center text-2xl shadow">
+            👥
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900 text-sm">Clientes en Fila:</span>
+              <span className="font-mono text-base font-black text-amber-900 bg-amber-200 px-2.5 py-0.5 border border-amber-600 rounded">
+                {unservedCount}
+              </span>
+              <span className="text-slate-500 text-[11px]">esperando en caja</span>
+            </div>
+            <div className="text-[11px] text-slate-600">
+              {unservedCount === 0 ? 'Fila vacía. Todos los clientes han sido atendidos.' : `${unservedCount} clientes esperan cobrar sus artículos de mostrador.`}
+            </div>
+          </div>
+        </div>
+
+        {/* Toggle Switch: Atención Automática / POS Desatendido */}
+        <div className="flex items-center gap-2 bg-white/80 p-2 border border-amber-300 rounded">
+          {isAutoCashierUnlocked ? (
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <span className="font-bold text-slate-800 block text-[11px]">Cajero Automático POS:</span>
+                <span className={`text-[10px] font-bold ${autoCashierEnabled ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {autoCashierEnabled ? '● ATENCIÓN AUTOMÁTICA ACTIVA' : '○ DESACTIVADO (Manual)'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick();
+                  if (onToggleAutoCashier) onToggleAutoCashier(!autoCashierEnabled);
+                }}
+                className={`px-3 py-1.5 font-bold text-xs border cursor-pointer transition-colors ${
+                  autoCashierEnabled
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-900'
+                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border-slate-400'
+                }`}
+              >
+                {autoCashierEnabled ? 'DESACTIVAR' : 'ACTIVAR AUTO'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-slate-500">
+              <span className="text-base">🔒</span>
+              <div className="text-left">
+                <span className="font-bold text-slate-700 block text-[10px]">Cajero Automático Bloqueado</span>
+                <span className="text-[9px] text-slate-500">Desbloquea 'Automatización POS' en el Árbol de I+D</span>
+              </div>
+            </div>
+          )}
+
+          <button
+            disabled={unservedCount === 0 || isStrikeActive}
+            onClick={() => {
+              sound.playCashChime();
+              onBatchServe();
+            }}
+            className="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-950 border border-amber-600 font-bold disabled:opacity-40 flex items-center gap-1"
+            title="Cobrar automáticamente a todos los clientes que tengan inventario disponible"
+          >
+            <span>⚡</span>
+            <span>Atender Cola Rápida</span>
+          </button>
+        </div>
+      </div>
+
       {/* Barra de Estado del Mostrador */}
-      <div className="bg-[#dfdfdf] border border-[#808080] p-2 flex items-center justify-between">
+      <div className="bg-[#dfdfdf] border border-[#808080] p-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-800">Caja Registradora: {storeName}</span>
           <span className="font-mono bg-white px-2 py-0.5 border border-[#808080]">
             Efectivo en Caja: L {storeCash.toLocaleString()}
           </span>
-          <span className="text-slate-500">({unservedCount} clientes esperando en fila)</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            disabled={unservedCount === 0}
-            onClick={() => {
-              sound.playCashChime();
-              onBatchServe();
-            }}
-            className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-500 font-bold disabled:opacity-40"
-            title="Cobrar automáticamente a todos los clientes que tengan inventario disponible"
-          >
-            ⚡ Atender Cola Rápida
-          </button>
+        {/* Controles rápidos de PVP / Elasticidad y Marketing */}
+        <div className="flex items-center gap-3 text-[11px]">
+          {onChangeMarkup && (
+            <div className="flex items-center gap-1 bg-white px-2 py-0.5 border border-slate-300">
+              <span className="text-slate-600">PVP Markup:</span>
+              <input
+                type="range"
+                min={50}
+                max={200}
+                step={5}
+                value={pricingMarkupPct}
+                onChange={(e) => onChangeMarkup(Number(e.target.value))}
+                className="w-16 h-2 cursor-pointer"
+                title={`Markup actual: ${pricingMarkupPct}%`}
+              />
+              <span className="font-mono font-bold text-slate-900">{pricingMarkupPct}%</span>
+            </div>
+          )}
+
+          {onChangeMarketing && (
+            <div className="flex items-center gap-1 bg-white px-2 py-0.5 border border-slate-300">
+              <span className="text-slate-600">Marketing:</span>
+              <input
+                type="range"
+                min={0}
+                max={15000}
+                step={500}
+                value={dailyMarketingSpend}
+                onChange={(e) => onChangeMarketing(Number(e.target.value))}
+                className="w-16 h-2 cursor-pointer"
+                title={`Presupuesto diario: L ${dailyMarketingSpend.toLocaleString()}`}
+              />
+              <span className="font-mono font-bold text-slate-900">L {dailyMarketingSpend.toLocaleString()}</span>
+            </div>
+          )}
         </div>
       </div>
 

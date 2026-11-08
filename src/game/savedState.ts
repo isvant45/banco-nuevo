@@ -147,5 +147,41 @@ export function restoreDailySimulationState(saved: any): DailySimulationState {
   if (result.fiscalSolvenciaActive === undefined) {
     result.fiscalSolvenciaActive = true;
   }
+  if (!result.warehouseTier) {
+    result.warehouseTier = 'garaje';
+  }
+  if (!result.warehouseOwnership) {
+    result.warehouseOwnership = 'alquiler';
+  }
+  if (!result.maxInventoryCapacity) {
+    result.maxInventoryCapacity = 100;
+  }
+  if (result.pricingMarkupPct === undefined) {
+    result.pricingMarkupPct = 100;
+  }
+  if (result.dailyMarketingSpend === undefined) {
+    result.dailyMarketingSpend = 0;
+  }
+  if (result.brandReputation === undefined) {
+    result.brandReputation = 50;
+  }
+  if (!Array.isArray(result.unlockedTechs)) {
+    result.unlockedTechs = [];
+  }
+  if (result.employeeMorale === undefined) {
+    result.employeeMorale = 80;
+  }
+  if (!result.wageLevel) {
+    result.wageLevel = 'minimo';
+  }
+  if (result.isStrikeActive === undefined) {
+    result.isStrikeActive = false;
+  }
+  if (result.autoCashierEnabled === undefined) {
+    result.autoCashierEnabled = false;
+  }
+  if (result.personalWealthHNL === undefined) {
+    result.personalWealthHNL = 0;
+  }
   return result;
 }

@@ -116,6 +116,8 @@ import { RetroToastContainer, RetroToast } from './RetroToastContainer';
 import { distributeDividendsAtMonthEnd } from '../../game/equityMarketEngine';
 import { processMonthlyCSuitePayroll, processUifTurnAudit } from '../../game/cSuiteEngine';
 import { applySharkDailyRetention } from '../../game/npcBankingEngine';
+import { TycoonProgressionHubWindow } from './TycoonProgressionHubWindow';
+import { updatePricingMarkup, updateMarketingSpend, resolveStrikeWithBonus } from '../../game/retailBusinessEngine';
 
 interface RetroDesktopProps {
   initialRole: RetroRoleMode;
@@ -253,6 +255,23 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
       // Arquitectura Macroeconómica & Banco Central
       macroEconomyState: createInitialMacroEconomyState(),
+
+      // 5 Sistemas de Progresión Tycoon
+      warehouseTier: 'garaje',
+      warehouseOwnership: 'alquiler',
+      maxInventoryCapacity: 100,
+      buildingAssetValue: 0,
+      pricingMarkupPct: 100,
+      dailyMarketingSpend: 0,
+      brandReputation: 50,
+      unlockedTechs: [],
+      employeeMorale: 80,
+      wageLevel: 'minimo',
+      isStrikeActive: false,
+      strikeDaysRemaining: 0,
+      autoCashierEnabled: false,
+      personalWealthHNL: 0,
+      consecutiveProfitableMonths: 0,
 
       dailyHistory: []
     };
@@ -1236,20 +1255,20 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       const uifRes = processUifTurnAudit(nextState);
       nextState = uifRes.updatedState;
       if (uifRes.auditTriggered) {
-        if (uifRes.lawyerDefended) {
+        if (uifRes.savedByLawyer) {
           sound.playApprovalStamp();
           addToast({
             title: 'UIF: Escudo Legal Exitoso',
-            message: uifRes.message,
+            message: uifRes.message || 'El Abogado Corporativo resolvió la auditoría sin sanciones.',
             type: 'success'
           });
         } else {
           sound.playHeavyStamp();
           addToast({
             title: 'UIF: Sanción Aplicada',
-            message: uifRes.message,
+            message: uifRes.message || 'La UIF impuso una sanción federal a la empresa.',
             type: 'danger',
-            amount: uifRes.fineAmountApplied ? -uifRes.fineAmountApplied : undefined
+            amount: uifRes.fineAmountHNL ? -uifRes.fineAmountHNL : undefined
           });
         }
       }
@@ -1403,7 +1422,22 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       simulatedEmails: createInitialSimulatedEmails(params.entityName, params.retailSector, initialBank),
       transactionVouchers: [],
       dynamicBankOffers: [],
-      fiscalPeriods: [],
+      // 5 Sistemas de Progresión Tycoon
+      warehouseTier: 'garaje',
+      warehouseOwnership: 'alquiler',
+      maxInventoryCapacity: 100,
+      buildingAssetValue: 0,
+      pricingMarkupPct: 100,
+      dailyMarketingSpend: 0,
+      brandReputation: 50,
+      unlockedTechs: [],
+      employeeMorale: 80,
+      wageLevel: 'minimo',
+      isStrikeActive: false,
+      strikeDaysRemaining: 0,
+      autoCashierEnabled: false,
+      personalWealthHNL: 0,
+      consecutiveProfitableMonths: 0,
 
       dailyHistory: []
     });
@@ -1485,7 +1519,7 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     { id: 'banco_central', title: 'Banco Central & Macroeconomía', icon: '🏛️', isOpen: !!openWindows.banco_central?.isOpen, isMinimized: !!openWindows.banco_central?.isMinimized },
     { id: 'equity_market', title: 'Mercado de Acciones & Valuación (BVM)', icon: '📈', isOpen: !!openWindows.equity_market?.isOpen, isMinimized: !!openWindows.equity_market?.isMinimized },
     { id: 'csuite_staff', title: 'Dirección C-Suite & RRHH', icon: '👔', isOpen: !!openWindows.csuite_staff?.isOpen, isMinimized: !!openWindows.csuite_staff?.isMinimized },
-    { id: 'npc_financing', title: 'Subasta de Crédito NPC', icon: '⚡', isOpen: !!openWindows.npc_financing?.isOpen, isMinimized: !!openWindows.npc_financing?.isMinimized }
+    { id: 'tycoon_hub', title: 'Expansión & I+D Corporativo', icon: '🚀', isOpen: !!openWindows.tycoon_hub?.isOpen, isMinimized: !!openWindows.tycoon_hub?.isMinimized }
   ];
 
   return (
@@ -2108,34 +2142,19 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </span>
         </button>
 
-        {/* Subasta de Crédito NPC */}
+        {/* Expansión Corporativa & I+D */}
         <button
           onClick={() => {
             sound.playClick();
-            bringToFront('npc_financing');
+            bringToFront('tycoon_hub');
           }}
           className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
         >
           <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
-            ⚡
+            🚀
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-            Crédito NPC
-          </span>
-        </button>
-
-        <button
-          onClick={() => {
-            sound.playClick();
-            setIsNegotiationModalOpen(true);
-          }}
-          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
-        >
-          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
-            📜
-          </div>
-          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-            Mesa Negociación
+            Expansión & I+D
           </span>
         </button>
 
@@ -2151,22 +2170,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
             Auditoría Crédito
-          </span>
-        </button>
-
-        <button
-          onClick={() => {
-            sound.playClick();
-            const nextRole: RetroRoleMode = roleMode === 'empresario' ? 'banquero' : 'empresario';
-            setRoleMode(nextRole);
-          }}
-          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
-        >
-          <div className="w-11 h-11 bg-amber-400/30 border border-amber-300 flex items-center justify-center text-2xl shadow group-hover:bg-amber-400/50 mb-1">
-            🔄
-          </div>
-          <span className="text-amber-200 text-[10px] font-bold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
-            {roleMode === 'empresario' ? 'Ver Banquero' : 'Ver Empresario'}
           </span>
         </button>
 
@@ -2320,6 +2323,48 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
               storeName={entityName}
               onServeCustomer={handleServeCustomer}
               onBatchServe={handleBatchServe}
+              autoCashierEnabled={simState.autoCashierEnabled ?? false}
+              onToggleAutoCashier={(enabled) => setSimState(prev => ({ ...prev, autoCashierEnabled: enabled }))}
+              isAutoCashierUnlocked={(simState.unlockedTechs || []).includes('automatizacion_pos')}
+              pricingMarkupPct={simState.pricingMarkupPct ?? 100}
+              onChangeMarkup={(m) => setSimState(prev => updatePricingMarkup(prev, m))}
+              dailyMarketingSpend={simState.dailyMarketingSpend ?? 0}
+              onChangeMarketing={(s) => setSimState(prev => updateMarketingSpend(prev, s))}
+              isStrikeActive={simState.isStrikeActive ?? false}
+              strikeDaysRemaining={simState.strikeDaysRemaining ?? 0}
+              onResolveStrike={() => {
+                const res = resolveStrikeWithBonus(simState);
+                if (res.error) {
+                  sound.playRejectBuzzer();
+                  alert(res.error);
+                } else {
+                  sound.playApprovalStamp();
+                  setSimState(res.updatedState);
+                }
+              }}
+            />
+          </RetroWindow>
+
+          {/* Ventana de Expansión Corporativa & I+D */}
+          <RetroWindow
+            id="tycoon_hub"
+            title={`Expansión & I+D Corporativo: ${entityName}`}
+            icon="🚀"
+            initialX={220}
+            initialY={45}
+            isOpen={!!openWindows.tycoon_hub?.isOpen}
+            isMinimized={!!openWindows.tycoon_hub?.isMinimized}
+            isMaximized={!!openWindows.tycoon_hub?.isMaximized}
+            zIndex={openWindows.tycoon_hub?.zIndex || 12}
+            onFocus={() => bringToFront('tycoon_hub')}
+            onClose={() => handleCloseWindow('tycoon_hub')}
+            onMinimize={() => handleMinimizeWindow('tycoon_hub')}
+            onMaximize={() => handleMaximizeWindow('tycoon_hub')}
+          >
+            <TycoonProgressionHubWindow
+              state={simState}
+              onUpdateState={(newState) => setSimState(newState)}
+              onOpenBank={() => bringToFront('bancos_comerciales')}
             />
           </RetroWindow>
 

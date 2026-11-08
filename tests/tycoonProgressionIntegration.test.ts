@@ -36,6 +36,7 @@ function createMockSimulationState(): DailySimulationState {
     dailyHour: 14,
     isDayClosed: false,
     roleMode: 'empresario',
+    lastClosingSummary: null,
     retailSector: 'constructora',
     storeName: 'Constructora Lempira S.A.',
     storeCash: 500000,
@@ -52,19 +53,31 @@ function createMockSimulationState(): DailySimulationState {
     monthlySalesAccumulated: 850000,
     smartBankOffers: [],
     smartBankCreditRating: 'AA',
-    constructionMaterials: {},
+    constructionMaterials: [] as any,
     constructionOrders: [],
     availableTenders: [],
     activeWorks: [],
     completedWorksHistory: [],
     sarTaxRecord: {
+      taxYear: 2026,
+      grossRevenues: 1200000,
+      deductibleMaterialsExpenses: 400000,
+      deductiblePayrollExpenses: 300000,
+      deductibleOtherCosts: 100000,
+      netTaxableIncome: 400000,
+      taxRatePct: 25,
+      isrTaxAmount: 100000,
       hasPendingDeclaration: false,
       pendingTaxDue: 0,
       historicalAuditCount: 0,
       fiscalSolvenciaActive: true,
       solvenciaFiscalIssued: true,
-      complianceScore: 95
-    },
+      complianceScore: 95,
+      isPaid: true,
+      auditStatus: 'aprobada_conforme',
+      solvenciaExpirationYear: 2027,
+      auditNotes: []
+    } as any,
     fiscalSolvenciaActive: true,
     commercialBanks: {
       ficohsa: {
@@ -78,7 +91,7 @@ function createMockSimulationState(): DailySimulationState {
           monthlyFee: 50
         }
       }
-    },
+    } as any,
     ownedMachinery: [
       {
         id: 'mach_1',
@@ -90,7 +103,7 @@ function createMockSimulationState(): DailySimulationState {
         currentValueHNL: 1080000,
         status: 'disponible'
       }
-    ],
+    ] as any,
     machineryDealers: [],
     materialManufacturerQuotes: [],
     bankerVaultCash: 0,
@@ -121,7 +134,7 @@ function createMockSimulationState(): DailySimulationState {
         appraisalDateYear: 2026,
         status: 'libre_gravamen'
       }
-    ],
+    ] as any,
     simulatedEmails: [],
     transactionVouchers: [],
     dynamicBankOffers: [],
@@ -136,7 +149,7 @@ function createMockSimulationState(): DailySimulationState {
       ratingCategory: 'Riesgo Mínimo',
       maxCreditLimitHNL: 5000000,
       recommendedRatePct: 9.5
-    }
+    } as any
   };
 }
 
@@ -218,7 +231,7 @@ describe('Motor de Equity, Valuación y Salida a Bolsa (IPO)', () => {
     const state = createMockSimulationState();
     // Aumentar histórico y activos para superar L 10 Millones
     state.historicalProfits = [600000, 750000, 800000];
-    state.realEstateCollaterals.push({
+    state.realEstateCollaterals!.push({
       id: 'col_edificio_corporativo',
       propertyName: 'Torre Corporativa Morazán',
       location: 'Tegucigalpa',
@@ -229,7 +242,7 @@ describe('Motor de Equity, Valuación y Salida a Bolsa (IPO)', () => {
       appraisalDateMonth: 1,
       appraisalDateYear: 2026,
       status: 'libre_gravamen'
-    });
+    } as any);
 
     const eligibility = evaluateIpoEligibility(state);
     assert.strictEqual(eligibility.isEligible, true);

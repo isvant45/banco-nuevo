@@ -251,7 +251,7 @@ export const NpcFinancingWindow: React.FC<NpcFinancingWindowProps> = ({
                           }`}
                         >
                           <span>{isSelected ? '☑' : '☐'}</span>
-                          <span>{col.propertyName}</span>
+                          <span>{col.propertyName || col.title}</span>
                           <span className="text-[10px] opacity-80">
                             (L {(col.marketValueHNL || col.appraisalValueHNL || 0).toLocaleString()})
                           </span>

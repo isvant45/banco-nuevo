@@ -434,7 +434,7 @@ export function evaluateContractorEconomicCapacity(state: DailySimulationState):
     creditProfile.score >= 640 ? 'A' : 
     creditProfile.score >= 540 ? 'BBB' : 'B';
 
-  const discount = creditProfile.rateDiscountPct;
+  const discount = creditProfile.rateDiscountPct ?? 0;
 
   // Ofertas diferenciadas por cada uno de los bancos competidores
   const offersByBank: Record<CommercialBankId, any> = {
@@ -2788,7 +2788,7 @@ export function calculateCreditTermsDisclosure(
   // Tasa de interés calculada con política del banco o términos acordados en oferta negociada
   const rateNominal = customTerms?.rateAnnualPct !== undefined
     ? customTerms.rateAnnualPct
-    : Math.max(6.5, Number((bankProfile.baseInterestRateLoan + prod.rateSpreadPct - capacity.creditProfile.rateDiscountPct).toFixed(2)));
+    : Math.max(6.5, Number((bankProfile.baseInterestRateLoan + prod.rateSpreadPct - (capacity.creditProfile.rateDiscountPct ?? 0)).toFixed(2)));
   const rateEffective = Number((Math.pow(1 + (rateNominal / 100 / 12), 12) - 1) * 100).toFixed(2);
   const monthlyRate = rateNominal / 100 / 12;
   const amortizationTerm = Math.max(1, termMonths - gracePeriodMonths);
@@ -3497,7 +3497,7 @@ export function consultBankAdvisor(
   const bank = COMMERCIAL_BANKS_PROFILES[bankId];
   const capacity = evaluateContractorEconomicCapacity(state);
   const score = capacity.creditProfile.score;
-  const dti = capacity.creditProfile.dtiRatioPct;
+  const dti = capacity.creditProfile.dtiRatioPct ?? 0;
   const streak = capacity.creditProfile.onTimePaymentsStreak || 1;
   const rel = state.commercialBanks[bankId];
   const relScore = rel?.relationshipScore || 50;

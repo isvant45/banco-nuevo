@@ -734,7 +734,8 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-300 p-2 bg-slate-50">
                         {collaterals.map(col => {
                           const isSelected = selectedCollateralIds.includes(col.id);
-                          const isUnavailable = col.availableCoverageHNL <= 0 && !isSelected;
+                          const availableCov = col.availableCoverageHNL ?? 0;
+                          const isUnavailable = availableCov <= 0 && !isSelected;
 
                           return (
                             <label
@@ -762,11 +763,11 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                               />
                               <div className="text-xs leading-tight flex-1">
                                 <div className="font-bold text-slate-900 flex justify-between">
-                                  <span>{col.title}</span>
-                                  <span className="font-mono text-blue-900">{formatHNLAmount(col.availableCoverageHNL)} disp.</span>
+                                  <span>{col.title || col.propertyName}</span>
+                                  <span className="font-mono text-blue-900">{formatHNLAmount(availableCov)} disp.</span>
                                 </div>
                                 <div className="text-[10px] text-slate-500 mt-0.5">
-                                  Avalúo: {formatHNLAmount(col.appraisalValueHNL)} · LTV: {col.ltvAcceptedPct}% · Gravámenes: {formatHNLAmount(col.pledgedAmountTotal || 0)}
+                                  Avalúo: {formatHNLAmount(col.appraisalValueHNL)} · LTV: {col.ltvAcceptedPct || 80}% · Gravámenes: {formatHNLAmount(col.pledgedAmountTotal || 0)}
                                 </div>
                               </div>
                             </label>
@@ -1260,8 +1261,8 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                         <strong className="text-slate-900 font-mono">{formatHNLAmount(col.appraisalValueHNL)}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 block text-[10px]">Cobertura LTV ({col.ltvAcceptedPct}%):</span>
-                        <strong className="text-blue-900 font-mono">{formatHNLAmount(col.eligibleCollateralValueHNL)}</strong>
+                        <span className="text-slate-500 block text-[10px]">Cobertura LTV ({col.ltvAcceptedPct || 80}%):</span>
+                        <strong className="text-blue-900 font-mono">{formatHNLAmount(col.eligibleCollateralValueHNL || 0)}</strong>
                       </div>
                       <div>
                         <span className="text-slate-500 block text-[10px]">Gravámenes Actuales:</span>
@@ -1269,7 +1270,7 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                       </div>
                       <div>
                         <span className="text-slate-500 block text-[10px]">Disponible para Crédito:</span>
-                        <strong className="text-emerald-800 font-mono">{formatHNLAmount(col.availableCoverageHNL)}</strong>
+                        <strong className="text-emerald-800 font-mono">{formatHNLAmount(col.availableCoverageHNL ?? 0)}</strong>
                       </div>
                     </div>
 

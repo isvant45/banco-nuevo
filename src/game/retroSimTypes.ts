@@ -248,14 +248,18 @@ export interface CommercialBankProfile {
 export interface CompanyCreditProfile {
   score: number; // 300 - 850
   tier: 'AAA_EXCELENTE' | 'AA_MUY_BUENO' | 'A_BUENO' | 'B_ACEPTABLE' | 'C_EN_RIESGO';
-  tierLabel: string;
-  onTimePaymentsStreak: number;
-  lastBiweeklyReviewDay: number;
-  totalCreditLimit: number;
-  creditUtilizationPct: number;
-  autoLimitIncreaseUnlocked: boolean;
-  rateDiscountPct: number;
-  dtiRatioPct: number;
+  tierLabel?: string;
+  onTimePaymentsStreak?: number;
+  lastBiweeklyReviewDay?: number;
+  totalCreditLimit?: number;
+  creditUtilizationPct?: number;
+  autoLimitIncreaseUnlocked?: boolean;
+  rateDiscountPct?: number;
+  dtiRatioPct?: number;
+  classification?: string;
+  ratingCategory?: string;
+  maxCreditLimitHNL?: number;
+  recommendedRatePct?: number;
 }
 
 export type CommercialLoanType = 
@@ -363,13 +367,14 @@ export interface BankCorporateCreditCard {
 export interface BankCheckingAccount {
   accountNumber: string;
   balance: number;
-  overdraftLimit: number;
-  overdraftUsed: number;
-  checksUsedCount: number;
+  overdraftLimit?: number;
+  overdraftUsed?: number;
+  checksUsedCount?: number;
   interestRateAnnual?: number; // Tasa pasiva de rendimiento anual negociada
   interestRateYieldPct?: number;
   openedDay?: number;
   monthlyFeeHNL?: number;
+  monthlyFee?: number;
 }
 
 export interface BankGuaranteeDeposit {
@@ -460,19 +465,23 @@ export interface MachineryDealer {
 
 export interface OwnedMachineryUnit {
   id: string;
-  dealerId: string;
-  dealerName: string;
-  modelName: string;
-  category: MachineryCategory;
-  icon: string;
-  ratingStars: 1 | 2 | 3 | 4 | 5;
+  dealerId?: string;
+  dealerName?: string;
+  modelName?: string;
+  name?: string;
+  category?: MachineryCategory;
+  icon?: string;
+  ratingStars?: 1 | 2 | 3 | 4 | 5;
   purchasePrice: number;
   purchaseCost?: number;
+  currentValueHNL?: number;
+  status?: string;
   title?: string;
   conditionPct: number;
-  totalHoursWorked: number;
-  hourlyFuelCost: number;
+  totalHoursWorked?: number;
+  hourlyFuelCost?: number;
   financedWithBank?: CommercialBankId;
+  machineryId?: string;
 }
 
 // ----------------------------------------------------
@@ -506,6 +515,7 @@ export interface SarTaxAuditRecord {
   isrTaxAmount: number; // Impuesto Sobre la Renta calculado
   pendingTaxDue?: number;
   isFiled?: boolean;
+  hasPendingDeclaration?: boolean;
   isPaid: boolean;
   auditStatus: 'pendiente' | 'aprobada_conforme' | 'reparos_auditados';
   solvenciaFiscalIssued: boolean;
@@ -515,6 +525,9 @@ export interface SarTaxAuditRecord {
   totalTaxPaidYtd?: number;
   sarAuditRiskScore?: number;
   lastAuditResult?: string;
+  historicalAuditCount?: number;
+  complianceScore?: number;
+  fiscalSolvenciaActive?: boolean;
 }
 
 export interface DailySimulationState {
@@ -663,11 +676,40 @@ export interface DailySimulationState {
 
   // Riesgo de Lavado de Activos & Auditoría UIF
   uifAudit?: UifAuditStatus;
+  uifSuspicionScore?: number;
 
   // Cuota de Mercado & Proyecciones a 3 Turnos
   marketSharePct?: number;
   historicalProfits?: number[]; // Ganancias netas de los últimos meses para cálculo de valuación
+
+  // 5 Sistemas de Progresión Tycoon & Micro-gestión
+  warehouseTier?: WarehouseTier;
+  warehouseOwnership?: WarehouseOwnership;
+  maxInventoryCapacity?: number;
+  buildingAssetValue?: number;
+
+  pricingMarkupPct?: number; // Elasticidad: 50% - 250%
+  dailyMarketingSpend?: number; // Presupuesto publicidad L/día
+  brandReputation?: number; // 0 - 100
+
+  unlockedTechs?: string[];
+  managementPoints?: number;
+
+  employeeMorale?: number; // 0 - 100
+  wageLevel?: WageLevel;
+  isStrikeActive?: boolean;
+  strikeDaysRemaining?: number;
+
+  autoCashierEnabled?: boolean;
+  personalWealthHNL?: number;
+  consecutiveProfitableMonths?: number;
+  victoryAchieved?: TycoonVictoryType;
 }
+
+export type WarehouseTier = 'garaje' | 'bodega' | 'fabrica' | 'mega_fabrica';
+export type WarehouseOwnership = 'alquiler' | 'propio';
+export type WageLevel = 'minimo' | 'competitivo' | 'premium';
+export type TycoonVictoryType = 'ipo' | 'monopolio' | 'jubilacion';
 
 export type CollateralAssetType = 
   | 'casa_habitacion' 
@@ -681,7 +723,7 @@ export type CollateralAssetType =
   | 'deposito_plazo' 
   | 'cuentas_por_cobrar';
 
-export type CollateralStatus = 'disponible' | 'pignorado_parcial' | 'pignorado_total';
+export type CollateralStatus = 'disponible' | 'pignorado_parcial' | 'pignorado_total' | 'libre_gravamen';
 
 export interface CollateralLien {
   id: string;
@@ -697,6 +739,7 @@ export interface CollateralLien {
 export interface RealEstateCollateralItem {
   id: string;
   title: string;
+  propertyName?: string;
   assetType: CollateralAssetType;
   ownerName: string;
   companyName: string;
@@ -718,13 +761,13 @@ export interface RealEstateCollateralItem {
   committedCoverage?: number;
   availableCoverage?: number;
   liens: CollateralLien[];
-  pledgedAmountTotal: number;
-  availableCoverageHNL: number;
-  isPledged: boolean;
-  isLockedForSale: boolean;
-  registrationNumber: string;
-  simulatedDocumentNumber: string;
-  situationNotes: string;
+  pledgedAmountTotal?: number;
+  availableCoverageHNL?: number;
+  isPledged?: boolean;
+  isLockedForSale?: boolean;
+  registrationNumber?: string;
+  simulatedDocumentNumber?: string;
+  situationNotes?: string;
   // Compatibilidad hacia atrás
   pledgedToBankId?: CommercialBankId;
   pledgedBankId?: CommercialBankId;
@@ -951,6 +994,7 @@ export interface CompetitorFirm {
   acquisitionPriceAssetDealHNL: number;
   acquisitionPriceSharePurchaseHNL: number;
   status: 'activo' | 'adquirido_jugador' | 'en_quiebra';
+  isAcquired?: boolean;
 }
 
 export interface FinancialStatementsSummary {

@@ -184,8 +184,15 @@ export function calculateThreeTurnProjections(state: DailySimulationState): {
     netCashFlowHNL: number;
     projectedEndingCashHNL: number;
     bankruptcyRisk: 'BAJO' | 'MODERADO' | 'CRÍTICO' | 'INMINENTE';
+    projectedSalesHNL: number;
+    projectedExpensesHNL: number;
+    projectedNetProfitHNL: number;
+    projectedCashRunwayHNL: number;
+    riskLevel: string;
   }[];
   runwayMonths: number;
+  estimatedRunwayMonths: number;
+  currentMonthlyBurnRateHNL: number;
   cfoAdvice: string;
 } {
   const hasCfo = Boolean(state.cSuiteStaff && state.cSuiteStaff.includes('CFO'));
@@ -194,6 +201,8 @@ export function calculateThreeTurnProjections(state: DailySimulationState): {
       isUnlocked: false,
       projections: [],
       runwayMonths: 0,
+      estimatedRunwayMonths: 0,
+      currentMonthlyBurnRateHNL: 0,
       cfoAdvice: 'Contrata un Director Financiero (CFO) para desbloquear proyecciones financieras a 3 turnos y anticipar quiebras.'
     };
   }
