@@ -105,6 +105,10 @@ import { DailyClosingModal } from './DailyClosingModal';
 import { RetroNewGameModal } from './RetroNewGameModal';
 import { ErpLedgerWindow } from './ErpLedgerWindow';
 import { createInitialErpCorporateState, advanceErpCorporateDay } from '../../game/erpCorporateEngine';
+import { CentralBankWindow } from './CentralBankWindow';
+import { NegotiationTableModal } from './NegotiationTableModal';
+import { DueDiligenceModal } from './DueDiligenceModal';
+import { createInitialMacroEconomyState, advanceMacroEconomyMonth } from '../../game/macroEconomyEngine';
 
 interface RetroDesktopProps {
   initialRole: RetroRoleMode;
@@ -240,6 +244,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       // Sistema ERP Corporativo & Libro Mayor General
       erpCorporateState: createInitialErpCorporateState(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro')),
 
+      // Arquitectura Macroeconómica & Banco Central
+      macroEconomyState: createInitialMacroEconomyState(),
+
       dailyHistory: []
     };
   });
@@ -286,7 +293,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     financial_statements: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     liabilities_manager: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     competitors_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
-    erp_ledger: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
+    erp_ledger: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    banco_central: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
   });
 
   const [topZIndex, setTopZIndex] = useState(20);
@@ -298,6 +306,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   const [isDailyClosingModalOpen, setIsDailyClosingModalOpen] = useState(false);
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [activeVoucherModal, setActiveVoucherModal] = useState<TransactionVoucher | null>(null);
+  const [isNegotiationModalOpen, setIsNegotiationModalOpen] = useState(false);
+  const [isDueDiligenceModalOpen, setIsDueDiligenceModalOpen] = useState(false);
+  const [negotiationBankId, setNegotiationBankId] = useState<CommercialBankId>('ficohsa');
 
   // Manejo de foco y visualización de ventanas
   const bringToFront = (id: string) => {
@@ -1238,6 +1249,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     // Procesar impacto del sistema ERP corporativo (sucursales, marketing, moral y Libro Mayor)
     nextState = advanceErpCorporateDay(nextState);
 
+    // Si comienza un nuevo ciclo mensual (día 1 o cambio de mes), procesar política monetaria y Banco Central
+    if (nextState.currentDay === 1 || nextState.currentMonth !== simState.currentMonth) {
+      nextState = advanceMacroEconomyMonth(nextState);
+    }
+
     // Enviar resumen diario de ventas por correo si hubo cobros en el día
     if (nextState.dailyReceipts && nextState.dailyReceipts.length > 0) {
       const totalVentasDia = nextState.dailyReceipts.reduce((sum, r) => sum + (r.totalAmount ?? r.total ?? 0), 0);
@@ -1297,6 +1313,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     // Procesar impacto del sistema ERP corporativo para los días transcurridos
     for (let d = 0; d < daysCount; d++) {
       nextState = advanceErpCorporateDay(nextState);
+    }
+
+    // Procesar avance macroeconómico si cambió de mes
+    if (nextState.currentMonth !== simState.currentMonth || daysCount >= 30) {
+      nextState = advanceMacroEconomyMonth(nextState);
     }
 
     setSimState(nextState);
@@ -1459,7 +1480,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     { id: 'financial_statements', title: 'Contabilidad: Balance & P&L', icon: '⚖️', isOpen: !!openWindows.financial_statements?.isOpen, isMinimized: !!openWindows.financial_statements?.isMinimized },
     { id: 'liabilities_manager', title: 'Centro de Pasivos & Obligaciones', icon: '📑', isOpen: !!openWindows.liabilities_manager?.isOpen, isMinimized: !!openWindows.liabilities_manager?.isMinimized },
     { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized },
-    { id: 'erp_ledger', title: 'ERP & Libro Mayor', icon: '📑', isOpen: !!openWindows.erp_ledger?.isOpen, isMinimized: !!openWindows.erp_ledger?.isMinimized }
+    { id: 'erp_ledger', title: 'ERP & Libro Mayor', icon: '📑', isOpen: !!openWindows.erp_ledger?.isOpen, isMinimized: !!openWindows.erp_ledger?.isMinimized },
+    { id: 'banco_central', title: 'Banco Central & Macroeconomía', icon: '🏛️', isOpen: !!openWindows.banco_central?.isOpen, isMinimized: !!openWindows.banco_central?.isMinimized }
   ];
 
   return (
@@ -2032,6 +2054,67 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
             ERP & Mayor
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('banco_central');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🏛️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Banco Central
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            setIsNegotiationModalOpen(true);
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📜
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Mesa Negociación
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            setIsDueDiligenceModalOpen(true);
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📋
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Auditoría Crédito
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            const nextRole: RetroRoleMode = roleMode === 'empresario' ? 'banquero' : 'empresario';
+            setRoleMode(nextRole);
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-amber-400/30 border border-amber-300 flex items-center justify-center text-2xl shadow group-hover:bg-amber-400/50 mb-1">
+            🔄
+          </div>
+          <span className="text-amber-200 text-[10px] font-bold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            {roleMode === 'empresario' ? 'Ver Banquero' : 'Ver Empresario'}
           </span>
         </button>
 
@@ -2630,6 +2713,28 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         />
       </RetroWindow>
 
+      {/* Ventana: Banco Central & Macroeconomía */}
+      <RetroWindow
+        id="banco_central"
+        title="Banco Central de Honduras — Regulador Macroeconómico, Tasa Prime & Encaje"
+        icon="🏛️"
+        initialX={120}
+        initialY={50}
+        isOpen={!!openWindows.banco_central?.isOpen}
+        isMinimized={!!openWindows.banco_central?.isMinimized}
+        isMaximized={!!openWindows.banco_central?.isMaximized}
+        zIndex={openWindows.banco_central?.zIndex || 5}
+        onFocus={() => bringToFront('banco_central')}
+        onClose={() => handleCloseWindow('banco_central')}
+        onMinimize={() => handleMinimizeWindow('banco_central')}
+        onMaximize={() => handleMaximizeWindow('banco_central')}
+      >
+        <CentralBankWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+        />
+      </RetroWindow>
+
       {/* Ventana: Correo Empresarial */}
       <RetroWindow
         id="business_email"
@@ -2671,6 +2776,31 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           voucher={activeVoucherModal}
           companyName={entityName}
           onClose={() => setActiveVoucherModal(null)}
+        />
+      )}
+
+      {/* Modal: Mesa de Negociación Bilateral (Smart Contract) */}
+      {isNegotiationModalOpen && (
+        <NegotiationTableModal
+          state={simState}
+          initialBankId={negotiationBankId}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => setIsNegotiationModalOpen(false)}
+        />
+      )}
+
+      {/* Modal: Due Diligence y Auditoría Crediticia del Banquero */}
+      {isDueDiligenceModalOpen && (
+        <DueDiligenceModal
+          state={simState}
+          bankId={negotiationBankId}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => setIsDueDiligenceModalOpen(false)}
+          onOpenNegotiation={(bId) => {
+            setIsDueDiligenceModalOpen(false);
+            setNegotiationBankId(bId);
+            setIsNegotiationModalOpen(true);
+          }}
         />
       )}
 

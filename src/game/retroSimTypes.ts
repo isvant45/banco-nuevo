@@ -3,6 +3,7 @@
  */
 
 import { IErpCorporateState } from './erpCorporateTypes';
+import { IMacroEconomyState, ISmartLoanContract } from './macroEconomyTypes';
 
 export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora' | 'supermercado' | 'autolote';
 
@@ -284,6 +285,9 @@ export interface BankCommercialLoan {
   purpose: string;
   loanType?: CommercialLoanType;
   productType?: CommercialLoanType;
+  loanId?: string;
+  loanName?: string;
+  collateralPledged?: string;
   originalAmount?: number;
   equipmentModel?: string;
   amortizedPrincipalTotal?: number;
@@ -406,6 +410,8 @@ export interface CommercialBankRelationship {
   guaranteeDeposits: BankGuaranteeDeposit[];
   termDeposits: BankTermDeposit[];
   negotiatedRateDiscount?: number;
+  name?: string;
+  shortName?: string;
 }
 
 // ----------------------------------------------------
@@ -460,6 +466,8 @@ export interface OwnedMachineryUnit {
   icon: string;
   ratingStars: 1 | 2 | 3 | 4 | 5;
   purchasePrice: number;
+  purchaseCost?: number;
+  title?: string;
   conditionPct: number;
   totalHoursWorked: number;
   hourlyFuelCost: number;
@@ -629,6 +637,10 @@ export interface DailySimulationState {
 
   // Sistema ERP Corporativo & Libro Mayor General
   erpCorporateState?: IErpCorporateState;
+
+  // Arquitectura Macroeconómica, Banco Central & Smart Contracts
+  macroEconomyState?: IMacroEconomyState;
+  smartContracts?: ISmartLoanContract[];
 }
 
 export type CollateralAssetType = 

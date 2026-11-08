@@ -1,106 +1,172 @@
-# Plan de Integración: Sistema ERP Corporativo & Libro Mayor en el Simulador
+# Plan Maestro: Simulador Macroeconómico, Empresarial y Bancario 360°
 
-Integración de un sistema ERP corporativo integral y realista en el simulador empresarial, estructurado bajo una ventana dedicada de escritorio retro (**«ERP Corporativo & Libro Mayor»** con icono **📑**) que articula los 4 pilares financieros y operativos en tiempo real.
+Transformación de **banco-nuevo** en un simulador económico de alta fidelidad basado en cuatro fases interconectadas: **Arquitectura Macroeconómica y Banco Central**, **Gestión Microeconómica del Empresario (OPEX/CAPEX/Supply Chain)**, **Gestión de Riesgo y Liquidez del Banquero (Encaje Legal/Bank Runs/Embargos)** y la **Mesa de Negociación Interactiva (Smart Contracts & Dashboards)**, completamente integrado dentro del Escritorio Retro Windows con cambio dinámico de rol.
 
 ---
 
-## Decisiones Críticas & Respuestas Confirmadas por el Usuario
+## Decisiones Confirmadas con el Usuario
 
 > [!IMPORTANT]
-> Decisiones de arquitectura y diseño confirmadas por el usuario en la fase de clarificación:
-
-- **Punto de Entrada en la UI**: Ventana dedicada de primer nivel (`erp_ledger`) con icono propio en el Escritorio Retro (**«ERP & Libro Mayor»**) y entrada en la barra de tareas.
-- **Gestión de Proveedores y Facturas**: Soporte de pagos al contado y financiamiento en cuotas mensuales, registrando automáticamente cada desembolso en el Libro Mayor General (partida doble).
-- **Operaciones y Realidad Empresarial**: La apertura de sucursales, capacitación del personal y campañas de publicidad tendrán impacto directo y dinámico en las ventas diarias, la moral del equipo y el posicionamiento de marca de la empresa.
-- **Auditoría del Contador**: Libro Mayor con filtros por categoría de cuenta (Activo, Pasivo, Patrimonio, Ingreso, Gasto), trazabilidad de quién y cuándo autorizó cada transacción, y módulo de cálculo fiscal a fin de mes (ISR 25% + Aportación Solidaria).
+> Decisiones de diseño y producto acordadas en la fase de clarificación:
+> - **Ritmo de Simulación**: Turnos diarios con cierres de jornada, reportes macroeconómicos mensuales automáticos y alertas de liquidez inmediatas en caso de tensión financiera.
+> - **Experiencia de Juego**: Modo dual conmutable en tiempo real entre rol **Empresario** y **Banquero** desde la barra de tareas y escritorio retro, permitiendo ver las dos caras de la misma transacción económica.
+> - **Visualización Macroeconómica**: Nueva ventana dedicada en el escritorio retro: **«🏛️ Banco Central & Macroeconomía»** con indicadores vivos de Tasa de Referencia (Prime Rate), Ciclo Económico (Expansión, Estancamiento, Recesión, Crisis), Tasa de Inflación y Reservas Internacionales.
 
 ---
 
-## 1. Visión General & Concepto Central
+## 1. Visión General del Sistema y Reglas Económicas
 
-El sistema ERP conecta la operativa comercial con la contabilidad formal:
-1. **Pilar 1: Tarjetas Corporativas**: Control estricto de límite, saldo disponible y deuda, validando fondos antes de cada consumo o pago.
-2. **Pilar 2: Proveedores y Cuentas por Pagar**: Facturas entrantes con estados (`PENDING`, `PARTIAL`, `PAID`), cronograma de vencimientos y liquidación de cuotas.
-3. **Pilar 3: Auditoría y Contador**: Libro Mayor General (*General Ledger*) con asientos contables de cada movimiento financiero, control de flujo de caja y liquidación fiscal de fin de mes.
-4. **Pilar 4: Operaciones Empresariales**: Apertura de sucursales con costo de capital y dotación mínima de personal, plan de incentivos laborales (moral/eficiencia) y campañas de mercadeo.
-
----
-
-## 2. Experiencia de Usuario & Diseño Visual
-
-### Flujo de Navegación Retro
-- **Icono en el Escritorio**: `📑 ERP & Libro Mayor` ubicado en la cuadrícula del escritorio retro junto a los iconos empresariales.
-- **Estructura de la Ventana Retro (`ErpLedgerWindow`)**:
-  - **Barra de Pestañas Retro**:
-    - `💳 1. Tarjetas Corporativas`: Visualización gráfica de la tarjeta, límite disponible, saldos y formulario de compras/pagos.
-    - `📦 2. Proveedores & Facturas`: Cartera de cuentas por pagar, facturas pendientes, abono al contado o por cuotas.
-    - `⚖️ 3. Libro Mayor & Contador`: Consola de auditoría contable, asientos detallados (Debe/Haber), filtros y liquidación mensual de ISR/Aportación Solidaria.
-    - `🏢 4. Operaciones & Expansión`: Apertura de sucursales en ciudades de Honduras (Tegucigalpa, San Pedro Sula, La Ceiba, Choluteca), gestión de moral de empleados y campañas publicitarias.
+El simulador se apoya en un motor central autoritativo (`src/game/macroEconomyEngine.ts`) que orquesta el ecosistema macroeconómico y gobierna las interacciones entre el Empresario y el Banquero:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 📑 ERP Corporativo & Libro Mayor - Áureo Enterprise                    [_][X]│
-├─────────────────────────────────────────────────────────────────────────────┤
-│ [💳 Tarjetas Corp] [📦 Cuentas por Pagar] [⚖️ Libro Mayor] [🏢 Operaciones] │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ Capital Disponible: L 3,850,000 │ Renta Gravable: L 420,000 │ Marca: 68/100  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  (Contenido dinámico interactivo con tablas retro, inputs y botones clásicos)│
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                   BANCO CENTRAL (IA & REGULADOR)                      │
+│   • Tasa Prime (2% - 15%)      • Encaje Legal Obligatorio (20%)        │
+│   • Ciclo Económico Dinámico    • Línea de Rescate de Liquidez Punitiva │
+└───────────────────┬────────────────────────────────┬───────────────────┘
+                    │ Tasa base e inflación          │ Encaje y rescate
+                    ▼                                ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────┐
+│       MÓDULO DEL EMPRESARIO          │  │     MÓDULO DEL BANQUERO      │
+│ • OPEX: Nómina, alquiler, servicios  │  │ • Depósitos de ahorristas    │
+│ • CAPEX: Maquinaria, sucursales      │  │ • Bóveda y Encaje Legal 20%  │
+│ • Credit Score dinámico (DTI/Mora)   │  │ • Auditoría Due Diligence    │
+│ • Cadena de Suministro e inventario  │  │ • Clasificación de Mora      │
+│ • Riesgo de quiebra por liquidez     │  │ • Riesgo de Bank Run (Pánico)│
+└───────────────────┬──────────────────┘  └──────────────┬───────────────┘
+                    │                                    │
+                    └──────────────► ◄───────────────────┘
+                             MESA DE NEGOCIACIÓN
+                         (Smart Contract Interactivo)
+                     • Monto, Plazo, Tasa Negociada
+                     • Periodo de Gracia • Garantías 80%
+                     • Firma bilateral del contrato
 ```
 
 ---
 
-## 3. Decisiones Técnicas & Reglas de Negocio
+## 2. Desglose Detallado de las 4 Fases de Implementación
 
-### Restricciones Empresariales Estrictas
-1. **Prohibición de Sobregiro no Autorizado**: Si una compra excede el saldo disponible de la tarjeta o si un pago a proveedor supera la caja/banco disponible, la operación se rechaza con una alerta financiera explicativa.
-2. **Regla de Expansión con Capital y Personal**: No se puede abrir una sucursal sin contar con el capital de instalación necesario y un mínimo de 2 empleados asignados.
-3. **Integridad de Partida Doble**: Toda compra, pago de nómina, pago a proveedor o impuesto genera simultáneamente un asiento en el Libro Mayor vinculando cuenta débito y crédito.
+### Fase 1: Arquitectura Macroeconómica (El Motor del Juego)
+- **Tasa de Referencia (Prime Rate / TPM)**:
+  - Generada y ajustada por el Banco Central mensualmente según la inflación y el ciclo (rango 2.0% – 15.0%).
+  - Influye en el costo del dinero para el Banquero (tasas pasivas a ahorristas y tasas activas de préstamos) y la carga financiera del Empresario.
+- **Mecánica de Rescate Punitivo de Liquidez**:
+  - Si la bóveda del Banquero cae por debajo del 0% o incumple el encaje legal durante retiros masivos, el Banco Central inyecta un crédito de salvamento obligatorio a una tasa punitiva (`Prime Rate + 10.0%`).
+  - La penalización se debita automáticamente de las ganancias del Banquero.
+- **Ciclos Económicos Dinámicos**:
+  - 4 estados: `EXPANSIÓN`, `ESTANCAMIENTO`, `RECESIÓN` y `CRISIS`.
+  - Transiciones estocásticas calibradas por turno mensual.
+  - **Efectos en Recesión/Crisis**: Demanda y ventas del Empresario caen (-25% a -40%), el riesgo de impago aumenta y el índice de desconfianza de los ahorristas se dispara.
+  - **Efectos en Expansión**: Las ventas aumentan (+15% a +35%), pero la inflación sube, incrementando el OPEX y el costo de insumos en inventario.
+
+### Fase 2: Módulo del Empresario (Gestión Microeconómica)
+- **Desglose Estricto OPEX vs. CAPEX**:
+  - **OPEX**: Nómina de colaboradores, alquiler de locales, servicios públicos y mantenimiento operativo mensual.
+  - **CAPEX**: Adquisición de maquinaria industrial, apertura de sucursales comerciales e infraestructura con depreciación mensual acumulada y vida útil.
+  - **Control de Flujo de Caja**: Alerta de liquidez crítica si las reservas líquidas no cubren al menos 15 días de OPEX.
+- **Motor de Calificación Crediticia (Credit Score Algorítmico)**:
+  - Algoritmo de 300 a 850 puntos basado en:
+    1. Historial de puntualidad de pagos (40%).
+    2. Ratio de Endeudamiento vs. Ingresos Brutos (DTI - Debt to Income) (35%).
+    3. Solvencia patrimonial y garantías reales libres de gravamen (15%).
+    4. Antigüedad y reputación comercial (10%).
+  - Puntuaciones altas (>750) otorgan descuentos en tasas de interés bancarias.
+- **Cadena de Suministro y Shocks de Costos**:
+  - Compra de materia prima e insumos que se transforman en inventario vendible.
+  - Si un shock macroeconómico encarece los suministros (+20%), el empresario puede elegir en UI: *Absorber el sobrecosto reduciendo margen* o *Trasladarlo al precio final arriesgando volumen de clientes*.
+
+### Fase 3: Módulo del Banquero (Gestión de Riesgo y Liquidez)
+- **Simulación de Ahorristas y Encaje Legal (20%)**:
+  - Depósitos de ciudadanos y empresas locales que representan pasivos del banco.
+  - Exigencia regulatoria del 20% inmovilizado en cuenta de encaje del Banco Central.
+  - La bóveda operativa solo puede prestar el 80% restante de los depósitos captados.
+- **Riesgo de Pánico Bancario (*Bank Run*)**:
+  - Modelado en función del ciclo económico, la tasa pasiva ofrecida y el índice de solvencia del banco.
+  - Si el banco entra en estrés de liquidez, los depositantes inician retiros masivos.
+- **Auditoría de Crédito y Dossier de Due Diligence**:
+  - Ventana interactiva donde el Banquero evalúa solicitudes de crédito con:
+    - Estado de resultados (P&L) y flujo de caja del solicitante.
+    - Credit Score y nivel de endeudamiento actual.
+    - Garantías hipotecarias/prendarias ofrecidas (con aforo del 75%-80%).
+    - Opciones de acción: **Aprobar Solicitud**, **Denegar por Riesgo**, o **Abrir Mesa de Negociación**.
+- **Gestión de Cartera en Mora y Embargos**:
+  - Estados: `VIGENTE` -> `MORA TEMPRANA (1 periodo)` -> `CARTERA VENCIDA (2 periodos)` -> `JUDICIAL (3 periodos)`.
+  - Acción judicial de **Ejecutar Garantía / Embargo**: Confisca el bien o maquinaria en garantía, lo liquida en remate público al 60% de su valor comercial y abona los fondos recuperados a la bóveda del banco.
+
+### Fase 4: La Interfaz de Interacción (Smart Contracts y Dashboards)
+- **Mesa de Negociación (Smart Contract Interactivo)**:
+  - Modal/Ventana especializada donde interactúan el solicitante y el banco.
+  - Sliders interactivos para:
+    - *Monto del préstamo*.
+    - *Plazo de amortización (meses)*.
+    - *Tasa de interés pactada*.
+    - *Periodo de gracia de capital (meses de solo intereses)*.
+    - *Garantía vinculada exigida*.
+  - Cálculo en tiempo real de la cuota mensual, cobertura de garantía y firma bilateral ("Firmar Contrato y Desembolsar").
+- **Dashboards Financieros Avanzados**:
+  - **Dashboard del Empresario**: Curva de ingresos vs. servicio de la deuda, semáforo de liquidez para OPEX y proyección de flujo neto.
+  - **Dashboard del Banquero**: Distribución de cartera por nivel de riesgo (A, B, C, D, E), indicador de encaje legal versus liquidez disponible y margen de intermediación financiera (NIM).
+- **Nueva Ventana Retro: «🏛️ Banco Central & Macroeconomía»**:
+  - Visualización del velocímetro del ciclo económico, gráfica histórica de la tasa Prime e inflación, botón de solicitud de Facilidad de Liquidez de Emergencia y boletines oficiales de política monetaria.
 
 ---
 
-## 4. Arquitectura de Datos & Componentes
+## 3. Arquitectura Técnica y Modelo de Datos
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ARQUITECTURA DEL SISTEMA ERP                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  src/game/erpCorporateTypes.ts                                              │
-│   ├─ IErpSupplierInvoice (Facturas por pagar, cuotas, estados)              │
-│   ├─ ILedgerTransactionEntry (Asientos del Libro Mayor)                     │
-│   ├─ IErpBranchOffice (Sucursales, costo operativo, personal)               │
-│   └─ IErpMarketingCampaign (Campañas y brand equity)                         │
-│                                │                                            │
-│                                ▼                                            │
-│  src/game/erpCorporateEngine.ts                                             │
-│   ├─ recordLedgerEntry(state, entry)                                        │
-│   ├─ paySupplierInvoiceInstallment(state, invoiceId, amount, source)        │
-│   ├─ openCompanyBranch(state, branchData)                                   │
-│   ├─ executeMarketingCampaign(state, campaignData)                          │
-│   └─ calculateMonthlyTaxLiquidation(state)                                  │
-│                                │                                            │
-│                                ▼                                            │
-│  src/components/retro/ErpLedgerWindow.tsx                                   │
-│   └─ Componente UI retro con las 4 pestañas interactivas                   │
-│                                │                                            │
-│                                ▼                                            │
-│  src/components/retro/RetroDesktop.tsx                                      │
-│   └─ Icono en escritorio, registro en openWindows y barra de tareas         │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+src/
+├── game/
+│   ├── macroEconomyTypes.ts          # Tipos: Ciclo, Tasa Prime, Encaje, OPEX/CAPEX, Dossier, SmartContract
+│   ├── macroEconomyEngine.ts         # Motor del Banco Central, ciclo, encaje legal, rescates y shocks
+│   ├── creditScoreEngine.ts          # Algoritmo de scoring empresarial (DTI, historial, capacidad)
+│   ├── retroSimTypes.ts              # Integración en DailySimulationState (macroState, bankRunRisk, etc.)
+│   └── commercialBanksEngine.ts      # Conexión con cartera de préstamos, embargo y liquidación al 60%
+└── components/
+    └── retro/
+        ├── CentralBankWindow.tsx      # Ventana retro del Banco Central, ciclo, tasas y liquidez
+        ├── NegotiationTableModal.tsx  # Mesa de negociación / Smart Contract con sliders interactivos
+        ├── DueDiligenceModal.tsx      # Dossier de auditoría crediticia del Banquero
+        ├── RetroDesktop.tsx           # Selector dual de rol (Empresario / Banquero), iconos y ventanas
+        └── RetroTaskbar.tsx           # Ticker con el ciclo macroeconómico actual e icono del Banco Central
 ```
+
+### Entidades y Estados Clave
+- `IMacroEconomyState`:
+  - `cycleState`: `'EXPANSION' | 'STAGNATION' | 'RECESSION' | 'CRISIS'`
+  - `primeRatePct`: number (ej. 6.5%)
+  - `inflationRatePct`: number (ej. 4.2%)
+  - `legalReservePct`: number (20.0%)
+  - `centralBankBailoutRatePct`: number (`primeRatePct + 10.0%`)
+  - `activeBailoutDebtHNL`: number
+  - `marketShockEvent`: string | null
+- `IOpexCapexBreakdown`:
+  - `monthlyWagesHNL`, `monthlyRentHNL`, `monthlyUtilitiesHNL`
+  - `machineryDepreciationMonthlyHNL`, `accumulatedDepreciationHNL`
+  - `daysOfCashRunway`: number
+- `ISmartLoanContract`:
+  - `contractId`, `bankId`, `borrowerName`, `amountHNL`, `interestRateAnnual`, `gracePeriodMonths`, `termMonths`, `collateralId`, `status: 'OFFERED' | 'SIGNED' | 'REJECTED'`
 
 ---
 
-## 5. Plan de Verificación
+## 4. Plan de Ejecución por Pasos
 
-1. **Pruebas de Compilación**: Ejecutar `compile_applet` para garantizar que no existan errores de sintaxis ni de empaquetado.
-2. **Chequeo de Tipado Estricto**: Ejecutar `lint_applet` (`tsc --noEmit`) asegurando 0 errores de TypeScript.
-3. **Verificación Funcional**:
-   - Abrir la ventana desde el icono del escritorio `📑 ERP & Libro Mayor`.
-   - Comprobar que los consumos y pagos con tarjeta actualicen el disponible y generen asientos en el Libro Mayor.
-   - Pagar facturas a proveedores por cuotas o al contado y verificar la reducción del pasivo.
-   - Probar la apertura de sucursales con validación de costo y empleados mínimos.
-   - Verificar la provisión de impuestos de fin de mes calculada con las tasas reales (25% ISR + 5% Solidario).
+1. **Paso 1: Motor Macroeconómico y Tipos (`macroEconomyTypes.ts` y `macroEconomyEngine.ts`)**:
+   - Crear las definiciones de datos y la lógica de fluctuación de tasas, ciclo económico, shocks y rescates punitivos del Banco Central.
+   - Enlazar el cálculo del encaje legal (20%) y el simulador de desconfianza de ahorristas (*Bank Run*).
+2. **Paso 2: Motor de Credit Score y OPEX/CAPEX del Empresario (`creditScoreEngine.ts`)**:
+   - Programar el cálculo de score de 300 a 850 puntos.
+   - Integrar la depreciación mensual de maquinarias e infraestructura y la evaluación de cobertura de nómina/servicios.
+3. **Paso 3: Lógica de Cartera Bancaria, Auditoría y Embargo al 60%**:
+   - Actualizar `commercialBanksEngine.ts` con transiciones de mora (`VIGENTE` -> `MORA` -> `VENCIDO` -> `JUDICIAL`).
+   - Implementar la función de embargo que liquida garantías al 60% en remate para restituir liquidez a la bóveda.
+4. **Paso 4: Componentes de UI Retro**:
+   - Crear `CentralBankWindow.tsx` con widgets de aguja del ciclo económico, tasas de interés, inflación y solicitudes de liquidez.
+   - Crear `NegotiationTableModal.tsx` (Mesa de negociación con sliders de tasa, periodo de gracia y garantía).
+   - Crear `DueDiligenceModal.tsx` para el rol de Banquero.
+5. **Paso 5: Conmutador de Rol Dual y Cableado en `RetroDesktop.tsx`**:
+   - Añadir el botón conmutador rápido de rol en la barra de tareas (*Empresario* ⇄ *Banquero*).
+   - Agregar el icono **«🏛️ Banco Central»** y registrar la ventana en el gestor de ventanas retro.
+6. **Paso 6: Verificación y Pruebas**:
+   - Compilación completa con `compile_applet` y verificación estricta de tipos con `lint_applet` (`tsc --noEmit`).
+   - Pruebas unitarias para corroborar la estabilidad matemática del ciclo y el encaje legal.
