@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan integral para resolver los 7 errores de compilación, tipado y lógica pendiente en el simulador bancario y fiscal (TransactionVoucher disclaimer, col.title en garantías, BankOfferNegotiationResult en RetroDesktop, motor fiscal SAR de dos etapas, capacidad de pago sin sustituto de caja ni tope de L 1,500, eliminación del tope artificial de 15M en garantías, y motor revolvente para tarjetas corporativas).",
-  "updatedAt":  "2026-11-07T23:55:16.102897428Z",
+  "summary":  "Plan de implementación para la integración del Sistema ERP Corporativo de 4 Pilares (Tarjetas de Crédito en tiempo real, Cuentas por Pagar y Proveedores por cuotas, Libro Mayor General para el Contador con cálculo de impuestos SAR a fin de mes, y Operaciones con Expansión de Sucursales, Moral de Empleados y Campañas de Marketing) con ventana dedicada retro e icono en el escritorio.",
+  "updatedAt":  "2026-11-08T13:41:32.928938502Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

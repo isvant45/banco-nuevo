@@ -1,104 +1,106 @@
-# Plan de Resolución de Errores de Tipado y Lógica Bancaria en el Simulador
+# Plan de Integración: Sistema ERP Corporativo & Libro Mayor en el Simulador
 
-Resolución paso a paso de los 7 errores de tipado, inconsistencias de propiedades y lógicas pendientes para el despliegue exitoso en GitHub Actions del simulador bancario y fiscal en TypeScript/React.
+Integración de un sistema ERP corporativo integral y realista en el simulador empresarial, estructurado bajo una ventana dedicada de escritorio retro (**«ERP Corporativo & Libro Mayor»** con icono **📑**) que articula los 4 pilares financieros y operativos en tiempo real.
 
 ---
 
-## Decisiones Críticas & Revisión del Usuario
+## Decisiones Críticas & Respuestas Confirmadas por el Usuario
 
 > [!IMPORTANT]
-> Todos los cambios se mantienen estrictamente enfocados en corregir los errores de compilación de TypeScript (`tsc --noEmit`), garantizar la consistencia de los tipos en `TransactionVoucher`, reparar las referencias de propiedades en garantías reales (`RealEstateCollateralItem`), y estructurar los flujos de crédito comercial, cálculo de capacidad, y crédito revolvente.
+> Decisiones de arquitectura y diseño confirmadas por el usuario en la fase de clarificación:
 
-- **Punto 1 (Tipado Voucher)**: Agregar `disclaimer?: string;` como propiedad opcional en `TransactionVoucher` (`src/game/retroSimTypes.ts`).
-- **Punto 2 (Garantías Reales)**: Reemplazar `col.propertyName` por `col.title` en `src/game/commercialBanksEngine.ts` (línea ~2872).
-- **Punto 3 (Negociación RetroDesktop)**: Retornar explícitamente el contrato completo `BankOfferNegotiationResult` con `outcome` y `reason` en `handleNegotiateOffer` (`src/components/retro/RetroDesktop.tsx`).
-- **Punto 4 (Motor Fiscal SAR)**: Vincular `paySarTaxObligation` en `SarTaxAuditWindow.tsx` y separar de forma determinista la presentación de la declaración (`isDeclared: true, isPaid: false`) del pago tributario.
-- **Punto 5 (Capacidad de Pago)**: Eliminar la caja como sustituto de ingresos cuando las ventas sean 0 y eliminar el piso artificial de L 1,500 en la cuota.
-- **Punto 6 (Garantías sin Tope de 15M)**: Eliminar el tope rígido de L 15,000,000 en la capacidad por garantías, respetando el avalúo real multiplicado por el porcentaje de aforo (LTV).
-- **Punto 7 (Crédito Revolvente)**: Implementar y conectar `chargeCorporateCard` (resta disponible, suma a saldo utilizado) y `payCorporateCreditCard` (resta saldo utilizado, restituye disponible).
+- **Punto de Entrada en la UI**: Ventana dedicada de primer nivel (`erp_ledger`) con icono propio en el Escritorio Retro (**«ERP & Libro Mayor»**) y entrada en la barra de tareas.
+- **Gestión de Proveedores y Facturas**: Soporte de pagos al contado y financiamiento en cuotas mensuales, registrando automáticamente cada desembolso en el Libro Mayor General (partida doble).
+- **Operaciones y Realidad Empresarial**: La apertura de sucursales, capacitación del personal y campañas de publicidad tendrán impacto directo y dinámico en las ventas diarias, la moral del equipo y el posicionamiento de marca de la empresa.
+- **Auditoría del Contador**: Libro Mayor con filtros por categoría de cuenta (Activo, Pasivo, Patrimonio, Ingreso, Gasto), trazabilidad de quién y cuándo autorizó cada transacción, y módulo de cálculo fiscal a fin de mes (ISR 25% + Aportación Solidaria).
 
 ---
 
-## 1. Visión General & Alcance
+## 1. Visión General & Concepto Central
+
+El sistema ERP conecta la operativa comercial con la contabilidad formal:
+1. **Pilar 1: Tarjetas Corporativas**: Control estricto de límite, saldo disponible y deuda, validando fondos antes de cada consumo o pago.
+2. **Pilar 2: Proveedores y Cuentas por Pagar**: Facturas entrantes con estados (`PENDING`, `PARTIAL`, `PAID`), cronograma de vencimientos y liquidación de cuotas.
+3. **Pilar 3: Auditoría y Contador**: Libro Mayor General (*General Ledger*) con asientos contables de cada movimiento financiero, control de flujo de caja y liquidación fiscal de fin de mes.
+4. **Pilar 4: Operaciones Empresariales**: Apertura de sucursales con costo de capital y dotación mínima de personal, plan de incentivos laborales (moral/eficiencia) y campañas de mercadeo.
+
+---
+
+## 2. Experiencia de Usuario & Diseño Visual
+
+### Flujo de Navegación Retro
+- **Icono en el Escritorio**: `📑 ERP & Libro Mayor` ubicado en la cuadrícula del escritorio retro junto a los iconos empresariales.
+- **Estructura de la Ventana Retro (`ErpLedgerWindow`)**:
+  - **Barra de Pestañas Retro**:
+    - `💳 1. Tarjetas Corporativas`: Visualización gráfica de la tarjeta, límite disponible, saldos y formulario de compras/pagos.
+    - `📦 2. Proveedores & Facturas`: Cartera de cuentas por pagar, facturas pendientes, abono al contado o por cuotas.
+    - `⚖️ 3. Libro Mayor & Contador`: Consola de auditoría contable, asientos detallados (Debe/Haber), filtros y liquidación mensual de ISR/Aportación Solidaria.
+    - `🏢 4. Operaciones & Expansión`: Apertura de sucursales en ciudades de Honduras (Tegucigalpa, San Pedro Sula, La Ceiba, Choluteca), gestión de moral de empleados y campañas publicitarias.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       ARQUITECTURA DE FLUJO Y TIPADO                       │
+│ 📑 ERP Corporativo & Libro Mayor - Áureo Enterprise                    [_][X]│
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [💳 Tarjetas Corp] [📦 Cuentas por Pagar] [⚖️ Libro Mayor] [🏢 Operaciones] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Capital Disponible: L 3,850,000 │ Renta Gravable: L 420,000 │ Marca: 68/100  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  (Contenido dinámico interactivo con tablas retro, inputs y botones clásicos)│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Decisiones Técnicas & Reglas de Negocio
+
+### Restricciones Empresariales Estrictas
+1. **Prohibición de Sobregiro no Autorizado**: Si una compra excede el saldo disponible de la tarjeta o si un pago a proveedor supera la caja/banco disponible, la operación se rechaza con una alerta financiera explicativa.
+2. **Regla de Expansión con Capital y Personal**: No se puede abrir una sucursal sin contar con el capital de instalación necesario y un mínimo de 2 empleados asignados.
+3. **Integridad de Partida Doble**: Toda compra, pago de nómina, pago a proveedor o impuesto genera simultáneamente un asiento en el Libro Mayor vinculando cuenta débito y crédito.
+
+---
+
+## 4. Arquitectura de Datos & Componentes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ARQUITECTURA DEL SISTEMA ERP                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  src/game/retroSimTypes.ts                                                  │
-│   └─ TransactionVoucher { ..., disclaimer?: string; }                       │
-│   └─ BankOfferNegotiationResult { outcome, reason, ... }                    │
-│   └─ RealEstateCollateralItem { title: string, appraisalValue, ltvPct }     │
+│  src/game/erpCorporateTypes.ts                                              │
+│   ├─ IErpSupplierInvoice (Facturas por pagar, cuotas, estados)              │
+│   ├─ ILedgerTransactionEntry (Asientos del Libro Mayor)                     │
+│   ├─ IErpBranchOffice (Sucursales, costo operativo, personal)               │
+│   └─ IErpMarketingCampaign (Campañas y brand equity)                         │
 │                                │                                            │
 │                                ▼                                            │
-│  src/game/commercialBanksEngine.ts                                          │
-│   ├─ [Fix 2] col.title en validación de gravamen                            │
-│   ├─ [Fix 5] Capacidad de pago basada en flujo operativo real (sin caja)    │
-│   ├─ [Fix 6] Garantías sin tope de 15M (Avalúo real x aforo LTV)           │
-│   └─ [Fix 7] chargeCorporateCard & payCorporateCreditCard                   │
+│  src/game/erpCorporateEngine.ts                                             │
+│   ├─ recordLedgerEntry(state, entry)                                        │
+│   ├─ paySupplierInvoiceInstallment(state, invoiceId, amount, source)        │
+│   ├─ openCompanyBranch(state, branchData)                                   │
+│   ├─ executeMarketingCampaign(state, campaignData)                          │
+│   └─ calculateMonthlyTaxLiquidation(state)                                  │
 │                                │                                            │
 │                                ▼                                            │
-│  src/game/sarFiscalEngine.ts & SarTaxAuditWindow.tsx                         │
-│   └─ [Fix 4] Declaración vs Pago en dos pasos diferenciados                │
+│  src/components/retro/ErpLedgerWindow.tsx                                   │
+│   └─ Componente UI retro con las 4 pestañas interactivas                   │
 │                                │                                            │
 │                                ▼                                            │
 │  src/components/retro/RetroDesktop.tsx                                      │
-│   └─ [Fix 3] handleNegotiateOffer entrega BankOfferNegotiationResult        │
+│   └─ Icono en escritorio, registro en openWindows y barra de tareas         │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Plan Detallado de Implementación Paso a Paso
+## 5. Plan de Verificación
 
-### Paso 1: Tipado en `TransactionVoucher`
-- **Archivo:** `src/game/retroSimTypes.ts`
-- **Cambio:** Agregar `disclaimer?: string;` a la interfaz `TransactionVoucher`.
-- **Resultado:** Elimina el error `Object literal may only specify known properties, and 'disclaimer' does not exist in type 'TransactionVoucher'` en `sarFiscalEngine.ts#L261` y `commercialBanksEngine.ts#L3092`.
-
-### Paso 2: Propiedad Correcta en Garantías
-- **Archivo:** `src/game/commercialBanksEngine.ts` (línea ~2872)
-- **Cambio:** Sustituir `col.propertyName` por `col.title` al emitir el mensaje de validación de gravamen de la garantía seleccionada.
-
-### Paso 3: Tipado de Negociación en `RetroDesktop.tsx`
-- **Archivo:** `src/components/retro/RetroDesktop.tsx`
-- **Cambio:** Ajustar el valor de retorno de `handleNegotiateOffer` para cumplir con la firma estricta de `BankOfferNegotiationResult`:
-  ```typescript
-  return {
-    outcome: res.outcome,
-    reason: res.reason,
-    success: res.success,
-    message: res.message,
-    dialogue: res.dialogue,
-    updatedOffer: res.updatedOffer
-  };
-  ```
-
-### Paso 4: Motor Fiscal SAR en Dos Fases
-- **Archivos:** `src/game/sarFiscalEngine.ts` y `src/components/retro/SarTaxAuditWindow.tsx`
-- **Cambio A:** Conectar `paySarTaxObligation` al botón de pago de impuestos en `SarTaxAuditWindow.tsx`.
-- **Cambio B:** Garantizar que `fileSarDeclaration` establezca `isDeclared = true, isPaid = false`, mientras que `paySarTaxObligation` sea la única responsable de saldar la obligación y marcar `isPaid = true`.
-
-### Paso 5: Capacidad de Pago Basada en Flujo Operativo Real
-- **Archivo:** `src/game/commercialBanksEngine.ts` (en `calculateCreditTermsDisclosure`)
-- **Cambio A:** Eliminar el uso de `storeCash` o `storeBankBalance` como ingreso cuando `monthlySales` sea 0.
-- **Cambio B:** Si `netFlow <= 0`, la cuota permitida y la capacidad de pago deben ser exactamente 0, sin el piso artificial de L 1,500.
-
-### Paso 6: Eliminación del Límite de 15 Millones en Garantías
-- **Archivo:** `src/game/commercialBanksEngine.ts` (en `calculateCreditTermsDisclosure`)
-- **Cambio:** Remover la constante rígida `bankExposureLimitHNL = 15000000;`. Utilizar el valor neto disponible de la garantía (`calculateCollateralAvailableCoverage(col) = appraisalValue * (ltvPct / 100) - currentLienHNL`) y calcular la cobertura total sin topes artificiales.
-
-### Paso 7: Implementación de Crédito Revolvente en Tarjetas
-- **Archivo:** `src/game/commercialBanksEngine.ts`
-- **Cambio A (`chargeCorporateCard`):** Valida que el monto no exceda `availableCredit`, incrementa `currentBalance`, reduce `availableCredit` y actualiza el pago mínimo.
-- **Cambio B (`payCorporateCreditCard`):** Permite abonos desde cuenta corriente o caja chica, reduce `currentBalance`, restituye `availableCredit` y genera el comprobante correspondiente.
-
----
-
-## 3. Plan de Verificación
-
-1. **Chequeo de Tipos TypeScript:** Ejecutar `tsc --noEmit` mediante `lint_applet` para asegurar 0 errores de compilación.
-2. **Compilación de la App:** Ejecutar `compile_applet` para confirmar un build exitoso.
-3. **Validación de Funcionalidad:** Comprobar que todas las ventanas del simulador operan de forma fluida con las nuevas lógicas.
+1. **Pruebas de Compilación**: Ejecutar `compile_applet` para garantizar que no existan errores de sintaxis ni de empaquetado.
+2. **Chequeo de Tipado Estricto**: Ejecutar `lint_applet` (`tsc --noEmit`) asegurando 0 errores de TypeScript.
+3. **Verificación Funcional**:
+   - Abrir la ventana desde el icono del escritorio `📑 ERP & Libro Mayor`.
+   - Comprobar que los consumos y pagos con tarjeta actualicen el disponible y generen asientos en el Libro Mayor.
+   - Pagar facturas a proveedores por cuotas o al contado y verificar la reducción del pasivo.
+   - Probar la apertura de sucursales con validación de costo y empleados mínimos.
+   - Verificar la provisión de impuestos de fin de mes calculada con las tasas reales (25% ISR + 5% Solidario).

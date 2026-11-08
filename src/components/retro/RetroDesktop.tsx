@@ -103,6 +103,8 @@ import { BusinessEmailWindow } from './BusinessEmailWindow';
 import { TransactionVoucherModal } from './TransactionVoucherModal';
 import { DailyClosingModal } from './DailyClosingModal';
 import { RetroNewGameModal } from './RetroNewGameModal';
+import { ErpLedgerWindow } from './ErpLedgerWindow';
+import { createInitialErpCorporateState, advanceErpCorporateDay } from '../../game/erpCorporateEngine';
 
 interface RetroDesktopProps {
   initialRole: RetroRoleMode;
@@ -235,6 +237,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       dynamicBankOffers: initialBankOffers,
       fiscalPeriods: [],
 
+      // Sistema ERP Corporativo & Libro Mayor General
+      erpCorporateState: createInitialErpCorporateState(initialName || (isConstructora ? 'Constructora Metropolitana' : 'Minimarket San Pedro')),
+
       dailyHistory: []
     };
   });
@@ -280,7 +285,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     holding_board: { isOpen: roleMode === 'grupo_empresarial', isMinimized: false, isMaximized: false, zIndex: 10 },
     financial_statements: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
     liabilities_manager: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
-    competitors_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
+    competitors_market: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 },
+    erp_ledger: { isOpen: false, isMinimized: false, isMaximized: false, zIndex: 5 }
   });
 
   const [topZIndex, setTopZIndex] = useState(20);
@@ -1229,6 +1235,9 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     // Evaluar y generar ofertas bancarias dinámicas según salud financiera
     nextState = evaluateAndGenerateBankOffers(nextState);
 
+    // Procesar impacto del sistema ERP corporativo (sucursales, marketing, moral y Libro Mayor)
+    nextState = advanceErpCorporateDay(nextState);
+
     // Enviar resumen diario de ventas por correo si hubo cobros en el día
     if (nextState.dailyReceipts && nextState.dailyReceipts.length > 0) {
       const totalVentasDia = nextState.dailyReceipts.reduce((sum, r) => sum + (r.totalAmount ?? r.total ?? 0), 0);
@@ -1284,6 +1293,11 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
 
     // Ofertas bancarias dinámicas
     nextState = evaluateAndGenerateBankOffers(nextState);
+
+    // Procesar impacto del sistema ERP corporativo para los días transcurridos
+    for (let d = 0; d < daysCount; d++) {
+      nextState = advanceErpCorporateDay(nextState);
+    }
 
     setSimState(nextState);
     setIsDailyClosingModalOpen(true);
@@ -1444,7 +1458,8 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     },
     { id: 'financial_statements', title: 'Contabilidad: Balance & P&L', icon: '⚖️', isOpen: !!openWindows.financial_statements?.isOpen, isMinimized: !!openWindows.financial_statements?.isMinimized },
     { id: 'liabilities_manager', title: 'Centro de Pasivos & Obligaciones', icon: '📑', isOpen: !!openWindows.liabilities_manager?.isOpen, isMinimized: !!openWindows.liabilities_manager?.isMinimized },
-    { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized }
+    { id: 'competitors_market', title: 'Mercado Competidor & M&A', icon: '🏢', isOpen: !!openWindows.competitors_market?.isOpen, isMinimized: !!openWindows.competitors_market?.isMinimized },
+    { id: 'erp_ledger', title: 'ERP & Libro Mayor', icon: '📑', isOpen: !!openWindows.erp_ledger?.isOpen, isMinimized: !!openWindows.erp_ledger?.isMinimized }
   ];
 
   return (
@@ -2002,6 +2017,21 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
             Mercado M&A
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('erp_ledger');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📑
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            ERP & Mayor
           </span>
         </button>
 
@@ -2574,6 +2604,29 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         <CompetitorsMarketWindow
           state={simState}
           onUpdateState={(nextSt) => setSimState(nextSt)}
+        />
+      </RetroWindow>
+
+      {/* Ventana: ERP Corporativo, Proveedores & Libro Mayor */}
+      <RetroWindow
+        id="erp_ledger"
+        title={`ERP Corporativo, Proveedores & Libro Mayor — ${entityName}`}
+        icon="📑"
+        initialX={110}
+        initialY={45}
+        isOpen={!!openWindows.erp_ledger?.isOpen}
+        isMinimized={!!openWindows.erp_ledger?.isMinimized}
+        isMaximized={!!openWindows.erp_ledger?.isMaximized}
+        zIndex={openWindows.erp_ledger?.zIndex || 5}
+        onFocus={() => bringToFront('erp_ledger')}
+        onClose={() => handleCloseWindow('erp_ledger')}
+        onMinimize={() => handleMinimizeWindow('erp_ledger')}
+        onMaximize={() => handleMaximizeWindow('erp_ledger')}
+      >
+        <ErpLedgerWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onViewVoucher={(voucher) => setActiveVoucherModal(voucher)}
         />
       </RetroWindow>
 

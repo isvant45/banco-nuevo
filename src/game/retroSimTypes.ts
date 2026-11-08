@@ -2,6 +2,8 @@
  * Tipos de datos para la simulación retro inspirada en Bank 2000 y el módulo de gestión empresarial aislada.
  */
 
+import { IErpCorporateState } from './erpCorporateTypes';
+
 export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora' | 'supermercado' | 'autolote';
 
 export type RetroRoleMode = 'empresario' | 'banquero' | 'grupo_empresarial';
@@ -624,6 +626,9 @@ export interface DailySimulationState {
 
   // Competidores Activos del Mercado Local (M&A)
   activeCompetitors?: CompetitorFirm[];
+
+  // Sistema ERP Corporativo & Libro Mayor General
+  erpCorporateState?: IErpCorporateState;
 }
 
 export type CollateralAssetType = 
