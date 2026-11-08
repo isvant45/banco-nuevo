@@ -407,7 +407,24 @@ export function evaluateContractorEconomicCapacity(state: DailySimulationState):
   const scoreMultiplier = creditProfile.score >= 780 ? 1.3 : creditProfile.score >= 710 ? 1.15 : creditProfile.score >= 640 ? 1.0 : 0.8;
   const flowCapacity = monthlySales > 0 ? Math.round(monthlySales * 2.8 + netMonthlyOperatingIncome * 6.0) : Math.round(totalLiquidity * 0.5);
   const baseBorrowing = Math.round((flowCapacity + machineryFleetValue * 0.5 + activeContractsValue * 0.3) * scoreMultiplier);
-  const maxBorrowing = baseBorrowing; // Sin piso artificial forzado de 500,000
+
+  // Aforo real contable de garantías reales disponibles al 80% de cobertura
+  const totalCollateralNetCapacity = (state.realEstateCollaterals || []).reduce((sum, col) => {
+    const appraisal = col.appraisalValueHNL || col.appraisalValue || 0;
+    const ltvPct = col.ltvAcceptedPct || col.ltvPercentage || col.ltvPct || 80;
+    const eligible = Math.round(appraisal * (ltvPct / 100));
+    const committed = (col.liens && col.liens.length > 0)
+      ? col.liens.reduce((s, l) => s + (l.committedCoverageHNL || 0), 0)
+      : (col.pledgedAmountTotal || 0);
+    return sum + Math.max(0, eligible - committed);
+  }, 0);
+
+  // La garantía cubre el 80% del préstamo, por lo que respalda hasta (cobertura / 0.80)
+  const collateralFinancingPower = totalCollateralNetCapacity > 0
+    ? Math.round(totalCollateralNetCapacity / 0.80)
+    : 0;
+
+  const maxBorrowing = baseBorrowing + collateralFinancingPower;
   const maxCard = Math.round((monthlySales > 0 ? monthlySales * 0.35 : totalLiquidity * 0.20) * scoreMultiplier);
 
   const rating: 'AAA' | 'AA' | 'A' | 'BBB' | 'B' = 
@@ -2591,15 +2608,15 @@ export function calculateCreditTermsDisclosure(
     ? customTerms.openingFeePct
     : prod.openingFeePct;
 
-  // 1. Cobertura neta de las garantías seleccionadas (Requisito 5)
+  // 1. Cobertura neta de las garantías seleccionadas (aforo contable del 80%)
   const normalizedCollateralIds = Array.isArray(collateralAssetId) 
     ? collateralAssetId 
     : (collateralAssetId ? [collateralAssetId] : []);
   const { totalCoverageHNL } = evaluateSelectedCollateralsCoverage(state, normalizedCollateralIds);
   const collateralCoverageProvidedHNL = totalCoverageHNL;
 
-  // Límite respaldado por las garantías seleccionadas según proporción exigida por el producto
-  const coverageRatio = (prod.requiredCollateralCoveragePct || 100) / 100;
+  // Límite respaldado por garantías: La garantía cubre el 80% del financiamiento (cobertura / 0.80)
+  const coverageRatio = 0.80;
   const collateralBackedMaxHNL = coverageRatio > 0 
     ? Math.floor(collateralCoverageProvidedHNL / coverageRatio) 
     : collateralCoverageProvidedHNL;
@@ -2609,9 +2626,9 @@ export function calculateCreditTermsDisclosure(
     ? 0 
     : Math.round(baseOffer.maxLoanHNL * 0.45);
 
-  // 3. Límite de producto según multiplicador y límite prudencial no topado a 15M
-  const productCapHNL = Math.round(baseOffer.maxLoanHNL * prod.maxAmountMultiplier);
-  const bankExposureLimitHNL = Math.max(100000000, collateralBackedMaxHNL * 1.5);
+  // 3. Límite de producto y exposición bancaria ampliada para financiamientos con respaldo real
+  const productCapHNL = Math.max(Math.round(baseOffer.maxLoanHNL * prod.maxAmountMultiplier), collateralBackedMaxHNL);
+  const bankExposureLimitHNL = Math.max(250000000, collateralBackedMaxHNL * 1.5);
 
   // 4. Límite por capacidad de pago real (basado estrictamente en ventas operativas reales, sin sustitutos de caja)
   const realMonthlySales = state.monthlySalesAccumulated || 0;
@@ -2623,8 +2640,7 @@ export function calculateCreditTermsDisclosure(
   // Flujo operativo neto disponible mensual
   const netFlow = Math.max(0, monthlySales - monthlyOperatingCosts - existingMonthlyDebt);
   
-  // Máxima cuota mensual permitida: 40% del flujo neto operativo disponible.
-  // Sin mínimo artificial: Si el flujo neto es cero, la capacidad de cuota es cero.
+  // Máxima cuota mensual permitida para créditos limpios sin garantía
   let maxMonthlyPaymentAllowed = 0;
   let paymentCapacityMaxHNL = 0;
 
@@ -2635,18 +2651,19 @@ export function calculateCreditTermsDisclosure(
       : maxMonthlyPaymentAllowed * amortizationTerm;
   }
 
-  // 5. Cálculo del Máximo Final Aprobado (respaldo real de garantías sin topes artificiales de 15M)
+  // 5. Cálculo del Máximo Final Aprobado:
+  // Al aportar garantías reales contables con aforo del 80%, el respaldo colateral determina y amplía
+  // la capacidad crediticia para préstamos más grandes, sin ser recortado artificialmente.
   let finalMaxApprovedHNL: number;
   if (collateralCoverageProvidedHNL > 0) {
     if (prod.requiresCollateral) {
-      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, paymentCapacityMaxHNL > 0 ? paymentCapacityMaxHNL : collateralBackedMaxHNL, productCapHNL, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(collateralBackedMaxHNL, bankExposureLimitHNL);
     } else {
-      // Las garantías amplían la capacidad de endeudamiento sobre la línea limpia
       const combinedCap = unsecuredLimitHNL + collateralBackedMaxHNL;
-      finalMaxApprovedHNL = Math.min(combinedCap, paymentCapacityMaxHNL > 0 ? paymentCapacityMaxHNL : combinedCap, productCapHNL, bankExposureLimitHNL);
+      finalMaxApprovedHNL = Math.min(combinedCap, bankExposureLimitHNL);
     }
   } else {
-    // Sin garantías
+    // Sin garantías (línea limpia sin respaldo real)
     if (prod.requiresCollateral) {
       finalMaxApprovedHNL = 0;
     } else {
@@ -2718,8 +2735,10 @@ export function calculateCreditTermsDisclosure(
   // 6. Explicación precisa y pedagógica del motivo del límite (Requisito 6)
   let limitReasonExplanation = '';
   if (approvedAmount >= requestedAmount && requestedAmount > 0) {
-    limitReasonExplanation = `Aprobado íntegro: Tu perfil crediticio, flujo operativo disponible y coberturas aportadas respaldan el monto solicitado de L ${requestedAmount.toLocaleString()}.`;
-  } else if (monthlySales === 0 && (state.storeBankBalance || 0) + (state.storeCash || 0) <= 0) {
+    limitReasonExplanation = collateralCoverageProvidedHNL > 0
+      ? `Aprobado íntegro con respaldo de garantías al 80%: Tus garantías reales seleccionadas (L ${collateralCoverageProvidedHNL.toLocaleString()}) cubren plenamente el 80% contable del financiamiento solicitado de L ${requestedAmount.toLocaleString()}.`
+      : `Aprobado íntegro: Tu perfil crediticio y capacidad de flujo operativo disponible respaldan el monto solicitado de L ${requestedAmount.toLocaleString()}.`;
+  } else if (monthlySales === 0 && (state.storeBankBalance || 0) + (state.storeCash || 0) <= 0 && collateralCoverageProvidedHNL === 0) {
     limitReasonExplanation = `Empresa nueva sin historial de ventas ni reservas líquidas verificables: la capacidad de cuota mensual es L 0/mes (flujo_disponible). Se requiere generar ventas operativas o constituir depósitos previos.`;
   } else if (limitingConstraint === 'flujo_disponible') {
     limitReasonExplanation = `Capacidad de pago insuficiente (flujo_disponible): Tu flujo operativo neto mensual (L ${netFlow.toLocaleString()}) solo permite una cuota máxima de L ${maxMonthlyPaymentAllowed.toLocaleString()}/mes, limitando el monto a L ${paymentCapacityMaxHNL.toLocaleString()}.`;

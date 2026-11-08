@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan integral para resolver los 7 errores de compilación, tipado y lógica pendiente en el simulador bancario y fiscal (TransactionVoucher disclaimer, col.title en garantías, BankOfferNegotiationResult en RetroDesktop, motor fiscal SAR de dos etapas, capacidad de pago sin sustituto de caja ni tope de L 1,500, eliminación del tope artificial de 15M en garantías, y motor revolvente para tarjetas corporativas).",
+  "updatedAt":  "2026-11-07T23:55:16.102897428Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

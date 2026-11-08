@@ -109,7 +109,6 @@ interface RetroDesktopProps {
   initialSector?: RetailSectorId;
   initialName?: string;
   onOpenAuditReport?: () => void;
-  onToggleViewMode?: () => void;
   onReturnToTitle?: () => void;
 }
 
@@ -118,7 +117,6 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
   initialSector = 'minimarket',
   initialName,
   onOpenAuditReport,
-  onToggleViewMode,
   onReturnToTitle
 }) => {
   const [roleMode, setRoleMode] = useState<RetroRoleMode>(initialRole);

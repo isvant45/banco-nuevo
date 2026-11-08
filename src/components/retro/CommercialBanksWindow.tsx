@@ -176,6 +176,12 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
   const [newAssetCost, setNewAssetCost] = useState<number>(1500000);
   const [newAssetDesc, setNewAssetDesc] = useState<string>('');
 
+  // Estados para compras y pagos de Tarjeta de Crédito Corporativa
+  const [cardChargeAmount, setCardChargeAmount] = useState<number>(5000);
+  const [cardChargeConcept, setCardChargeConcept] = useState<string>('Compra de Insumos y Mercadería');
+  const [cardPaymentAmount, setCardPaymentAmount] = useState<number>(0);
+  const [cardPaymentSource, setCardPaymentSource] = useState<'checking' | 'cash'>('checking');
+
   // Asesor Bancario
   const [advisorTopic, setAdvisorTopic] = useState<BankAdvisorTopic>('negociar_tasa');
   const [advisorTargetRate, setAdvisorTargetRate] = useState<number>(9.5);
@@ -689,10 +695,10 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                       label="Monto de Financiamiento Solicitado (HNL):"
                       value={loanAmount}
                       onChange={setLoanAmount}
-                      maxAllowed={capacity.maxBorrowingCapacity}
+                      maxAllowed={Math.max(capacity.maxBorrowingCapacity, liveDisclosure.collateralBackedMaxHNL, 150000000)}
                       minAllowed={50000}
                       operationType="prestamo"
-                      helpText={`Capacidad máxima aprobable según score crediticio: ${formatHNLAmount(capacity.maxBorrowingCapacity)}.`}
+                      helpText={`Capacidad de financiamiento contable con respaldo de garantías al 80%: hasta ${formatHNLAmount(Math.max(capacity.maxBorrowingCapacity, liveDisclosure.collateralBackedMaxHNL, 150000000))}.`}
                     />
                   </div>
 
@@ -911,17 +917,186 @@ export const CommercialBanksWindow: React.FC<CommercialBanksWindowProps> = ({
                   </div>
                 </div>
 
-                {/* Pagos de Tarjeta */}
-                {corporateCard.currentBalance > 0 && (
-                  <div className="border-t pt-2 flex justify-end gap-2">
-                    <button
-                      onClick={() => onPayCard(selectedBankId, corporateCard.currentBalance)}
-                      className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border border-emerald-900 cursor-pointer shadow-sm active:scale-95"
-                    >
-                      Pagar Saldo Total de Tarjeta ({formatHNLAmount(corporateCard.currentBalance)})
-                    </button>
+                {/* 1. SECCIÓN DE CONSUMOS / GASTOS CON TARJETA */}
+                {(() => {
+                  const availableCredit = corporateCard.availableCredit ?? Math.max(0, corporateCard.creditLimit - corporateCard.currentBalance);
+                  return (
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <h5 className="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
+                          <span>💳</span> Realizar Gastos / Consumos con Tarjeta (Crédito Revolvente)
+                        </h5>
+                        <span className="text-[11px] font-mono font-bold text-emerald-800">
+                          Disponible para gastar: {formatHNLAmount(availableCredit)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Concepto del Gasto / Compra:</label>
+                          <select
+                            value={cardChargeConcept}
+                            onChange={(e) => setCardChargeConcept(e.target.value)}
+                            className="w-full p-1.5 border border-slate-400 bg-white text-xs font-semibold"
+                          >
+                            <option value="Compra de Insumos y Mercadería">Compra de Insumos y Mercadería</option>
+                            <option value="Combustible y Mantenimiento de Flota">Combustible y Mantenimiento de Flota</option>
+                            <option value="Equipamiento de Obra y Maquinaria">Equipamiento de Obra y Maquinaria</option>
+                            <option value="Servicios Operativos y Telecomunicaciones">Servicios Operativos y Telecomunicaciones</option>
+                            <option value="Viáticos y Representación Comercial">Viáticos y Representación Comercial</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Monto a Cargar (HNL):</label>
+                          <input
+                            type="number"
+                            min={100}
+                            max={availableCredit}
+                            step={500}
+                            value={cardChargeAmount}
+                            onChange={(e) => setCardChargeAmount(Math.max(0, Math.min(availableCredit, Number(e.target.value))))}
+                            className="w-full p-1.5 border border-slate-400 font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botones de montos rápidos */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                        <span className="text-slate-500 font-bold">Carga rápida:</span>
+                        {[2000, 5000, 15000, 50000].map((quick) => (
+                          quick <= availableCredit && (
+                            <button
+                              key={quick}
+                              type="button"
+                              onClick={() => { sound.playClick(); setCardChargeAmount(quick); }}
+                              className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-800 cursor-pointer"
+                            >
+                              +{formatHNLAmount(quick)}
+                            </button>
+                          )
+                        ))}
+                        {availableCredit > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { sound.playClick(); setCardChargeAmount(availableCredit); }}
+                            className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded text-blue-900 font-bold cursor-pointer"
+                          >
+                            Todo Disponible
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={availableCredit <= 0 || cardChargeAmount <= 0 || cardChargeAmount > availableCredit}
+                        onClick={() => {
+                          if (onChargeCard) {
+                            sound.playCashChime();
+                            onChargeCard(selectedBankId, cardChargeAmount, cardChargeConcept);
+                          }
+                        }}
+                        className="w-full py-2 bg-blue-900 hover:bg-blue-800 disabled:bg-slate-300 text-white font-bold text-xs border border-blue-950 shadow-sm cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <span>💳</span>
+                        <span>
+                          {availableCredit <= 0 
+                            ? 'Límite Agotado - Efectúa un pago para liberar saldo' 
+                            : `Procesar Compra con Tarjeta (${formatHNLAmount(cardChargeAmount)})`}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. SECCIÓN DE PAGOS Y LIBERACIÓN DE CUPO REVOLVENTE */}
+                <div className="border-t pt-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h5 className="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
+                      <span>💵</span> Pagar y Restituir Cupo de Tarjeta de Crédito
+                    </h5>
+                    <span className="text-[11px] font-mono font-bold text-rose-800">
+                      Deuda actual: {formatHNLAmount(corporateCard.currentBalance)}
+                    </span>
                   </div>
-                )}
+
+                  {corporateCard.currentBalance <= 0 ? (
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                      <span>✅</span>
+                      <span>Tu tarjeta corporativa se encuentra al día con saldo L 0.00 pendiente. ¡Cupo 100% disponible!</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 bg-slate-50 p-2.5 border border-slate-300">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Origen de Fondos para el Pago:</label>
+                          <select
+                            value={cardPaymentSource}
+                            onChange={(e) => setCardPaymentSource(e.target.value as 'checking' | 'cash')}
+                            className="w-full p-1.5 border border-slate-400 bg-white text-xs font-semibold"
+                          >
+                            <option value="checking">Cuenta Bancaria ({formatHNLAmount(state.storeBankBalance)})</option>
+                            <option value="cash">Caja Chica en Efectivo ({formatHNLAmount(state.storeCash)})</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Monto a Abonar (HNL):</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={corporateCard.currentBalance}
+                            step={100}
+                            value={cardPaymentAmount > 0 ? cardPaymentAmount : corporateCard.currentBalance}
+                            onChange={(e) => setCardPaymentAmount(Math.max(0, Math.min(corporateCard.currentBalance, Number(e.target.value))))}
+                            className="w-full p-1.5 border border-slate-400 font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botones de pago rápido */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sound.playClick();
+                            setCardPaymentAmount(corporateCard.currentBalance);
+                          }}
+                          className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-950 font-bold text-[11px] rounded cursor-pointer"
+                        >
+                          Pago Total: {formatHNLAmount(corporateCard.currentBalance)}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sound.playClick();
+                            setCardPaymentAmount(corporateCard.minPaymentMonthly || Math.round(corporateCard.currentBalance * 0.05));
+                          }}
+                          className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-bold text-[11px] rounded cursor-pointer"
+                        >
+                          Pago Mínimo: {formatHNLAmount(corporateCard.minPaymentMonthly || Math.round(corporateCard.currentBalance * 0.05))}
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const toPay = cardPaymentAmount > 0 ? cardPaymentAmount : corporateCard.currentBalance;
+                          sound.playApprovalStamp();
+                          onPayCard(selectedBankId, toPay);
+                          setCardPaymentAmount(0);
+                        }}
+                        className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs border border-emerald-950 shadow-sm cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <span>💵</span>
+                        <span>
+                          Efectuar Pago a Tarjeta ({formatHNLAmount(cardPaymentAmount > 0 ? cardPaymentAmount : corporateCard.currentBalance)})
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="bg-white border-2 border-[#808080] p-4 text-center space-y-3 shadow-inner">

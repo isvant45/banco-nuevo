@@ -665,6 +665,7 @@ export interface RealEstateCollateralItem {
   appraisalDate: string;
   ltvAcceptedPct: number; // Porcentaje aceptado de cobertura (ej: 75% u 80%)
   ltvPercentage?: number;
+  ltvPct?: number;
   eligibleCollateralValueHNL: number; // Avalúo * % LTV
   eligibleValue?: number;
   committedCoverage?: number;
