@@ -3348,10 +3348,12 @@ export function requestFullCommercialCredit(
     destinationAccountNumber: isCashDestination ? 'Caja Chica en Efectivo' : `${targetBank.name} - ${targetCheckingAccNum}`,
     grossAmountHNL: disclosure.approvedAmountHNL,
     amount: disclosure.approvedAmountHNL,
+    approvedAmountHNL: disclosure.approvedAmountHNL,
     deductionsHNL: disclosure.openingFeeHNL,
     openingFeeDeduction: disclosure.openingFeeHNL,
     netDisbursedOrPaidHNL: netCashReceived,
     netDisbursement: netCashReceived,
+    netDisbursementHNL: netCashReceived,
     deductionsBreakdown: [
       { concept: `Comisión Bancaria de Apertura (${disclosure.openingFeePct}%)`, amountHNL: disclosure.openingFeeHNL }
     ],
@@ -3367,7 +3369,7 @@ export function requestFullCommercialCredit(
 
   // Correo institucional al buzón de la empresa
   const disbursementEmail: SimulatedEmail = {
-    id: `email-disb-${Date.now()}`,
+    id: `email-desemb-${Date.now()}`,
     voucherId: voucher.id,
     category: 'bancos_financiamiento',
     senderName: `${bank.name} - Gerencia de Créditos`,
@@ -3426,8 +3428,10 @@ export function requestFullCommercialCredit(
     commercialBanks: updatedBanks,
     realEstateCollaterals: updatedCollaterals,
     dynamicBankOffers: updatedOffers,
+    disbursementVouchers: [voucher, ...(state.disbursementVouchers || [])],
     transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
-    simulatedEmails: [disbursementEmail, ...updatedSimulatedEmails]
+    simulatedEmails: [disbursementEmail, ...updatedSimulatedEmails],
+    inGameEmails: [disbursementEmail, ...(state.inGameEmails || updatedSimulatedEmails)]
   };
 
   const newScore = calculateCompanyCreditScore(nextState);
@@ -4374,10 +4378,14 @@ export function createDefaultRealEstateCollaterals(
     appraisalValue: item.appraisalValueHNL,
     ltvPercentage: item.ltvAcceptedPct,
     eligibleValue: item.eligibleCollateralValueHNL,
+    eligibleValueHNL: item.eligibleCollateralValueHNL,
+    remainingCoverageHNL: item.availableCoverageHNL,
     committedCoverage: item.pledgedAmountTotal,
+    committedCoverageHNL: item.pledgedAmountTotal,
     availableCoverage: item.availableCoverageHNL,
     acquisitionValue: item.acquisitionValueHNL,
-    marketValue: item.marketValueHNL
+    marketValue: item.marketValueHNL,
+    liensHistory: []
   }));
 }
 
@@ -4424,9 +4432,12 @@ export function pledgeRealEstateCollateralToLoan(
   const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
     ...c,
     liens: updatedLiens,
+    liensHistory: updatedLiens.map((l, idx) => ({ ...l, priorityOrder: l.priorityRank || (idx + 1) })),
     pledgedAmountTotal: newPledgedTotal,
+    committedCoverageHNL: newPledgedTotal,
     availableCoverageHNL: newAvailable,
-    status: newAvailable <= 0 ? 'pignorado_total' as const : 'pignorado_parcial' as const,
+    remainingCoverageHNL: newAvailable,
+    status: 'comprometida' as const,
     isPledged: true,
     isLockedForSale: true,
     pledgedToBankId: bankId,
@@ -4474,9 +4485,12 @@ export function releaseRealEstateCollateral(
   const updatedCollaterals = collaterals.map(c => c.id === collateralId ? {
     ...c,
     liens: [],
+    liensHistory: [],
     pledgedAmountTotal: 0,
+    committedCoverageHNL: 0,
     availableCoverageHNL: c.eligibleCollateralValueHNL,
-    status: 'disponible' as const,
+    remainingCoverageHNL: c.eligibleCollateralValueHNL,
+    status: 'liberada' as const,
     isPledged: false,
     isLockedForSale: false,
     pledgedToBankId: undefined,
@@ -4578,8 +4592,10 @@ export function requestNewAppraisal(
     appraisalDate: timestampStr,
     eligibleCollateralValueHNL: newEligible,
     eligibleValue: newEligible,
+    eligibleValueHNL: newEligible,
     availableCoverageHNL: newAvailable,
     availableCoverage: newAvailable,
+    remainingCoverageHNL: newAvailable,
     situationNotes: `Avalúo actualizado (${timestampStr}) por perito colegiado. Plusvalía estimada: +${plusvaliaPct}%.`
   } : c);
 
@@ -4962,7 +4978,9 @@ export function executeFlexibleLoanPayment(
     success: true,
     voucher,
     distributionBreakdown: voucher.distributionBreakdown,
-    message: `¡PAGO APLICADO! Se pagaron L ${targetPaymentAmount.toLocaleString()} a ${bank.name}. Distribución: Mora L ${appliedLateFees.toLocaleString()}, Interés L ${appliedInterest.toLocaleString()}, Capital L ${appliedPrincipal.toLocaleString()}. Nuevo saldo deudor: L ${newLoanBalance.toLocaleString()}. Comprobante No. ${voucherNum}.`
+    message: (newLoanBalance <= 0 || isCancellation)
+      ? `¡LIQUIDACIÓN TOTAL! El préstamo ha quedado cancelado en su totalidad en ${bank.name}. Comprobante No. ${voucherNum}.`
+      : `¡PAGO APLICADO! Se pagaron L ${targetPaymentAmount.toLocaleString()} a ${bank.name}. Distribución: Mora L ${appliedLateFees.toLocaleString()}, Interés L ${appliedInterest.toLocaleString()}, Capital L ${appliedPrincipal.toLocaleString()}. Nuevo saldo deudor: L ${newLoanBalance.toLocaleString()}. Comprobante No. ${voucherNum}.`
   };
 }
 
@@ -5084,6 +5102,7 @@ export function transferBetweenAccounts(
     updatedState: {
       ...state,
       commercialBanks: updatedBanks,
+      interbankTransfers: [voucher, ...(state.interbankTransfers || [])],
       transactionVouchers: [voucher, ...(state.transactionVouchers || [])],
       simulatedEmails: [emailNotice, ...(state.simulatedEmails || [])]
     },
@@ -5583,7 +5602,9 @@ export function createInitialSimulatedEmails(
       folder: 'inbox',
       relatedEntityType: 'bank_offer',
       relatedEntityId: initialPreApprovedOffer.id,
-      bankOfferPayload: initialPreApprovedOffer
+      bankOfferPayload: initialPreApprovedOffer,
+      loanOfferData: initialPreApprovedOffer,
+      actions: ['Ver Condiciones', 'Negociar', 'Aceptar Desembolso']
     },
     {
       id: 'email-init-sar-solvencia',
@@ -5665,5 +5686,29 @@ export function createInitialSimulatedEmails(
     }
   ];
 }
+
+export const requestCollateralAppraisal = requestNewAppraisal;
+export const executeInterbankTransfer = transferBetweenAccounts;
+
+export function executeLoanRepayment(
+  state: DailySimulationState,
+  bankId: CommercialBankId,
+  amount: number,
+  paymentType: 'cuota_mensual' | 'varias_cuotas' | 'pago_parcial' | 'abono_capital' | 'cancelacion_total' | 'cancelar_prestamo' | 'una_cuota' = 'cuota_mensual',
+  repaymentOption: 'reducir_cuota' | 'reducir_plazo' = 'reducir_plazo',
+  sourceAccount: 'checking' | 'cash' = 'checking'
+) {
+  return executeFlexibleLoanPayment(state, bankId, paymentType, amount, sourceAccount, repaymentOption);
+}
+
+export function generateInitialInGameEmails(
+  sector: RetailSectorId = 'constructora',
+  companyName: string = 'Empresa Mercantil S.A.',
+  ownerName?: string
+): SimulatedEmail[] {
+  return createInitialSimulatedEmails(companyName, sector);
+}
+
+
 
 

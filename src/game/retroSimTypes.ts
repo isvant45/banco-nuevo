@@ -4,6 +4,24 @@
 
 import { IErpCorporateState } from './erpCorporateTypes';
 import { IMacroEconomyState, ISmartLoanContract } from './macroEconomyTypes';
+import {
+  MarketIntelligenceState,
+  PoliticalLobbyState,
+  CSuiteExecutive,
+  HostileMnaCompetitor,
+  PublicRelationsState,
+  BusinessAutomationRule,
+  DeepWebState,
+  BlackSwanEvent,
+  CeoPersonalLifeState,
+  PatentPortfolioState,
+  UnionLaborState,
+  TreasuryTradingState,
+  EnvironmentalAgencyState,
+  AureoAmpState
+} from './tycoonAdvancedTypes';
+
+export * from './tycoonAdvancedTypes';
 
 export type RetailSectorId = 'minimarket' | 'bar_restaurante' | 'constructora' | 'supermercado' | 'autolote';
 
@@ -528,6 +546,11 @@ export interface SarTaxAuditRecord {
   historicalAuditCount?: number;
   complianceScore?: number;
   fiscalSolvenciaActive?: boolean;
+  paidAmountHNL?: number;
+  taxHistory?: any[];
+  isDeclarationFiled?: boolean;
+  remainingTaxDueHNL?: number;
+  solvenciaBlockers?: string[];
 }
 
 export interface DailySimulationState {
@@ -635,9 +658,13 @@ export interface DailySimulationState {
   // Ofertas Bancarias Dinámicas & Comprobantes Oficiales
   dynamicBankOffers?: DynamicBankOffer[];
   transactionVouchers?: TransactionVoucher[];
+  disbursementVouchers?: TransactionVoucher[];
+  interbankTransfers?: TransactionVoucher[];
 
   // Correo Empresarial Simulado Dentro del Juego
   simulatedEmails?: SimulatedEmail[];
+  inGameEmails?: SimulatedEmail[];
+  corporateEmailAccounts?: any[];
 
   // Garantías Reales Registradas (Casas, Terrenos, Locales, Maquinaria, etc.)
   realEstateCollaterals?: RealEstateCollateralItem[];
@@ -704,6 +731,22 @@ export interface DailySimulationState {
   personalWealthHNL?: number;
   consecutiveProfitableMonths?: number;
   victoryAchieved?: TycoonVictoryType;
+
+  // 14 Sistemas Tycoon Avanzados
+  marketIntelligence?: MarketIntelligenceState;
+  politicalLobby?: PoliticalLobbyState;
+  cSuiteExecutives?: CSuiteExecutive[];
+  hostileMnaTargets?: HostileMnaCompetitor[];
+  publicRelations?: PublicRelationsState;
+  automationRules?: BusinessAutomationRule[];
+  deepWeb?: DeepWebState;
+  activeBlackSwan?: BlackSwanEvent | null;
+  ceoPersonalLife?: CeoPersonalLifeState;
+  patentPortfolio?: PatentPortfolioState;
+  unionLabor?: UnionLaborState;
+  treasuryTrading?: TreasuryTradingState;
+  environmentalAgency?: EnvironmentalAgencyState;
+  aureoAmp?: AureoAmpState;
 }
 
 export type WarehouseTier = 'garaje' | 'bodega' | 'fabrica' | 'mega_fabrica';
@@ -723,7 +766,7 @@ export type CollateralAssetType =
   | 'deposito_plazo' 
   | 'cuentas_por_cobrar';
 
-export type CollateralStatus = 'disponible' | 'pignorado_parcial' | 'pignorado_total' | 'libre_gravamen';
+export type CollateralStatus = 'disponible' | 'comprometida' | 'pignorado_parcial' | 'pignorado_total' | 'libre_gravamen' | 'liberada';
 
 export interface CollateralLien {
   id: string;
@@ -758,9 +801,13 @@ export interface RealEstateCollateralItem {
   ltvPct?: number;
   eligibleCollateralValueHNL: number; // Avalúo * % LTV
   eligibleValue?: number;
+  eligibleValueHNL?: number;
+  remainingCoverageHNL?: number;
   committedCoverage?: number;
+  committedCoverageHNL?: number;
   availableCoverage?: number;
   liens: CollateralLien[];
+  liensHistory?: any[];
   pledgedAmountTotal?: number;
   availableCoverageHNL?: number;
   isPledged?: boolean;
@@ -775,6 +822,16 @@ export interface RealEstateCollateralItem {
   appraisalDateDay?: number;
   appraisalDateMonth?: number;
   appraisalDateYear?: number;
+  acquisitionCostHNL?: number;
+  simulatedDeedDocument?: {
+    deedNumber?: string;
+    notaryPublic?: string;
+    registrationOffice?: string;
+    registrationBook?: string;
+    folioNumber?: string;
+    notaryName?: string;
+    deedDate?: string;
+  };
 }
 
 export type VoucherOperationType = 
@@ -806,10 +863,12 @@ export interface TransactionVoucher {
   destinationAccountNumber?: string;
   grossAmountHNL: number;
   amount?: number;
+  approvedAmountHNL?: number;
   deductionsHNL: number;
   openingFeeDeduction?: number;
   netDisbursedOrPaidHNL: number;
   netDisbursement?: number;
+  netDisbursementHNL?: number;
   deductionsBreakdown?: {
     concept: string;
     amountHNL: number;
@@ -842,7 +901,9 @@ export type EmailCategory =
   | 'garantias'
   | 'proyectos'
   | 'competidores_adquisiciones'
-  | 'sistema_avisos';
+  | 'competidores_mna'
+  | 'sistema_avisos'
+  | 'avisos_sistema';
 
 export interface DynamicBankOffer {
   id: string;
@@ -909,10 +970,13 @@ export interface SimulatedEmail {
   senderEmail: string;
   recipientEmail?: string;
   recipient?: string; // Alias de destinatario
+  recipientName?: string;
   companyName?: string;
   subject: string;
   body: string;
   sentDate?: string;
+  simulatedDate?: string;
+  isSent?: boolean;
   simDay?: number;
   simMonth?: number;
   simYear?: number;
@@ -939,6 +1003,8 @@ export interface SimulatedEmail {
     principalHNL?: number;
   };
   voucherPayload?: TransactionVoucher;
+  loanOfferData?: any;
+  actions?: (string | { label: string; actionType: string; targetWindowId?: string; payload?: any })[] | any;
   actionRequired?: boolean;
   accionEjecutada?: boolean;
   accionResultado?: string;
@@ -946,6 +1012,9 @@ export interface SimulatedEmail {
   statusTag?: 'Pendiente' | 'Resuelto' | 'Pre-Aprobado' | 'Vencido' | string;
   isReplied?: boolean;
 }
+
+export type InGameEmail = SimulatedEmail;
+export type InGameEmailCategory = EmailCategory;
 
 export interface SarFiscalPeriodRecord {
   fiscalYear: number;

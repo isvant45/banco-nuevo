@@ -118,6 +118,17 @@ import { processMonthlyCSuitePayroll, processUifTurnAudit } from '../../game/cSu
 import { applySharkDailyRetention } from '../../game/npcBankingEngine';
 import { TycoonProgressionHubWindow } from './TycoonProgressionHubWindow';
 import { updatePricingMarkup, updateMarketingSpend, resolveStrikeWithBonus } from '../../game/retailBusinessEngine';
+import { MarketIntelligenceWindow } from './MarketIntelligenceWindow';
+import { PoliticalLobbyWindow } from './PoliticalLobbyWindow';
+import { CSuiteManagerWindow } from './CSuiteManagerWindow';
+import { HostileTakeoverWindow } from './HostileTakeoverWindow';
+import { TwitHNWindow } from './TwitHNWindow';
+import { AutomationMacrosWindow } from './AutomationMacrosWindow';
+import { DeepWebTerminalWindow } from './DeepWebTerminalWindow';
+import { CeoPersonalLifeWindow } from './CeoPersonalLifeWindow';
+import { TradingTerminalWindow } from './TradingTerminalWindow';
+import { AureoAmpWindow } from './AureoAmpWindow';
+import { processDailyTycoonAdvancedStep } from '../../game/tycoonAdvancedEngine';
 
 interface RetroDesktopProps {
   initialRole: RetroRoleMode;
@@ -1300,6 +1311,19 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
       };
     }
 
+    // Procesar los 14 sistemas Tycoon avanzados (macros, niebla, cisnes negros, trading, C-Suite, etc.)
+    const tycoonRes = processDailyTycoonAdvancedStep(nextState);
+    nextState = tycoonRes.updatedState;
+    if (tycoonRes.events.length > 0) {
+      tycoonRes.events.forEach(msg => {
+        addToast({
+          title: 'Sistema Tycoon',
+          message: msg,
+          type: msg.includes('🚨') || msg.includes('CATASTRÓFICO') ? 'danger' : msg.includes('⚠️') ? 'warning' : 'info'
+        });
+      });
+    }
+
     setSimState(nextState);
     setIsDailyClosingModalOpen(true);
   };
@@ -1339,6 +1363,10 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     if (nextState.currentMonth !== simState.currentMonth || daysCount >= 30) {
       nextState = advanceMacroEconomyMonth(nextState);
     }
+
+    // Procesar los 14 sistemas Tycoon avanzados
+    const tycoonDaysRes = processDailyTycoonAdvancedStep(nextState);
+    nextState = tycoonDaysRes.updatedState;
 
     setSimState(nextState);
     setIsDailyClosingModalOpen(true);
@@ -1519,7 +1547,17 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
     { id: 'banco_central', title: 'Banco Central & Macroeconomía', icon: '🏛️', isOpen: !!openWindows.banco_central?.isOpen, isMinimized: !!openWindows.banco_central?.isMinimized },
     { id: 'equity_market', title: 'Mercado de Acciones & Valuación (BVM)', icon: '📈', isOpen: !!openWindows.equity_market?.isOpen, isMinimized: !!openWindows.equity_market?.isMinimized },
     { id: 'csuite_staff', title: 'Dirección C-Suite & RRHH', icon: '👔', isOpen: !!openWindows.csuite_staff?.isOpen, isMinimized: !!openWindows.csuite_staff?.isMinimized },
-    { id: 'tycoon_hub', title: 'Expansión & I+D Corporativo', icon: '🚀', isOpen: !!openWindows.tycoon_hub?.isOpen, isMinimized: !!openWindows.tycoon_hub?.isMinimized }
+    { id: 'tycoon_hub', title: 'Expansión & I+D Corporativo', icon: '🚀', isOpen: !!openWindows.tycoon_hub?.isOpen, isMinimized: !!openWindows.tycoon_hub?.isMinimized },
+    { id: 'market_intel', title: 'Inteligencia de Mercado (Big Data)', icon: '📡', isOpen: !!openWindows.market_intel?.isOpen, isMinimized: !!openWindows.market_intel?.isMinimized },
+    { id: 'political_lobby', title: 'Relaciones Gubernamentales & Lobby', icon: '🏛️', isOpen: !!openWindows.political_lobby?.isOpen, isMinimized: !!openWindows.political_lobby?.isMinimized },
+    { id: 'csuite_rpg', title: 'Dirección C-Suite RPG & Talentos', icon: '👔', isOpen: !!openWindows.csuite_rpg?.isOpen, isMinimized: !!openWindows.csuite_rpg?.isMinimized },
+    { id: 'hostile_mna', title: 'Tomas Hostiles & M&A', icon: '⚔️', isOpen: !!openWindows.hostile_mna?.isOpen, isMinimized: !!openWindows.hostile_mna?.isMinimized },
+    { id: 'twithn_social', title: 'TwitHN (Red Social & ESG)', icon: '🐦', isOpen: !!openWindows.twithn_social?.isOpen, isMinimized: !!openWindows.twithn_social?.isMinimized },
+    { id: 'auto_macros', title: 'Programador de Macros ERP', icon: '⚙️', isOpen: !!openWindows.auto_macros?.isOpen, isMinimized: !!openWindows.auto_macros?.isMinimized },
+    { id: 'deep_web', title: 'Terminal Cifrado Tor (Black Ops)', icon: '🕶️', isOpen: !!openWindows.deep_web?.isOpen, isMinimized: !!openWindows.deep_web?.isMinimized },
+    { id: 'ceo_private', title: 'Vida Privada del CEO & Fortuna', icon: '🍸', isOpen: !!openWindows.ceo_private?.isOpen, isMinimized: !!openWindows.ceo_private?.isMinimized },
+    { id: 'trading_terminal', title: 'Terminal de Trading de Tesorería', icon: '📊', isOpen: !!openWindows.trading_terminal?.isOpen, isMinimized: !!openWindows.trading_terminal?.isMinimized },
+    { id: 'aureo_amp', title: 'ÁureoAmp 2000 Pro', icon: '⚡', isOpen: !!openWindows.aureo_amp?.isOpen, isMinimized: !!openWindows.aureo_amp?.isMinimized }
   ];
 
   return (
@@ -2155,6 +2193,166 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
           </div>
           <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
             Expansión & I+D
+          </span>
+        </button>
+
+        {/* 1. Big Data & Niebla de Guerra */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('market_intel');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📡
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Big Data Intel
+          </span>
+        </button>
+
+        {/* 2. Lobby Político & Aranceles */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('political_lobby');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🏛️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Lobby Político
+          </span>
+        </button>
+
+        {/* 3. C-Suite RPG & Talentos */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('csuite_rpg');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🧠
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            C-Suite RPG
+          </span>
+        </button>
+
+        {/* 4. Tomas Hostiles & M&A */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('hostile_mna');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            ⚔️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Tomas Hostiles
+          </span>
+        </button>
+
+        {/* 5. TwitHN & Relaciones Públicas */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('twithn_social');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🐦
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            TwitHN Social
+          </span>
+        </button>
+
+        {/* 6. Automatización Macros ERP */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('auto_macros');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            ⚙️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Macros ERP
+          </span>
+        </button>
+
+        {/* 7. Deep Web Tor Console */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('deep_web');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🕶️
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Deep Web Tor
+          </span>
+        </button>
+
+        {/* 8. Vida Privada del CEO & Fortuna */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('ceo_private');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            🍸
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Vida del CEO
+          </span>
+        </button>
+
+        {/* 9. Trading Terminal Commodities */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('trading_terminal');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            📊
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            Trading Terminal
+          </span>
+        </button>
+
+        {/* 10. ÁureoAmp 2000 Pro */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            bringToFront('aureo_amp');
+          }}
+          className="w-20 flex flex-col items-center text-center group cursor-pointer focus:outline-none"
+        >
+          <div className="w-11 h-11 bg-white/20 border border-white/40 flex items-center justify-center text-2xl shadow group-hover:bg-white/40 mb-1">
+            ⚡
+          </div>
+          <span className="text-white text-[11px] font-semibold leading-tight drop-shadow px-1 group-focus:bg-[#000080]">
+            ÁureoAmp
           </span>
         </button>
 
@@ -2938,7 +3136,233 @@ export const RetroDesktop: React.FC<RetroDesktopProps> = ({
         />
       </RetroWindow>
 
-      {/* Modal de Comprobante Oficial de Transacción Bancaria */}
+      {/* 1. Mercado de Información & Big Data (Niebla de Guerra) */}
+      <RetroWindow
+        id="market_intel"
+        title="Mercado de Información & Big Data (Niebla de Guerra)"
+        icon="📡"
+        initialX={90}
+        initialY={40}
+        isOpen={!!openWindows.market_intel?.isOpen}
+        isMinimized={!!openWindows.market_intel?.isMinimized}
+        isMaximized={!!openWindows.market_intel?.isMaximized}
+        zIndex={openWindows.market_intel?.zIndex || 5}
+        onFocus={() => bringToFront('market_intel')}
+        onClose={() => handleCloseWindow('market_intel')}
+        onMinimize={() => handleMinimizeWindow('market_intel')}
+        onMaximize={() => handleMaximizeWindow('market_intel')}
+      >
+        <MarketIntelligenceWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('market_intel')}
+        />
+      </RetroWindow>
+
+      {/* 2. Relaciones Gubernamentales & Lobby Político */}
+      <RetroWindow
+        id="political_lobby"
+        title="Relaciones Gubernamentales & Lobby Político"
+        icon="🏛️"
+        initialX={95}
+        initialY={45}
+        isOpen={!!openWindows.political_lobby?.isOpen}
+        isMinimized={!!openWindows.political_lobby?.isMinimized}
+        isMaximized={!!openWindows.political_lobby?.isMaximized}
+        zIndex={openWindows.political_lobby?.zIndex || 5}
+        onFocus={() => bringToFront('political_lobby')}
+        onClose={() => handleCloseWindow('political_lobby')}
+        onMinimize={() => handleMinimizeWindow('political_lobby')}
+        onMaximize={() => handleMaximizeWindow('political_lobby')}
+      >
+        <PoliticalLobbyWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('political_lobby')}
+        />
+      </RetroWindow>
+
+      {/* 3. Gabinete C-Suite RPG */}
+      <RetroWindow
+        id="csuite_rpg"
+        title="Gabinete C-Suite: Retención, Ego & Lealtad"
+        icon="👔"
+        initialX={100}
+        initialY={50}
+        isOpen={!!openWindows.csuite_rpg?.isOpen}
+        isMinimized={!!openWindows.csuite_rpg?.isMinimized}
+        isMaximized={!!openWindows.csuite_rpg?.isMaximized}
+        zIndex={openWindows.csuite_rpg?.zIndex || 5}
+        onFocus={() => bringToFront('csuite_rpg')}
+        onClose={() => handleCloseWindow('csuite_rpg')}
+        onMinimize={() => handleMinimizeWindow('csuite_rpg')}
+        onMaximize={() => handleMaximizeWindow('csuite_rpg')}
+      >
+        <CSuiteManagerWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('csuite_rpg')}
+        />
+      </RetroWindow>
+
+      {/* 4. Tomas Hostiles & M&A */}
+      <RetroWindow
+        id="hostile_mna"
+        title="Tomas Hostiles, Absorción & Fusiones M&A"
+        icon="⚔️"
+        initialX={105}
+        initialY={55}
+        isOpen={!!openWindows.hostile_mna?.isOpen}
+        isMinimized={!!openWindows.hostile_mna?.isMinimized}
+        isMaximized={!!openWindows.hostile_mna?.isMaximized}
+        zIndex={openWindows.hostile_mna?.zIndex || 5}
+        onFocus={() => bringToFront('hostile_mna')}
+        onClose={() => handleCloseWindow('hostile_mna')}
+        onMinimize={() => handleMinimizeWindow('hostile_mna')}
+        onMaximize={() => handleMaximizeWindow('hostile_mna')}
+      >
+        <HostileTakeoverWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('hostile_mna')}
+        />
+      </RetroWindow>
+
+      {/* 5. TwitHN (Red Social & ESG) */}
+      <RetroWindow
+        id="twithn_social"
+        title="TwitHN – Red Social, ESG & Reputación Pública"
+        icon="🐦"
+        initialX={110}
+        initialY={60}
+        isOpen={!!openWindows.twithn_social?.isOpen}
+        isMinimized={!!openWindows.twithn_social?.isMinimized}
+        isMaximized={!!openWindows.twithn_social?.isMaximized}
+        zIndex={openWindows.twithn_social?.zIndex || 5}
+        onFocus={() => bringToFront('twithn_social')}
+        onClose={() => handleCloseWindow('twithn_social')}
+        onMinimize={() => handleMinimizeWindow('twithn_social')}
+        onMaximize={() => handleMaximizeWindow('twithn_social')}
+      >
+        <TwitHNWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('twithn_social')}
+        />
+      </RetroWindow>
+
+      {/* 6. Automatización Macros ERP */}
+      <RetroWindow
+        id="auto_macros"
+        title="Motor de Automatización de Procesos (Macros ERP)"
+        icon="⚙️"
+        initialX={115}
+        initialY={65}
+        isOpen={!!openWindows.auto_macros?.isOpen}
+        isMinimized={!!openWindows.auto_macros?.isMinimized}
+        isMaximized={!!openWindows.auto_macros?.isMaximized}
+        zIndex={openWindows.auto_macros?.zIndex || 5}
+        onFocus={() => bringToFront('auto_macros')}
+        onClose={() => handleCloseWindow('auto_macros')}
+        onMinimize={() => handleMinimizeWindow('auto_macros')}
+        onMaximize={() => handleMaximizeWindow('auto_macros')}
+      >
+        <AutomationMacrosWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('auto_macros')}
+        />
+      </RetroWindow>
+
+      {/* 7. Terminal Tor / Deep Web Corporativa */}
+      <RetroWindow
+        id="deep_web"
+        title="Terminal Tor / Deep Web Corporativa PGP"
+        icon="🕶️"
+        initialX={120}
+        initialY={70}
+        isOpen={!!openWindows.deep_web?.isOpen}
+        isMinimized={!!openWindows.deep_web?.isMinimized}
+        isMaximized={!!openWindows.deep_web?.isMaximized}
+        zIndex={openWindows.deep_web?.zIndex || 5}
+        onFocus={() => bringToFront('deep_web')}
+        onClose={() => handleCloseWindow('deep_web')}
+        onMinimize={() => handleMinimizeWindow('deep_web')}
+        onMaximize={() => handleMaximizeWindow('deep_web')}
+      >
+        <DeepWebTerminalWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('deep_web')}
+        />
+      </RetroWindow>
+
+      {/* 8. Patrimonio Privado & Vida del CEO */}
+      <RetroWindow
+        id="ceo_private"
+        title="Patrimonio Privado & Vida del CEO (Retiro Dividendos 10% SAR)"
+        icon="🍸"
+        initialX={125}
+        initialY={75}
+        isOpen={!!openWindows.ceo_private?.isOpen}
+        isMinimized={!!openWindows.ceo_private?.isMinimized}
+        isMaximized={!!openWindows.ceo_private?.isMaximized}
+        zIndex={openWindows.ceo_private?.zIndex || 5}
+        onFocus={() => bringToFront('ceo_private')}
+        onClose={() => handleCloseWindow('ceo_private')}
+        onMinimize={() => handleMinimizeWindow('ceo_private')}
+        onMaximize={() => handleMaximizeWindow('ceo_private')}
+      >
+        <CeoPersonalLifeWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('ceo_private')}
+        />
+      </RetroWindow>
+
+      {/* 9. Terminal de Especulación de Tesorería */}
+      <RetroWindow
+        id="trading_terminal"
+        title="Terminal de Especulación de Tesorería (Commodities)"
+        icon="📊"
+        initialX={130}
+        initialY={80}
+        isOpen={!!openWindows.trading_terminal?.isOpen}
+        isMinimized={!!openWindows.trading_terminal?.isMinimized}
+        isMaximized={!!openWindows.trading_terminal?.isMaximized}
+        zIndex={openWindows.trading_terminal?.zIndex || 5}
+        onFocus={() => bringToFront('trading_terminal')}
+        onClose={() => handleCloseWindow('trading_terminal')}
+        onMinimize={() => handleMinimizeWindow('trading_terminal')}
+        onMaximize={() => handleMaximizeWindow('trading_terminal')}
+      >
+        <TradingTerminalWindow
+          state={simState}
+          onUpdateState={(nextSt) => setSimState(nextSt)}
+          onClose={() => handleCloseWindow('trading_terminal')}
+        />
+      </RetroWindow>
+
+      {/* 10. ÁureoAmp 2000 Pro */}
+      <RetroWindow
+        id="aureo_amp"
+        title="ÁureoAmp 2000 Pro - Reproductor Multimedia"
+        icon="⚡"
+        initialX={135}
+        initialY={85}
+        isOpen={!!openWindows.aureo_amp?.isOpen}
+        isMinimized={!!openWindows.aureo_amp?.isMinimized}
+        isMaximized={!!openWindows.aureo_amp?.isMaximized}
+        zIndex={openWindows.aureo_amp?.zIndex || 5}
+        onFocus={() => bringToFront('aureo_amp')}
+        onClose={() => handleCloseWindow('aureo_amp')}
+        onMinimize={() => handleMinimizeWindow('aureo_amp')}
+        onMaximize={() => handleMaximizeWindow('aureo_amp')}
+      >
+        <AureoAmpWindow
+          onClose={() => handleCloseWindow('aureo_amp')}
+        />
+      </RetroWindow>
       {activeVoucherModal && (
         <TransactionVoucherModal
           voucher={activeVoucherModal}

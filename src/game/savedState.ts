@@ -7,6 +7,13 @@ import {
   createDefaultBankRelationships 
 } from './commercialBanksEngine';
 import { DEFAULT_INITIAL_SAR_RECORD } from './constructionEngine';
+import {
+  createInitialCSuiteExecutives,
+  createInitialHostileMnaTargets,
+  createInitialPublicRelations,
+  createInitialAutomationRules,
+  DEFAULT_COMMODITY_PORTFOLIO
+} from './tycoonAdvancedEngine';
 
 // Fill newly introduced fields without replacing the player's balances or lists.
 function mergeDefaults(defaults: any, saved: any): any {
@@ -183,5 +190,121 @@ export function restoreDailySimulationState(saved: any): DailySimulationState {
   if (result.personalWealthHNL === undefined) {
     result.personalWealthHNL = 0;
   }
+
+  // Integración robusta de los 14 sistemas Tycoon avanzados
+  if (!result.cSuiteExecutives) {
+    result.cSuiteExecutives = createInitialCSuiteExecutives();
+  }
+  if (!result.marketIntelligence) {
+    result.marketIntelligence = {
+      subscriptionTier: 'none',
+      subscriptionCostMonthly: 0,
+      dataBrokerOptIn: false,
+      accumulatedDataRecords: 1250,
+      dataBreachRiskPct: 5,
+      dataBreachOccurred: false,
+      totalDataSalesRevenueHNL: 0,
+      revealedCompetitorDossiers: {}
+    };
+  }
+  if (!result.politicalLobby) {
+    result.politicalLobby = {
+      campaignDonationsTotalHNL: 0,
+      politicalInfluencePoints: 0,
+      importTariffActive: false,
+      importTariffDaysRemaining: 0,
+      subsidiesGrantedHNL: 0,
+      tooBigToFailWorkforcePct: 8.5,
+      bailoutRequested: false,
+      bailoutReceivedHNL: 0,
+      governmentRelationsScore: 45
+    };
+  }
+  if (!result.hostileMnaTargets) {
+    result.hostileMnaTargets = createInitialHostileMnaTargets();
+  }
+  if (!result.publicRelations) {
+    result.publicRelations = createInitialPublicRelations();
+  }
+  if (!result.automationRules) {
+    result.automationRules = createInitialAutomationRules();
+  }
+  if (!result.deepWeb) {
+    result.deepWeb = {
+      isConsoleUnlocked: false,
+      accessCodeEntered: '',
+      ipTraceRiskPct: 0,
+      policeRaidPending: false,
+      activeContracts: []
+    };
+  }
+  if (!result.ceoPersonalLife) {
+    result.ceoPersonalLife = {
+      personalBankBalanceHNL: 350000,
+      ceoStress: 25,
+      burnoutWarning: false,
+      monthlySalaryDrawHNL: 45000,
+      luxuryAssetsOwned: [],
+      angelInvestorsUnlocked: false,
+      vacationDaysTaken: 0
+    };
+  }
+  if (!result.patentPortfolio) {
+    result.patentPortfolio = {
+      registeredPatents: [
+        {
+          id: 'pat_001',
+          title: 'Algoritmo de Optimización Logística y Despacho Automatizado',
+          registrationType: 'patente_oficial',
+          protectionYearsRemaining: 8,
+          dailyPassiveRoyaltiesHNL: 450,
+          infringementDefended: true
+        }
+      ],
+      activeLawsuits: [],
+      totalRoyaltiesEarnedHNL: 0
+    };
+  }
+  if (!result.unionLabor) {
+    result.unionLabor = {
+      unionizationPct: 35,
+      collectiveBargainingCycleDays: 90,
+      strikeActive: false,
+      strikeDaysRemaining: 0,
+      wageDemandIncreasePct: 15,
+      strikebreakersHired: false,
+      unionDisputeHistory: []
+    };
+  }
+  if (!result.treasuryTrading) {
+    result.treasuryTrading = {
+      tradingAccountCashHNL: 150000,
+      marginDebtHNL: 0,
+      marginLimitHNL: 500000,
+      holdings: DEFAULT_COMMODITY_PORTFOLIO,
+      realizedProfitLossHNL: 0,
+      marginCallActive: false
+    };
+  }
+  if (!result.environmentalAgency) {
+    result.environmentalAgency = {
+      carbonEmissionsTonsMonthly: 42,
+      greenFiltersInstalled: false,
+      carbonTaxPenaltyMonthlyHNL: 0,
+      ministryInspectionPending: false,
+      environmentalCertificationValid: true
+    };
+  }
+  if (!result.aureoAmp) {
+    result.aureoAmp = {
+      isPlaying: false,
+      currentTrackIndex: 0,
+      volumePct: 75,
+      repeat: true,
+      shuffle: false,
+      playbackSec: 0
+    };
+  }
+
   return result;
 }
